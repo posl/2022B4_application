@@ -46,9 +46,3 @@ class Board:
 
     def setbit_stone_black(self, mask):
         self.stone_black ^= mask
-
-
-b = Board()
-b.reset()
-print(f"{b.stone_exist:b}")
-print(f"{b.stone_black:b}")
