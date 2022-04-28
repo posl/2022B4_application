@@ -1,3 +1,4 @@
+import numpy as np
 
 
 class Board:
@@ -20,6 +21,10 @@ class Board:
     @property
     def action_size(self):
         return self.height * self.width
+
+    @property
+    def state(self):
+        return np.array([self.stone_exist, self.stone_black])
 
     def t2n(self, t):
         return self.width * t[0] + t[1]
