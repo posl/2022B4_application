@@ -9,7 +9,6 @@ class StepNumGenerator:
         down = Board.height - 1 - up
 
         self.nums = [up, right, down, left]
-        Board.width = Board.width
 
     # 引数には正負の符号を指定する
     def __gen(self, sign):
@@ -97,9 +96,9 @@ class Board:
 
     # オセロ盤を初期状態にセットするためのメソッド
     def reset(self):
-        shift = self.t2n((Board.height // 2 - 1, Board.width // 2 - 1))
-        self.stone_exist = (0b11 << shift) + (0b11 << (shift + Board.width))
-        self.stone_black = (0b10 << shift) + (0b01 << (shift + Board.width))
+        shift = self.t2n((self.height // 2 - 1, self.width // 2 - 1))
+        self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
+        self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
         self.turn = 1
 
 
