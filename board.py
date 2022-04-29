@@ -3,20 +3,20 @@ import numpy as np
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
 class StepNumGenerator:
-    def __init__(self, startpoint, width, height):
-        up, left = divmod(startpoint, width)
-        right = width - 1 - left
-        down = height - 1 - up
+    def __init__(self, startpoint):
+        up, left = divmod(startpoint, Board.width)
+        right = Board.width - 1 - left
+        down = Board.height - 1 - up
 
         self.nums = [up, right, down, left]
-        self.width = width
+        Board.width = Board.width
 
     # 引数には正負の符号を指定する
     def __gen(self, sign):
         # 水平方向探索用の (step, num)
         yield sign, self.nums[sign]
 
-        step_base = sign * self.width
+        step_base = sign * Board.width
         num_base = self.nums[sign + 1]
 
         for bias in range(-1, 2):
@@ -56,54 +56,62 @@ class ElementNumRange:
 
 
 class Board:
+    height = 8
+    width = 8
+    action_size = height * width
+
+    # インスタンスを生成する前にクラス属性をチェックするようにする
+    def __new__(cls):
+        assert not cls.height % 2
+        assert not cls.width % 2
+        assert cls.action_size <= 64
+
+        return super().__new__(cls)
+
     def __init__(self):
         self.stone_exist = 0
         self.stone_black = 0
         self.turn = 1
 
-        assert not self.height % 2
-        assert not self.width % 2
-        assert self.action_size <= 64
-
-    # property でデコレートすることでメソッドを属性のようにして呼び出すことができるようになる
-    @property
-    def height(self):
-        return 8
-    @property
-    def width(self):
-        return 8
-
-    @property
-    def action_size(self):
-        return self.height * self.width
-
+    # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
     @property
     def state(self):
-        return np.array([self.stone_exist, self.stone_black])
+        box = np.empty(16, dtype = np.float32)
+        stone_exist = self.stone_exist
+        stone_black = self.stone_black
+
+        for i in range(8):
+            box[i] = stone_exist & 0xff
+            box[i + 8] = stone_black & 0xff
+            stone_exist >>= 8
+            stone_black >>= 8
+
+        # 正規化してから出力する
+        return box / 255.
 
 
     # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換するためのメソッド
-    def t2n(self, t):
-        return self.width * t[0] + t[1]
+    @staticmethod
+    def t2n(t):
+        return Board.width * t[0] + t[1]
 
     # オセロ盤を初期状態にセットするためのメソッド
     def reset(self):
-        shift = self.t2n((self.height // 2 - 1, self.width // 2 - 1))
-        self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
-        self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
+        shift = self.t2n((Board.height // 2 - 1, Board.width // 2 - 1))
+        self.stone_exist = (0b11 << shift) + (0b11 << (shift + Board.width))
+        self.stone_black = (0b10 << shift) + (0b01 << (shift + Board.width))
         self.turn = 1
 
 
     # 指定された 64 bit 整数の下から n bit 目の値を取得するためのメソッド
-    def __getbit(self, x, n):
-        x = x >> n
-        return x & 1
+    def __getbit(self, name, n):
+        return (getattr(self, name) >> n) & 1
 
     def getbit_stone_exist(self, n):
-        return self.__getbit(self.stone_exist, n)
+        return self.__getbit("stone_exist", n)
 
     def getbit_stone_black(self, n):
-        return self.__getbit(self.stone_black, n)
+        return self.__getbit("stone_black", n)
 
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新するためのメソッド
@@ -116,7 +124,7 @@ class Board:
 
     # 空きマスに自身の石を置けるかどうかの真偽値を取得するためのメソッド
     def is_placable(self, startpoint):
-        for step, num in StepNumGenerator(startpoint, self.width, self.height).generator:
+        for step, num in StepNumGenerator(startpoint).generator:
             n_gen = ElementNumRange(startpoint, step, num)
             try:
                 n = next(n_gen)
