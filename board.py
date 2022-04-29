@@ -31,11 +31,11 @@ class Board:
         assert not self.width % 2 and self.width < 9
 
     @property
-    def height():
+    def height(self):
         return 8
 
     @property
-    def width():
+    def width(self):
         return 8
 
     @property
