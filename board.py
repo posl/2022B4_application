@@ -33,7 +33,6 @@ class Board:
     @property
     def height(self):
         return 8
-
     @property
     def width(self):
         return 8
@@ -53,7 +52,7 @@ class Board:
     def reset(self):
         shift = self.t2n((self.height // 2 - 1, self.width // 2 - 1))
         self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
-        self.stone_black = (0b01 << shift) + (0b10 << (shift + self.width))
+        self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
         self.turn = 1
 
 
