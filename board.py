@@ -61,8 +61,8 @@ class Board:
 
     # インスタンスを生成する前にクラス属性をチェックするようにする
     def __new__(cls):
-        assert not cls.height % 2
-        assert not cls.width % 2
+        assert not cls.height & 1
+        assert not cls.width & 1
         assert cls.action_size <= 64
 
         return super().__new__(cls)
@@ -96,7 +96,7 @@ class Board:
 
     # オセロ盤を初期状態にセットするためのメソッド
     def reset(self):
-        shift = self.t2n((self.height // 2 - 1, self.width // 2 - 1))
+        shift = self.t2n(((self.height >> 2) - 1, (self.width >> 2) - 1))
         self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
         self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
         self.turn = 1
@@ -112,12 +112,13 @@ class Board:
     def getbit_stone_black(self, n):
         return self.__getbit("stone_black", n)
 
-    # 1が立っているビットの数を取得
+
+    # 1 が立っているビットの数を取得
     def __bits_count(self, x):
-        # 2bitごとの組に分け、立っているビット数を2bitで表現する
+        # 2 bit ごとの組に分け、立っているビット数を 2 bit で表現する
         x = x - ((x >> 1) & 0x5555555555555555)
 
-        # 4bit整数に 上位2bit + 下位2bit を計算した値を入れる
+        # 4 bit 整数に 上位 2 bit + 下位 2 bit を計算した値を入れる
         x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333)
 
         x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f # 8bitごと
@@ -132,7 +133,8 @@ class Board:
 
     @property
     def white_num(self):
-        return self.__bits_count(self.stone_exist) - self.black_num
+        return self.__bits_count(self.stone_exist ^ self.stone_black)
+
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新するためのメソッド
     def setbit_stone_exist(self, n):
