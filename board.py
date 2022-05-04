@@ -96,7 +96,7 @@ class Board:
 
     # オセロ盤を初期状態にセットするためのメソッド
     def reset(self):
-        shift = self.t2n(((self.height >> 2) - 1, (self.width >> 2) - 1))
+        shift = self.t2n(((self.height >> 1) - 1, (self.width >> 1) - 1))
         self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
         self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
         self.turn = 1
