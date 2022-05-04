@@ -72,12 +72,17 @@ class Board:
         self.stone_black = 0
         self.turn = 1
 
+
     # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
     @property
     def state(self):
+        return self.stone_exist, self.stone_black
+
+    # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
+    @staticmethod
+    def state2numpy(state):
         box = np.empty(16, dtype = np.float32)
-        stone_exist = self.stone_exist
-        stone_black = self.stone_black
+        stone_exist, stone_black = state
 
         for i in range(8):
             box[i] = stone_exist & 0xff
@@ -121,7 +126,7 @@ class Board:
         # 4 bit ごとにブロック分けして、各ブロックに 上位 2 bit + 下位 2 bit を計算した値を入れる
         x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333)
 
-        # 8 bit ごとにブロック分けして、 上位 4 bit + 下位 4 bit を計算した値を入れる
+        # 8 bit ごとにブロック分けして、各ブロックに 上位 4 bit + 下位 4 bit を計算した値を入れる
         x += x >> 4
         x &= 0x0f0f0f0f0f0f0f0f
 
