@@ -74,12 +74,17 @@ class Board:
         self.stone_black = 0
         self.turn = 1
 
+
     # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
     @property
     def state(self):
+        return self.stone_exist, self.stone_black
+
+    # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
+    @staticmethod
+    def state2numpy(state):
         box = np.empty(16, dtype = np.float32)
-        stone_exist = self.stone_exist
-        stone_black = self.stone_black
+        stone_exist, stone_black = state
 
         for i in range(8):
             box[i] = stone_exist & 0xff
@@ -115,13 +120,35 @@ class Board:
         return self.__getbit("stone_black", n)
 
 
+    # 1 が立っているビットの数を取得
+    @staticmethod
+    def __bits_count(x):
+        # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
+        x -= (x >> 1) & 0x5555555555555555
+
+        # 4 bit ごとにブロック分けして、各ブロックに 上位 2 bit + 下位 2 bit を計算した値を入れる
+        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333)
+
+        # 8 bit ごとにブロック分けして、各ブロックに 上位 4 bit + 下位 4 bit を計算した値を入れる
+        x += x >> 4
+        x &= 0x0f0f0f0f0f0f0f0f
+
+        # 以下、同様
+        x += x >> 8
+        x += x >> 16
+        x += x >> 32
+
+        # 0 ~ 64 を表現するために、下位 7 bit のみを取り出して出力とする
+        return x & 0x7f
+
     @property
     def black_num(self):
-        return self.stone_black.bit_count()
+        return self.__bits_count(self.stone_black)
 
     @property
     def white_num(self):
-        return (self.stone_exist ^ self.stone_black).bit_count()
+        return self.__bits_count(self.stone_exist ^ self.stone_black)
+
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新するためのメソッド
     def setbit_stone_exist(self, n):
