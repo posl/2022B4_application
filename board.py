@@ -82,7 +82,7 @@ class Board:
 
     # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
     @staticmethod
-    def state2numpy(state, xp = np):
+    def state2ndarray(state, xp = np):
         box = xp.empty(16, dtype = np.float32)
         stone_exist, stone_black = state
 
