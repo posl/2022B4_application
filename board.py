@@ -177,17 +177,19 @@ class Board:
 
         return False
 
+    # 石を置ける箇所がどこかにあるかどうかの真偽値を取得するためのメソッド
+    def somewhere_placable(self):
+        for n in range(self.action_size):
+            if not self.getbit_stone_exist(n) and self.is_placable(n):
+                return True
+        return False
+
     # エージェントが石を置ける箇所の番号をリストで取得するためのメソッド
     def list_placable(self):
         p_list = []
-
         for n in range(self.action_size):
-            if self.getbit_stone_exist(n):
-                continue
-
-            if self.is_placable(n):
+            if not self.getbit_stone_exist(n) and self.is_placable(n):
                 p_list.append(n)
-
         return p_list
 
 
