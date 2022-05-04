@@ -96,12 +96,12 @@ class Board:
         return box / 255.
 
 
-    # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換するためのメソッド
+    # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換する
     @staticmethod
     def t2n(t):
         return Board.width * t[0] + t[1]
 
-    # オセロ盤を初期状態にセットするためのメソッド
+    # オセロ盤を初期状態にセットする
     def reset(self):
         shift = self.t2n(((self.height >> 1) - 1, (self.width >> 1) - 1))
         self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
@@ -109,7 +109,7 @@ class Board:
         self.turn = 1
 
 
-    # 指定された 64 bit 整数の下から n bit 目の値を取得するためのメソッド
+    # 指定された 64 bit 整数の下から n bit 目の値を取得する
     def __getbit(self, name, n):
         return (getattr(self, name) >> n) & 1
 
@@ -120,7 +120,7 @@ class Board:
         return self.__getbit("stone_black", n)
 
 
-    # 1 が立っているビットの数を取得
+    # 1 が立っているビットの数を取得する
     @staticmethod
     def __bits_count(x):
         # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
@@ -150,7 +150,7 @@ class Board:
         return self.__bits_count(self.stone_exist ^ self.stone_black)
 
 
-    # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新するためのメソッド
+    # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新する
     def setbit_stone_exist(self, n):
         self.stone_exist |= 1 << n
 
@@ -158,7 +158,7 @@ class Board:
         self.stone_black ^= mask
 
 
-    # 空きマスに自身の石を置けるかどうかの真偽値を取得するためのメソッド
+    # 空きマスに自身の石を置けるかどうかの真偽値を取得する (石をひっくり返すときも同じ構文なので、フラグで切り替える)
     def is_placable(self, startpoint):
         for step, num in StepNumGenerator(startpoint).generator:
             n_gen = ElementNumRange(startpoint, step, num)
@@ -177,14 +177,14 @@ class Board:
 
         return False
 
-    # 石を置ける箇所がどこかにあるかどうかの真偽値を取得するためのメソッド
+    # 石を置ける箇所がどこかにあるかどうかの真偽値を取得する
     def somewhere_placable(self):
         for n in range(self.action_size):
             if not self.getbit_stone_exist(n) and self.is_placable(n):
                 return True
         return False
 
-    # エージェントが石を置ける箇所の番号をリストで取得するためのメソッド
+    # エージェントが石を置ける箇所の番号をリストで取得する
     def list_placable(self):
         p_list = []
         for n in range(self.action_size):
@@ -199,14 +199,14 @@ class Board:
             return self.player1_plan(self)
         else:
             return self.player2_plan(self)
-    
-    # nに駒を置く
+
+    # n に駒を置く
     def __set(self, n):
         self.setbit_stone_exist(n)
         if self.turn == 1:
             self.setbit_stone_black(1 << n)
-    
-    # nに置いた時に返るマスを返す
+
+    # n に置いた時に返るマスを返す
     def __reverse(self, startpoint):
         for step, num in StepNumGenerator(startpoint).generator:
             n_gen = ElementNumRange(startpoint, step, num)
@@ -224,12 +224,12 @@ class Board:
                             continue
                         self.setbit_stone_black(mask)
                     break
-    
-    # nに駒を置き、返す
+
+    # n に駒を置き、返す
     def put(self, n):
         self.__set(n)
         self.__reverse(n)
-    
+
     # ターンを交代
     def turn_change(self):
         self.turn ^= 1
@@ -240,7 +240,7 @@ class Board:
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
         self.player_turn = first_play % 2
-    
+
     # ゲームが正常に続行できるか判定
     def can_continue(self):
         tmp_board = copy.copy(self)
@@ -252,11 +252,11 @@ class Board:
                 return "pass"
             else:
                 return "gameset"
-    
+
     # ゲーム終了時
     def gameset(self):
         print("owa\nblack:", self.black_num, "   white:", self.white_num) #表示
-    
+
     # ゲームの本体
     def game(self):
         print("start") #表示
@@ -269,22 +269,22 @@ class Board:
                 continue
             elif flag == "gameset":
                 break
-            
+
             self.print_state()
-            
+
             # 置く場所を取得
             n = self.get_num()
             print("put : ", n)
-            
+
             # 駒を置く
             self.put(n)
 
             # ターン更新
             self.turn_change()
-        
+
         print("gameset") #表示
         self.gameset()
-    
+
 
     # 一時的な盤面表示
     def print_board(self, x):
