@@ -299,6 +299,37 @@ class Board:
         print(self.list_placable())
         print()
 
+# ログ機能を持ち，以前の盤面に戻ることができる
+class LogBoard(Board):
+    def __init__(self):
+        super().__init__()
+        self.stone_exist_stack = [None] * Board.action_size
+        self.stone_black_stack = [None] * Board.action_size
+        self.stack_num = 0
+
+    # ログを追加する
+    def add_log(self):
+        if self.stack_num == Board.action_size:
+            return
+        self.stone_exist_stack[self.stack_num] = self.stone_exist
+        self.stone_black_stack[self.stack_num] = self.stone_black
+        self.stack_num += 1
+
+    # 最新のログの盤面に戻る
+    def undo_log(self):
+        if self.stack_num == 0:
+            return
+        self.stack_num -= 1
+        self.stone_exist = self.stone_exist_stack[self.stack_num]
+        self.stone_black = self.stone_black_stack[self.stack_num]
+
+    # ゲーム木用
+    # Boardから必要な情報をセットする
+    def set_board(self, board : Board):
+        self.stone_exist = board.stone_exist
+        self.stone_black = board.stone_black
+        self.turn = board.turn
+
 
 
 
