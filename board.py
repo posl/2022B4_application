@@ -101,7 +101,7 @@ class Board:
 
     # オセロ盤を初期状態にセットするためのメソッド
     def reset(self):
-        shift = self.t2n(((self.height >> 2) - 1, (self.width >> 2) - 1))
+        shift = self.t2n(((self.height >> 1) - 1, (self.width >> 1) - 1))
         self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
         self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
         self.turn = 1
@@ -119,7 +119,8 @@ class Board:
 
 
     # 1 が立っているビットの数を取得
-    def __bits_count(self, x):
+    @staticmethod
+    def __bits_count(x):
         # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
         x -= (x >> 1) & 0x5555555555555555
 
