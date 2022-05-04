@@ -34,13 +34,16 @@ class StepNumGenerator:
         yield from self.__gen(-1)
 
 
-# オセロ盤の各位置から８方向それぞれに、存在する石を探索するときに使うジェネレータ
+# 開始の数とステップ数、要素数を指定する range ジェネレータ
 class ElementNumRange:
-    def __init__(self, startpoint, step, num):
-        self.value = startpoint
-        self.step = step
+    def __init__(self, startpoint):
+        self.startpoint = startpoint
+
+    def reset(self, step_num):
+        self.step, self.num = step_num
+        self.value = self.startpoint
         self.count = 0
-        self.num = num
+        return self
 
     def __iter__(self):
         return self
@@ -52,6 +55,27 @@ class ElementNumRange:
         self.count += 1
         self.value += self.step
         return self.value
+
+
+# オセロ盤の特定のマスから全方位探索を行うためのジェネレータ
+class OmniDirectionalSearcher:
+    def __init__(self, startpoint):
+        self.step_num = StepNumGenerator(startpoint).generator
+        self.range = ElementNumRange(startpoint)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # この next() の呼び出しで生じる StopIteration 例外をこのジェネレータが生じさせた例外として使う
+        n_gen = self.range.reset(next(self.step_num))
+
+        try:
+            n = next(n_gen)
+        except StopIteration:
+            return next(self)
+
+        return n, n_gen
 
 
 
@@ -158,15 +182,9 @@ class Board:
         self.stone_black ^= mask
 
 
-    # 空きマスに自身の石を置けるかどうかの真偽値を取得する (石をひっくり返すときも同じ構文なので、フラグで切り替える)
+    # 空きマスに自身の石を置けるかどうかの真偽値を取得する
     def is_placable(self, startpoint):
-        for step, num in StepNumGenerator(startpoint).generator:
-            n_gen = ElementNumRange(startpoint, step, num)
-            try:
-                n = next(n_gen)
-            except StopIteration:
-                continue
-
+        for n, n_gen in OmniDirectionalSearcher(startpoint):
             if self.getbit_stone_exist(n) and (self.getbit_stone_black(n) ^ self.turn):
                 for n in n_gen:
                     if self.getbit_stone_exist(n):
@@ -174,7 +192,6 @@ class Board:
                             continue
                         return True
                     break
-
         return False
 
     # 石を置ける箇所がどこかにあるかどうかの真偽値を取得する
@@ -208,15 +225,10 @@ class Board:
 
     # n に置いた時に返るマスを返す
     def __reverse(self, startpoint):
-        for step, num in StepNumGenerator(startpoint).generator:
-            n_gen = ElementNumRange(startpoint, step, num)
-            try:
-                n = next(n_gen)
-            except StopIteration:
-                continue
-
+        for n, n_gen in OmniDirectionalSearcher(startpoint):
             if self.getbit_stone_exist(n) and (self.getbit_stone_black(n) ^ self.turn):
                 mask = 1 << n
+
                 for n in n_gen:
                     if self.getbit_stone_exist(n):
                         if self.getbit_stone_black(n) ^ self.turn:
