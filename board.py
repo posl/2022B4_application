@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 import copy
 import random
 
@@ -14,19 +15,21 @@ class StepNumGenerator:
 
     # 引数には正負の符号を指定する
     def __gen(self, sign):
+        nums = self.nums
+
         # 水平方向探索用の (step, num)
-        yield sign, self.nums[sign]
+        yield sign, nums[sign]
 
+        # 垂直方向探索用の (step, num)
         step_base = sign * Board.width
-        num_base = self.nums[sign + 1]
+        num_base = nums[sign + 1]
+        yield step_base, num_base
 
-        for bias in range(-1, 2):
-            if bias:
-                # 斜め方向探索用の (step, num)
-                yield step_base + bias, min(num_base, self.nums[bias])
-            else:
-                # 垂直方向探索用の (step, num)
-                yield step_base, num_base
+        # 左斜め方向探索用の (step, num)
+        yield step_base - 1, min(num_base, nums[-1])
+
+        # 右斜め方向探索用の (step, num)
+        yield step_base + 1, min(num_base, nums[1])
 
     @property
     def generator(self):
@@ -89,7 +92,7 @@ class Board:
     def __new__(cls):
         assert not cls.height & 1
         assert not cls.width & 1
-        assert cls.action_size <= 64
+        assert cls.action_size.bit_length() < 256
 
         return super().__new__(cls)
 
@@ -107,12 +110,13 @@ class Board:
     # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
     @staticmethod
     def state2ndarray(state, xp = np):
-        box = xp.empty(16, dtype = np.float32)
+        size = ceil(Board.action_size / 8)
+        box = xp.empty(size << 1, dtype = np.float32)
         stone_exist, stone_black = state
 
-        for i in range(8):
+        for i in range(size):
             box[i] = stone_exist & 0xff
-            box[i + 8] = stone_black & 0xff
+            box[i + size] = stone_black & 0xff
             stone_exist >>= 8
             stone_black >>= 8
 
@@ -127,9 +131,10 @@ class Board:
 
     # オセロ盤を初期状態にセットする
     def reset(self):
-        shift = self.t2n(((self.height >> 1) - 1, (self.width >> 1) - 1))
-        self.stone_exist = (0b11 << shift) + (0b11 << (shift + self.width))
-        self.stone_black = (0b10 << shift) + (0b01 << (shift + self.width))
+        width = self.width
+        shift = self.t2n(((self.height >> 1) - 1, (width >> 1) - 1))
+        self.stone_exist = (0b11 << shift) + (0b11 << (shift + width))
+        self.stone_black = (0b10 << shift) + (0b01 << (shift + width))
         self.turn = 1
 
 
@@ -144,9 +149,18 @@ class Board:
         return self.__getbit("stone_black", n)
 
 
-    # 1 が立っているビットの数を取得する
+    # 引数以上の数で最小の２のべき乗を取得する (任意の bit 数の整数に対応可能)
     @staticmethod
-    def __bits_count(x):
+    def get_powerof2(x: int):
+        assert x > 0
+
+        # 指定された値が２のべき乗でない場合は目的の出力を作成する
+        if x & (x - 1):
+            return 1 << x.bit_length()
+        return x
+
+    # 1 が立っているビットの数を取得する (255 bit の整数まで対応可能)
+    def __bits_count(self, x):
         # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
         x -= (x >> 1) & 0x5555555555555555
 
@@ -158,12 +172,14 @@ class Board:
         x &= 0x0f0f0f0f0f0f0f0f
 
         # 以下、同様
-        x += x >> 8
-        x += x >> 16
-        x += x >> 32
+        n = 8
+        max_n = self.get_powerof2(x)
+        while n < max_n:
+            x += x >> n
+            n <<= 1
 
-        # 0 ~ 64 を表現するために、下位 7 bit のみを取り出して出力とする
-        return x & 0x7f
+        # 下位 8 bit のみを取り出して出力とする (出力は 0 ~ 255 になる)
+        return x & 0xff
 
     @property
     def black_num(self):
@@ -310,6 +326,7 @@ class Board:
         print("black:", self.black_num, "   white:", self.white_num)
         print(self.list_placable())
         print()
+
 
 # ログ機能を持ち，以前の盤面に戻ることができる
 class LogBoard(Board):
