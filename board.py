@@ -363,18 +363,18 @@ class LogBoard(Board):
 
 
 if __name__ == "__main__":
-    def player(othello):
+    def player(board : Board):
         while 1:
             try:
                 n = int(input("enter n : "))
-                if othello.is_placable(n):
+                if board.is_placable(n):
                     return n
             except:
                 print("error")
                 continue
 
-    def com_random(othello):
-        return random.choice(othello.list_placable())
+    def com_random(board : Board):
+        return random.choice(board.list_placable())
 
 
     board = Board()
