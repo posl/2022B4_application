@@ -336,7 +336,7 @@ class Board:
         print()
 
 
-    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキスト
+    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
     @contextmanager
     def log_runtime(self, n):
         self.add_log()
