@@ -1,5 +1,4 @@
 import numpy as np
-import copy
 import random
 
 
@@ -255,14 +254,15 @@ class Board:
 
     # ゲームが正常に続行できるか判定
     def can_continue(self):
-        tmp_board = copy.copy(self)
-        if tmp_board.list_placable():
+        if self.list_placable():
             return "true"
         else:
-            tmp_board.turn ^= 1
-            if tmp_board.list_placable():
+            self.turn ^= 1
+            if self.list_placable():
+                self.turn ^= 1
                 return "pass"
             else:
+                self.turn ^= 1
                 return "gameset"
 
     # ゲーム終了時
