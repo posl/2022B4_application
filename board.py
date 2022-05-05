@@ -316,6 +316,8 @@ class Board:
         print("gameset") #表示
         self.gameset()
 
+        return self.black_num, self.white_num
+
 
     # 一時的な盤面表示
     def print_board(self, x):
@@ -384,8 +386,10 @@ if __name__ == "__main__":
     # それぞれのプレイヤーの戦略の関数をわたす
     # プレイヤー先行でゲーム開始
     #board.pre(player, com_random, 1)
-    board.pre(player, player, 1)
-    board.game()
+    #board.pre(player, player, 1)
+    board.pre(com_random, com_random, 1)
+
+    print(board.game())
 
 
     #詰み手順の確認
