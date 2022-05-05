@@ -105,6 +105,9 @@ class Board:
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
         self.log_stack = []
 
+        # somewhere_placable() で保存した n を次の list_placable() に使うための変数
+        self.tmp_n = None
+
 
     # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
     @property
@@ -232,13 +235,24 @@ class Board:
     def somewhere_placable(self):
         for n in range(self.action_size):
             if not self.getbit_stone_exist(n) and self.is_placable(n):
+                self.tmp_n = n
                 return True
         return False
 
     # エージェントが石を置ける箇所の番号をリストで取得する
     def list_placable(self):
         p_list = []
-        for n in range(self.action_size):
+
+        # このメソッドの呼び出しの直前の somewhere_placable() の結果を引き継ぐことができる
+        n = self.tmp_n
+        if n is None:
+            start = 0
+        else:
+            p_list.append(n)
+            start = n + 1
+            self.tmp_n = None
+
+        for n in range(start, self.action_size):
             if not self.getbit_stone_exist(n) and self.is_placable(n):
                 p_list.append(n)
         return p_list
