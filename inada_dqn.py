@@ -92,14 +92,15 @@ class SumTree:
 
         # 木構造を保持する ndarray の後半半分が実際の優先度データを格納する部分
         index += self.capacity
-        self.tree[index] = value
+        tree = self.tree
+        tree[index] = value
 
         # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
         parent = index // 2
         while parent:
             left_child = 2 * parent
             right_child = left_child + 1
-            self.tree[parent] = self.tree[left_child] + self.tree[right_child]
+            tree[parent] = tree[left_child] + tree[right_child]
             parent //= 2
 
 
@@ -113,12 +114,13 @@ class SumTree:
         current_index = 1
 
         # 実際の優先度データが格納されているインデックスに行き着くまでループを続ける
+        tree = self.tree
         while current_index < self.capacity:
             left_child = 2 * current_index
             right_child = left_child + 1
 
             # 乱数 z が左子ノードより大きい場合は、z を左部分木にある全要素の和の分減じてから、右子ノードに進む
-            left_value = self.tree[left_child]
+            left_value = tree[left_child]
             if z > left_value:
                 current_index = right_child
                 z -= left_value
