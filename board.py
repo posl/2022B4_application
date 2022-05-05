@@ -151,8 +151,8 @@ class Board:
     # 引数以上の数で最小の２のべき乗を取得する (任意の bit 数の整数に対応可能)
     @staticmethod
     def get_powerof2(x: int):
-        # 指定された値が２のべき乗でない場合は目的の出力を作成する
         if x > 0:
+            # 指定された値が２のべき乗でない場合は目的の出力を作成する
             if x & (x - 1):
                 return 1 << x.bit_length()
         elif x:
