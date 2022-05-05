@@ -1,5 +1,6 @@
 import numpy as np
 from math import ceil
+from contextlib import contextmanager
 import random
 
 
@@ -96,9 +97,13 @@ class Board:
         return super().__new__(cls)
 
     def __init__(self):
+        # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_exist = 0
         self.stone_black = 0
         self.turn = 1
+
+        # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
+        self.log_stack = []
 
 
     # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
@@ -329,6 +334,27 @@ class Board:
         print("black:", self.black_num, "   white:", self.white_num)
         print(self.list_placable())
         print()
+
+
+    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキスト
+    @contextmanager
+    def log_runtime(self, n):
+        self.add_log()
+        self.put(n)
+        self.turn_change()
+        yield
+
+        self.turn_change()
+        self.undo_log()
+
+    # ログを追加する
+    def add_log(self):
+        self.log_stack.append(self.state)
+
+    # 最新のログの盤面に戻る
+    def undo_log(self):
+        state = self.log_stack.pop()
+        self.stone_exist, self.stone_black = state
 
 
 # ログ機能を持ち，以前の盤面に戻ることができる
