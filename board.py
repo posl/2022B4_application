@@ -240,7 +240,7 @@ class Board:
 
 
     # 置くマスを取得
-    def get_num(self):
+    def get_action(self):
         if self.turn == self.player_turn:
             return self.player1_plan(self)
         else:
@@ -276,7 +276,7 @@ class Board:
         self.turn ^= 1
 
     # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
-    def pre(self, player1_plan, player2_plan, first_play):
+    def set_plan(self, player1_plan, player2_plan, first_play):
         self.reset()
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
@@ -315,7 +315,7 @@ class Board:
             self.print_state()
 
             # 置く場所を取得
-            n = self.get_num()
+            n = self.get_action()
             print("put : ", n)
 
             # 駒を置く
@@ -415,9 +415,9 @@ if __name__ == "__main__":
     board = Board()
     # それぞれのプレイヤーの戦略の関数をわたす
     # プレイヤー先行でゲーム開始
-    #board.pre(player, com_random, 1)
-    #board.pre(player, player, 1)
-    board.pre(com_random, com_random, 1)
+    #board.set_plan(player, com_random, 1)
+    #board.set_plan(player, player, 1)
+    board.set_plan(com_random, com_random, 1)
 
     print(board.game())
 

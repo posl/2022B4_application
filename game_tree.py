@@ -157,7 +157,5 @@ if __name__ == "__main__":
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
-	board.pre(ab0.get_next_move, ab1.get_next_move, 1)
+	board.set_plan(ab0.get_next_move, ab1.get_next_move, 1)
 	board.game()
-
-
