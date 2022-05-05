@@ -316,8 +316,6 @@ class Board:
         print("gameset") #表示
         self.gameset()
 
-        return self.black_num, self.white_num
-
 
     # 一時的な盤面表示
     def print_board(self, x):
