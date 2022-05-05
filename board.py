@@ -191,6 +191,11 @@ class Board:
             return self.black_num
         return self.white_num
 
+    # 通し番号 n に自身の石を打ったとき、自身の石の数が幾つになるかを取得する
+    def get_next_stone_num(self, n):
+        with self.log_runtime(n):
+            return self.get_stone_num()
+
 
     # 指定された 64 bit 整数の下から n bit 目の値を取得する
     def __getbit(self, name, n):
