@@ -142,17 +142,6 @@ class Board:
         self.turn = 1
 
 
-    # 指定された 64 bit 整数の下から n bit 目の値を取得する
-    def __getbit(self, name, n):
-        return (getattr(self, name) >> n) & 1
-
-    def getbit_stone_exist(self, n):
-        return self.__getbit("stone_exist", n)
-
-    def getbit_stone_black(self, n):
-        return self.__getbit("stone_black", n)
-
-
     # 引数以上の数で最小の２のべき乗を取得する (任意の bit 数の整数に対応可能)
     @staticmethod
     def get_powerof2(x: int):
@@ -188,6 +177,7 @@ class Board:
         # 下位 8 bit のみを取り出して出力とする (出力は 0 ~ 255 になる)
         return x & 0xff
 
+
     @property
     def black_num(self):
         return self.__bits_count(self.stone_black)
@@ -195,6 +185,22 @@ class Board:
     @property
     def white_num(self):
         return self.__bits_count(self.stone_exist ^ self.stone_black)
+
+    def get_stone_num(self):
+        if self.turn:
+            return self.black_num
+        return self.white_num
+
+
+    # 指定された 64 bit 整数の下から n bit 目の値を取得する
+    def __getbit(self, name, n):
+        return (getattr(self, name) >> n) & 1
+
+    def getbit_stone_exist(self, n):
+        return self.__getbit("stone_exist", n)
+
+    def getbit_stone_black(self, n):
+        return self.__getbit("stone_black", n)
 
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新する
