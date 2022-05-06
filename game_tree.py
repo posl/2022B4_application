@@ -120,10 +120,10 @@ if __name__ == "__main__":
 				continue
 
 	board = Board()
-	board.reset()
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
+	board.reset()
 	board.set_plan(ab0.get_next_move, ab1.get_next_move)
 	board.game()
