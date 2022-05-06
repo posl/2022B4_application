@@ -321,6 +321,7 @@ class Board:
     def game(self, render_func = None):
         flag = 1
         while flag:
+            self.print_state()
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
@@ -400,9 +401,7 @@ if __name__ == "__main__":
     # プレイヤー先行でゲーム開始
     #board.set_plan(player, com_random, 1)
     #board.set_plan(player, player, 1)
-    board.set_plan(com_random, com_random, 1)
-
-    print(board.game())
+    board.play(com_random, com_random)
 
 
     #詰み手順の確認
