@@ -6,9 +6,9 @@ from random import random
 # 動作確認未完了
 
 class GTTDAgent:
-    def __init__(self):
+    def __init__(self, data_size):
         self.__alpha = 0.01
-        self.__data_size = Board.action_size
+        self.__data_size = data_size
         self.__data_list = np.zeros(self.__data_size)
 
     def __creat_new_data(self):
@@ -25,7 +25,6 @@ class GTTDAgent:
         self.__creat_new_data()
 
     def update(self, reward):
-    #   self.set_data([(1 - self.__alpha) * self.__data_list + self.__alpha * reward * self.__new_data_list])
       self.set_data([(1 - self.__alpha) * self.__data_list[i] + self.__alpha * reward * self.__new_data_list[i] for i in range(self.__data_size)])
 
     def get_data(self):
@@ -77,7 +76,7 @@ class GTReinforce:
         for i in range(repeat_num):
             board.reset()
             agent_alphabeta = AlphaBeta(self.__agent.get_new_data())
-            board.set_plan(self.player1, agent_alphabeta.get_next_move, 1)
+            board.set_plan(self.player1, agent_alphabeta.get_next_move)
             self.__agent.update(self.game(board))
         return self.__agent.get_data()
     
