@@ -6,9 +6,9 @@ from random import random
 # 動作確認未完了
 
 class GTTDAgent:
-    def __init__(self, data_size):
+    def __init__(self):
         self.__alpha = 0.01
-        self.__data_size = data_size
+        self.__data_size = Board.action_size
         self.__data_list = np.zeros(self.__data_size)
 
     def __creat_new_data(self):
@@ -44,40 +44,19 @@ class GTReinforce:
     def set_player1(self, player):
         self.player1 = player
 
-    def game(self, board : Board):
-        while 1:
-            #ゲームが正常に続行されるか
-            flag = board.can_continue()
-            if flag == "pass":
-                print("pass") #表示
-                board.turn_change()
-                continue
-            elif flag == "gameset":
-                break
-
-            # 置く場所を取得
-            n = board.get_action()
-
-            # 駒を置く
-            board.put(n)
-
-            # ターン更新
-            board.turn_change()
-
-        if board.black_num > board.white_num:
-            return 1
-        elif board.black_num == board.white_num:
-            return 0
-        else:
-            return -1
-
     def start(self, repeat_num = 3):
         board = Board()
         for i in range(repeat_num):
             board.reset()
             agent_alphabeta = AlphaBeta(self.__agent.get_new_data())
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
-            self.__agent.update(self.game(board))
+            board.play(self.player1, agent_alphabeta.get_next_move)
+            reward = -1
+            if board.black_num > board.white_num:
+                reward = 1
+            elif board.black_num == board.white_num:
+                reward = -1
+            self.__agent.update(reward)
         return self.__agent.get_data()
     
     def makefile(self, filename):
