@@ -1,5 +1,4 @@
 from board import Board
-from board import Board
 import numpy as np
 
 class AlphaBeta:
@@ -50,7 +49,7 @@ class AlphaBeta:
 			board.add_log()
 			board.put(i)
 			board.turn_change()
-			tmp_value = self.__min_node(board, 1, alpha, beta)
+			tmp_value = self.__node(board, 1, alpha, beta)
 			board.undo_log()
 			board.turn_change()
 
@@ -62,21 +61,29 @@ class AlphaBeta:
 
 		return place_max
 
-	# 評価の最大値を求める
-	def __max_node(self, board : Board, depth, alpha, beta):
+	# 評価を求める
+	def __node(self, board : Board, depth, alpha, beta):
 		if depth == AlphaBeta.__max_depth:
 			return self.__evaluate(board)
 
-		value = self.__min_value
-		place_list = board.list_placable()
+		# 求める評価値が最大か最小か決定する
+		ismax = (depth + 1) % 2
 
+		if ismax:
+			value = self.__min_value
+		else:
+			value = self.__max_value
+		
+		place_list = board.list_placable()
 		if not place_list:
 			board.turn_change()
+			# 自分が打てないが相手が打てる場合
 			if board.list_placable():
-				value = self.__min_node(board, depth + 1, alpha, beta)
+				value = self.__node(board, depth + 1, alpha, beta)
 				board.turn_change()
 				return value
 
+			#ゲームが終了している場合
 			else:
 				board.turn_change()
 				return self.__evaluate(board)
@@ -85,52 +92,24 @@ class AlphaBeta:
 			board.add_log()
 			board.put(i)
 			board.turn_change()
-			tmp_value = self.__min_node(board, depth + 1, alpha, beta)
+			tmp_value = self.__node(board, depth + 1, alpha, beta)
 			board.undo_log()
 			board.turn_change()
 
-			if tmp_value >= beta:
-				return tmp_value
-			if tmp_value > value:
-				value = tmp_value
-				if value > alpha:
-					alpha = value
-
-		return value
-
-	# 評価の最小値を求める
-	def __min_node(self, board : Board, depth, alpha, beta):
-		if depth == AlphaBeta.__max_depth:
-			return self.__evaluate(board)
-
-		value = self.__max_value
-		place_list = board.list_placable()
-
-		if not place_list:
-			board.turn_change()
-			if board.list_placable():
-				value = self.__max_node(board, depth + 1, alpha, beta)
-				board.turn_change()
-				return value
-
+			if ismax:
+				if tmp_value >= beta:
+					return tmp_value
+				if tmp_value > value:
+					value = tmp_value
+					if value > alpha:
+						alpha = value
 			else:
-				board.turn_change()
-				return self.__evaluate(board)
-
-		for i in place_list:
-			board.add_log()
-			board.put(i)
-			board.turn_change()
-			tmp_value = self.__max_node(board, depth + 1, alpha, beta)
-			board.undo_log()
-			board.turn_change()
-
-			if tmp_value <= alpha:
-				return tmp_value
-			if tmp_value < value:
-				value = tmp_value
-				if value < beta:
-					beta = value
+				if tmp_value <= alpha:
+					return tmp_value
+				if tmp_value < value:
+					value = tmp_value
+					if value < beta:
+						beta = value
 
 		return value
 
