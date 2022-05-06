@@ -2,7 +2,7 @@ from board import Board
 import numpy as np
 
 class AlphaBeta:
-	__max_depth = 6
+	__max_depth = 4
 
 	def __init__(self, select_value = 0):
 		self.set_value_list(select_value)
