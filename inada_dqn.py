@@ -306,7 +306,7 @@ class DQNAgent:
     # ε の確率で探索、1 - ε の確率で活用を行う (ε-greedy 法)
     def get_action(self, board, progress = None):
         if progress is not None and np.random.rand() < self.epsilon(progress):
-            return self.rng.choice(self.action_size)
+            return int(self.rng.choice(self.action_size))
 
         # オセロ盤の状態情報を変換して、ニューラルネットワークに流す
         state = board.state

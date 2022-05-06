@@ -20,7 +20,7 @@ def simple_plan(board):
     if np.random.rand() < 0.3:
         if len(placable) == 1:
             return placable[0]
-        return rng.choice(placable)
+        return int(rng.choice(placable))
 
     current_stone_num = board.get_stone_num()
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
@@ -49,7 +49,7 @@ class SelfMatch:
             for turn in (1, 0):
                 self.agents[turn].reset()
 
-            with tqdm(range(0, episodes + 1), desc = f"run {run}", leave = False) as pbar:
+            with tqdm(range(1, episodes + 1), desc = f"run {run}", leave = False) as pbar:
                 for episode in pbar:
                     self.fit_one_episode(progress = episode / episodes)
 
