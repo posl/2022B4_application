@@ -4,6 +4,8 @@ import inada_framework.functions as dzf
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
 from inada_dqn import SumTree
+from board import Board
+from inada_selfmatch import REINFORCE
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -51,11 +53,16 @@ class ReinforceAgent:
 
         # 方策を合法手のみに絞って、確率形式に変換し、それに従って行動を選択する
         placable = board.list_placable()
-        probs = dzf.softmax(policy[placable])
-        action_arg = self.rng.choice(len(placable), p = probs.data[0])
+        print(placable)
+        probs = dzf.softmax(policy[:, placable])
+
+        if len(placable) == 1:
+            action_index = 0
+        else:
+            action_index = self.rng.choice(len(placable), p = probs.data[0])
 
         # 行動が選ばれる確率も一緒に出力する
-        return placable(action_arg), probs[0, action_arg]
+        return placable[action_index], probs[0, action_index]
 
 
     def add(self, data):
@@ -114,3 +121,14 @@ class ReinforceComputer(ReinforceAgent):
 
         # 複数人のエージェントの意見から重み付きランダムサンプリングして、選ばれたものをコンピュータの行動とする
         return actions[player_probs.sample()]
+
+
+
+
+if __name__ == "__main__":
+    board = Board()
+    first_agent = ReinforceAgent(board.action_size, gamma = 0.98, lr = 0.0002)
+    second_agent = ReinforceAgent(board.action_size, gamma = 0.98, lr = 0.0002)
+
+    self_match = REINFORCE(board, first_agent, second_agent)
+    self_match.fit(runs = 100, episodes = 10000, file_name = "reinforce")

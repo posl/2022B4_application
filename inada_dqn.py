@@ -8,6 +8,7 @@ import pickle
 import zlib
 xp = cuda.cp if cuda.gpu_enable else np
 import copy
+from inada_selfmatch import DQN
 
 
 # Q 関数を近似するニューラルネットワーク
@@ -304,7 +305,7 @@ class DQNAgent:
 
         # 合法手の中から Q 関数が最大のものを選択する
         placable = board.list_placable()
-        qs = qs[placable]
+        qs = qs[0, placable]
 
         # オセロ盤の状態情報も一緒に出力する
         return placable[qs.argmax()], state
@@ -353,3 +354,32 @@ class DQNComputer(DQNAgent):
     # 何ステップ先の報酬まで見て学習したものを使うか選ぶことによって、難易度を変えることができる
     def reset(self, step_num, turn, file_name):
         self.qnet.load_weights(file_name + f"{turn}_{step_num}")
+
+
+
+
+if __name__ == "__main__":
+    # ハイパーパラメータ設定
+    buffer_size = 1000000
+    step_num = 2
+    gamma = 0.99
+    prioritized = True
+    compress = False
+
+    qnet_class = DuelingNet
+    batch_size = 32
+
+
+    # 経験再生バッファ
+    replay_buffer1 = ReplayBuffer(buffer_size, step_num, gamma, prioritized, compress)
+    replay_buffer2 = ReplayBuffer(buffer_size, step_num, gamma, prioritized, compress)
+
+    # 環境とエージェント
+    board = Board()
+    first_agent = DQNAgent(qnet_class, replay_buffer1, board.action_size, batch_size, step_num, gamma)
+    second_agent = DQNAgent(qnet_class, replay_buffer2, board.action_size, batch_size, step_num, gamma)
+
+
+    # 自己対戦
+    self_match = DQN(board, first_agent, second_agent)
+    self_match.fit(runs = 100, episodes = 3000, file_name = "dqn")

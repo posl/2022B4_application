@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from collections import deque
+from inada_framework import Variable
 
 
 # エージェントの評価に使う単純な方策
@@ -17,13 +18,20 @@ def simple_plan(board):
     # そうでなければ、30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
     rng = np.random.default_rng()
     if np.random.rand() < 0.3:
+        if len(placable) == 1:
+            return placable[0]
         return rng.choice(placable)
 
     current_stone_num = board.get_stone_num()
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
 
     # np.argmax を使うと選択が偏るため、np.where で取り出したインデックスからランダムに選ぶ
-    action_index = rng.choice(np.where(flip_nums == max(flip_nums))[0])
+    action_indexs = np.where(flip_nums == max(flip_nums))[0]
+
+    if len(action_indexs) == 1:
+        action_index = action_indexs[0]
+    else:
+        action_index = rng.choice(action_indexs)
     return placable[action_index]
 
 
@@ -86,9 +94,9 @@ class SelfMatch:
 
 class DQN(SelfMatch):
     def fit_one_episode(self, progress):
-        transition_infos = deque(maxlen = 2), deque(maxlen = 2)
         board = self.board
         board.reset()
+        transition_infos = deque(), deque()
         flag = 1
 
         while flag:
@@ -118,7 +126,7 @@ class DQN(SelfMatch):
             except IndexError:
                 break
             else:
-                board.update((state, action, board.state, reward), progress)
+                agent.update((state, action, board.state, reward), progress)
                 reward = -reward
 
     # 先攻か後攻か、何ステップ先の報酬まで見て学習したものかによってファイル名の接尾語を変える
@@ -161,7 +169,7 @@ class REINFORCE(SelfMatch):
                 break
 
         agent = self.agents[board.turn ^ 1]
-        agent.add((-reward, 0))
+        agent.add((-reward, Variable(np.array(0))))
         agent.update()
 
     # 評価用方策に対しての勝率の高い順で８人分のパラメータを保存する (先攻・後攻は別々のファイル)
