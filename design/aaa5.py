@@ -78,9 +78,15 @@ def player(board : board.Board):
 def com_random(board : board.Board):
 	return random.choice(board.list_placable())
 
+def f():
+        return com_random, com_random
+
 def next_button1_click():
 	game_frame.tkraise()
-	game_board.set_plan(com_random, com_random, 1)
+	game_board.reset()
+	player1_plan, player2_plan = f()
+	game_board.set_plan(player1_plan, player2_plan)
+	game_canvas_update()
 
 next_button1 = tk.Button(option_frame, text="NEXT", font=(font_name,50), width=6, height=1, command=lambda:next_button1_click())
 next_button1.place(x=400, y=400 )
@@ -95,13 +101,22 @@ game_frame.grid(row=0, column=0, sticky="nsew")
 game_canvas = tk.Canvas(game_frame, width=400, height=400)
 game_canvas.place(x=50, y=30)
 
-def game_button1_click():
-	game_board.game()
-	game_canvas_update()
+
 
 game_button1 = tk.Button(game_frame, text="AUTO", font=(font_name,50), width=6, height=1, command=lambda:game_button1_click())
 game_button1.place(x=500, y=30)
 
+madayaruka_flag = 1
+def game_button1_click():
+	global madayaruka_flag
+	if madayaruka_flag==1:
+		n = game_board.get_action()
+		game_board.put_stone(n)
+		flag = game_board.can_continue()
+		madayaruka_flag = flag
+	else:
+		print()
+	game_canvas_update()
 
 # ボード
 game_board = board.Board()
@@ -135,17 +150,9 @@ game_frame.tkraise()
 start_frame.tkraise()
 
 
+result_frame = tk.Frame(tkapp, bg = "#44EE88")
+result_frame.grid(row=0, column=0, sticky="nsew")
 
-def fix():
-    a = tkapp.winfo_geometry().split('+')[0]
-    b = a.split('x')
-    w = int(b[0])
-    h = int(b[1])
-    tkapp.geometry('%dx%d' % (w+1,h+1))
-
-tkapp.update()
-
-tkapp.after(0, fix)
 
 #無限ループで処理を行う
 tkapp.mainloop()
