@@ -7,7 +7,6 @@ from collections import deque
 import pickle
 import zlib
 xp = cuda.cp if cuda.gpu_enable else np
-import copy
 from inada_selfmatch import DQN
 
 
@@ -292,7 +291,7 @@ class DQNAgent:
 
     # ターゲットネットワークはパラメータを学習せず、定期的に学習対象のネットワークと同期させることで学習を進行させる
     def sync_qnet(self):
-        self.qnet_target = copy.deepcopy(self.qnet)
+        self.qnet_target.copy_weights(self.qnet)
 
     def save_weights(self, file_name):
         self.qnet.save_weights(file_name)
@@ -392,3 +391,10 @@ if __name__ == "__main__":
     # 自己対戦
     self_match = DQN(board, first_agent, second_agent)
     self_match.fit(runs = 100, episodes = 3000, file_name = "dqn")
+
+
+    import random
+    def random_computer(board : Board):
+        return random.choice(board.list_placable())
+    print(self_match.eval(1, random_computer), "%")
+    print(self_match.eval(0, random_computer), "%")

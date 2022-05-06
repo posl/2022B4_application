@@ -55,14 +55,14 @@ class Layer:
             param.to_gpu()
 
     # パラメータを保持するインスタンスの辞書を平板化して取得する
-    def _flatten_params(self, params_dict, parent_key = ""):
+    def flatten_params(self, params_dict, parent_key = ""):
         for name in self._params:
             object = self.__dict__[name]
             key = parent_key + name
 
             if isinstance(object, Layer):
                 # Layer が入れ子構造になっている場合は、再帰的にこの関数を呼び出す
-                object._flatten_params(params_dict, key + "/")
+                object.flatten_params(params_dict, key + "/")
             elif isinstance(object, Parameter):
                 params_dict[key] = object
 
@@ -72,7 +72,7 @@ class Layer:
             self.to_cpu()
 
         params_dict = {}
-        self._flatten_params(params_dict)
+        self.flatten_params(params_dict)
         array_dict = {key : param.data for key, param in params_dict.items()}
 
         try:
@@ -96,11 +96,23 @@ class Layer:
             npz = np.load(file_path)
 
             params_dict = {}
-            self._flatten_params(params_dict)
+            self.flatten_params(params_dict)
             for key, param in params_dict.items():
                 param.data = npz[key]
         else:
             print("parameters file could not be found.")
+
+    # 同じレイヤクラスのインスタンス同士でパラメータを同期させる
+    def copy_weights(self, layer):
+        assert isinstance(layer, self.__class__)
+
+        passed_params_dict = {}
+        layer.flatten_params(passed_params_dict)
+
+        params_dict = {}
+        self.flatten_params(params_dict)
+        for key, param in params_dict.items():
+            param.data = passed_params_dict[key].data
 
 
 class Model(Layer):
@@ -130,11 +142,11 @@ class Affine(Layer):
 
     def forward(self, x):
         if self.W.data is None:
-            self.W.data = self._init_W(x)
+            self.W.data = self.init_W(x)
         return dzf.affine(x, self.W, self.b)
 
     # 重みは Xavier の初期値
-    def _init_W(self, x):
+    def init_W(self, x):
         I = x.shape[1]
         xp = cuda.get_array_module(x)
         return xp.random.randn(I, self.out_size).astype(np.float32) * np.sqrt(self.W_mode / I)
@@ -151,10 +163,10 @@ class BatchNorm(Layer):
 
     def forward(self, x):
         if self.gamma.data is None:
-            self._init_params(x)
+            self.init_params(x)
         return dzf.batch_nrom(x, self.gamma, self.beta, self.avg_mean.data, self.avg_var.data)
 
-    def _init_params(self, x):
+    def init_params(self, x):
         xp = cuda.get_array_module(x)
         D = x.shape[1]
         self.gamma.data = xp.ones(D, dtype = x.dtype)
@@ -184,10 +196,10 @@ class Conv2d(Layer):
 
     def forward(self, x, dzf_func = dzf.conv2d):
         if self.W.data is None:
-            self.W.data = self._init_W(x)
+            self.W.data = self.init_W(x)
         return dzf_func(x, self.W, self.b, self.stride, self.padding)
 
-    def _init_W(self, x):
+    def init_W(self, x):
         C, OC = x.shape[1], self.out_channels
         KH, KW = pair(self.filter_size)
         xp = cuda.get_array_module(x)
@@ -198,8 +210,8 @@ class Deconv2d(Conv2d):
     def forward(self, x):
         return super().forward(x, dzf.deconv2d)
 
-    def _init_W(self, x):
-        return super()._init_W(x).transpose(1, 0, 2, 3)
+    def init_W(self, x):
+        return super().init_W(x).transpose(1, 0, 2, 3)
 
 
 # 1×1 の畳み込み層 (チャネル数だけが変化する)
@@ -212,7 +224,7 @@ class Conv2d1x1(Layer):
 
     def forward(self, x):
         if self.W.data is None:
-            self.W.data = self._init_W(x)
+            self.W.data = self.init_W(x)
 
         # ImageNet で学習済みのパラメータの次元数が 4 であるために必要な処理
         elif self.W.data.ndim == 4:
@@ -221,7 +233,7 @@ class Conv2d1x1(Layer):
 
         return dzf.conv2d_1x1filter(x, self.W)
 
-    def _init_W(self, x):
+    def init_W(self, x):
         C, OC = x.shape[1], self.out_channels
         xp = cuda.get_array_module(x)
         return xp.random.randn(OC, C).astype(np.float32) * np.sqrt(self.W_mode / C)
@@ -279,12 +291,12 @@ class LSTM(Layer):
 
             # この条件式が真になるのは学習を開始した直後の順伝播時だけ
             if self.Wx.data is None:
-                self.Wx.data = self._init_Wx(x.shape[1], xp)
+                self.Wx.data = self.init_Wx(x.shape[1], xp)
 
         x, self.h, self.c = dzf.lstm(x, self.h, self.c, self.Wx, self.Wh, self.b, self.dropout_ratio)
         return x
 
-    def _init_Wx(self, in_size, xp):
+    def init_Wx(self, in_size, xp):
         return xp.random.randn(in_size, self.hidden_size * 4).astype(np.float32) * np.sqrt(1 / in_size)
 
 
@@ -321,12 +333,12 @@ class GRU(Layer):
 
             # この条件式が真になるのは学習を開始した直後の順伝播時だけ
             if self.Wx.data is None:
-                self.Wx.data = self._init_Wx(x.shape[1], xp)
+                self.Wx.data = self.init_Wx(x.shape[1], xp)
 
         x, self.h = dzf.gru(x, self.h, self.Wx, self.Wh, self.b, self.dropout_ratio)
         return x
 
-    def _init_Wx(self, in_size, xp):
+    def init_Wx(self, in_size, xp):
         return xp.random.randn(in_size, self.hidden_size * 3).astype(np.float32) * np.sqrt(1 / in_size)
 
 

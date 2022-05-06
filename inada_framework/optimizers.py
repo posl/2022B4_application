@@ -24,9 +24,9 @@ class Optimizer:
             f(params)
 
         for param in params:
-            self._update(param)
+            self.update(param)
 
-    def _update(self, param):
+    def update(self, param):
         raise NotImplementedError()
 
     def add_hook(self, f):
@@ -93,7 +93,7 @@ class SGD(Optimizer):
         super().__init__()
         self.lr = lr
 
-    def _update(self, param):
+    def update(self, param):
         param.data -= self.lr * param.grad.data
 
 
@@ -105,7 +105,7 @@ class Momentum(Optimizer):
         self.momentum = momentum
         self.vs = {}
 
-    def _update(self, param):
+    def update(self, param):
         v_key = id(param)
         if v_key not in self.vs:
             xp = cuda.get_array_module(param.data)
@@ -125,7 +125,7 @@ class Nesterov(Optimizer):
         self.momentum = momentum
         self.vs = {}
 
-    def _update(self, param):
+    def update(self, param):
         v_key = id(param)
         if v_key not in self.vs:
             xp = cuda.get_array_module(param.data)
@@ -146,7 +146,7 @@ class AdaGrad(Optimizer):
         self.eps = eps
         self.hs = {}
 
-    def _update(self, param):
+    def update(self, param):
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
@@ -169,7 +169,7 @@ class AdaDelta(Optimizer):
         self.msg = {}
         self.msdx = {}
 
-    def _update(self, param):
+    def update(self, param):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)
@@ -195,7 +195,7 @@ class RMSprop:
         self.eps = eps
         self.hs = {}
 
-    def _update(self, param):
+    def update(self, param):
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
@@ -231,7 +231,7 @@ class Adam(Optimizer):
         self.product2 *= self.beta2
         return self.lr * math.sqrt(1.0 - self.product2) / (1.0 - self.product1)
 
-    def _update(self, param):
+    def update(self, param):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)
