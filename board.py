@@ -245,7 +245,8 @@ class Board:
     def set_plan(self, player1_plan, player2_plan):
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
-
+    
+    @property
     def plans(self):
         return self.player1_plan, self.player2_plan
 
@@ -300,7 +301,7 @@ class Board:
 
     # ゲーム本体
     def game(self, render_func = None):
-        flag = 1
+        flag = (self.stone_exist.bit_count() & 1) ^ 1
         while flag:
             n = self.get_action()
             self.put_stone(n)
@@ -310,11 +311,11 @@ class Board:
                 # 引数は pass があったかどうかの真偽値
                 render_func()
 
-    def play(self):
+    def play(self, player1_plan, player2_plan):
         self.reset()
 
-        # start 表示 (コンピュータの設定選択)
-        player1_plan, player2_plan = f()
+        # # start 表示 (コンピュータの設定選択)
+        # player1_plan, player2_plan = f()
 
         self.set_plan(player1_plan, player2_plan)
 
@@ -336,7 +337,7 @@ class Board:
         print("-" * 20)
         self.print_board(self.stone_black)
         print("black:", self.black_num, "   white:", self.white_num)
-        print(self.list_placable())
+        print("turn:", self.turn, self.list_placable())
         print()
 
 
@@ -396,6 +397,10 @@ if __name__ == "__main__":
     #board.set_plan(player, com_random, 1)
     #board.set_plan(player, player, 1)
     board.play()
+
+    print("game set")
+    print("black:", board.black_num)
+    print("white:", board.white_num)
 
 
     #詰み手順の確認
