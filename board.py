@@ -195,6 +195,7 @@ class Board:
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新する
     def setbit_stone_exist(self, n):
+        print("n", type(n))
         self.stone_exist |= 1 << n
 
     def setbit_stone_black(self, mask):
@@ -298,14 +299,13 @@ class Board:
     def game(self, render_func = None):
         flag = 1
         while flag:
-            self.print_state()
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
 
             if render_func is not None:
                 # 引数は pass があったかどうかの真偽値
-                render_func(flag == 2)
+                render_func()
 
     def play(self):
         self.reset()
@@ -316,8 +316,9 @@ class Board:
         self.set_plan(player1_plan, player2_plan)
 
         # 最初の盤面表示
+        self.print_state()
 
-        self.game()
+        self.game(self.print_state)
 
         # finish 表示 (結果の表示)
 
