@@ -46,13 +46,8 @@ class AlphaBeta:
 		place_max = place_list[0]
 
 		for i in place_list:
-			board.add_log()
-			board.put(i)
-			board.turn_change()
-			tmp_value = self.__node(board, 1, alpha, beta)
-			board.undo_log()
-			board.turn_change()
-
+			with board.log_runtime(i):
+				tmp_value = self.__node(board, 1, alpha, beta)
 			if tmp_value >= beta:
 				return tmp_value
 			if tmp_value > alpha:
@@ -89,12 +84,8 @@ class AlphaBeta:
 				return self.__evaluate(board)
 
 		for i in place_list:
-			board.add_log()
-			board.put(i)
-			board.turn_change()
-			tmp_value = self.__node(board, depth + 1, alpha, beta)
-			board.undo_log()
-			board.turn_change()
+			with board.log_runtime(i):
+				tmp_value = self.__node(board, depth + 1, alpha, beta)
 
 			if ismax:
 				if tmp_value >= beta:
