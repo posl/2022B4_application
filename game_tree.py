@@ -2,7 +2,7 @@ from board import Board
 import numpy as np
 
 class AlphaBeta:
-	__max_depth = 6
+	__max_depth = 4
 
 	def __init__(self, select_value = 0):
 		self.set_value_list(select_value)
@@ -42,6 +42,7 @@ class AlphaBeta:
 		value = self.__min_value
 		place_list = board.list_placable()
 		if not place_list:
+			print("error")
 			return -1
 		place_max = place_list[0]
 
@@ -119,9 +120,10 @@ if __name__ == "__main__":
 				continue
 
 	board = Board()
+	board.reset()
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
-	board.set_plan(ab0.get_next_move, ab1.get_next_move, 1)
+	board.set_plan(ab0.get_next_move, ab1.get_next_move)
 	board.game()
