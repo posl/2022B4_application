@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 from tqdm import tqdm
 from collections import deque
 from inada_framework import Variable
@@ -52,6 +53,7 @@ class SelfMatch:
     def __fit(self, runs, episodes, file_name):
         print("\033[92m=== Final Winning Percentage ===\033[0m")
         print(" run || first | second")
+        start = time()
 
         for run in range(1, runs + 1):
             for turn in (1, 0):
@@ -67,12 +69,13 @@ class SelfMatch:
                         win_rate1 = self.eval(1)
                         pbar.set_postfix(dict(rates = (f"{win_rate1}%", f"{win_rate0}%")))
 
-            # 最終結果の表示とパラメータの保存
+            # 最終結果と経過時間のの表示、パラメータの保存
             print(f"{run:>4}", end = " || ")
             for turn in (1, 0):
                 win_rate = self.eval(turn)
-                print(f"{win_rate:>3} %", end = " | " if turn else None)
                 self.save(turn, win_rate, file_name)
+                print(f"{win_rate:>3} %", end = " | " if turn else "  ")
+            print("({:.5g} min)".format((time() - start) / 60))
 
     # このメソッドは継承した子クラスが実装する
     def fit_one_episode(self, progress):
