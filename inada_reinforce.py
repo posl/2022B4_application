@@ -47,12 +47,24 @@ class ReinforceAgent:
         action, _ = self.get_action(board)
         return action
 
-    def get_action(self, board):
+    def get_action(self, board, progress = None):
         state = board.state2ndarray(board.state, xp)
         policy = self.pi(state[None, :])
-
-        # 方策を合法手のみに絞って、確率形式に変換し、それに従って行動を選択する
         placable = board.list_placable()
+
+        # 学習時以外はスコアが最大の行動を選択する
+        if progress is None:
+            scores = policy.data[0, placable]
+            action_indexs = np.where(scores == max(scores))[0]
+
+            if len(action_indexs) == 1:
+                action_index = 0
+            else:
+                action_index = self.rng.choice(action_indexs)
+            return placable[action_index], None
+
+        # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
+        policy **= (1.0 + progress)
         probs = dzf.softmax(policy[:, placable])
 
         if len(placable) == 1:
@@ -126,8 +138,8 @@ class ReinforceComputer(ReinforceAgent):
 
 if __name__ == "__main__":
     board = Board()
-    first_agent = ReinforceAgent(board.action_size, gamma = 0.98, lr = 0.0002)
-    second_agent = ReinforceAgent(board.action_size, gamma = 0.98, lr = 0.0002)
+    first_agent = ReinforceAgent(board.action_size, gamma = 0.99, lr = 0.0002)
+    second_agent = ReinforceAgent(board.action_size, gamma = 0.99, lr = 0.0002)
 
     self_match = REINFORCE(board, first_agent, second_agent)
     self_match.fit(runs = 100, episodes = 10000, file_name = "reinforce")
