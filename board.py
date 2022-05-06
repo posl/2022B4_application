@@ -40,24 +40,28 @@ class StepNumGenerator:
 # 開始の数とステップ数、要素数を指定する range ジェネレータ
 class ElementNumRange:
     def __init__(self, startpoint):
-        self.startpoint = startpoint
+        self.args = [startpoint, None, None]
 
+    # クラスからのインスタンス生成の回数を減らして、処理速度改善
     def reset(self, step_num):
-        self.step, self.num = step_num
-        self.value = self.startpoint
+        self.args[1:] = step_num
         self.count = 0
         return self
 
     def __iter__(self):
         return self
 
+    # getattr() の呼び出しが少なくなるようにして、処理速度改善
     def __next__(self):
-        if self.count >= self.num:
+        startpoint, step, num = self.args
+        count = self.count
+
+        if count >= num:
             raise StopIteration()
 
-        self.count += 1
-        self.value += self.step
-        return self.value
+        count += 1
+        self.count = count
+        return startpoint + step * count
 
 
 # オセロ盤の特定のマスから全方位探索を行うためのジェネレータ
@@ -71,7 +75,8 @@ class OmniDirectionalSearcher:
 
     def __next__(self):
         # この next() の呼び出しで生じる StopIteration 例外をこのジェネレータが生じさせた例外として使う
-        n_gen = self.range.reset(next(self.step_num))
+        step_num = next(self.step_num)
+        n_gen = self.range.reset(step_num)
 
         try:
             n = next(n_gen)
