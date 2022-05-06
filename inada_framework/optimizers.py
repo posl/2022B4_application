@@ -24,9 +24,9 @@ class Optimizer:
             f(params)
 
         for param in params:
-            self.update(param)
+            self._update(param)
 
-    def update(self, param):
+    def _update(self, param):
         raise NotImplementedError()
 
     def add_hook(self, f):
@@ -93,7 +93,7 @@ class SGD(Optimizer):
         super().__init__()
         self.lr = lr
 
-    def update(self, param):
+    def _update(self, param):
         param.data -= self.lr * param.grad.data
 
 
@@ -105,7 +105,7 @@ class Momentum(Optimizer):
         self.momentum = momentum
         self.vs = {}
 
-    def update(self, param):
+    def _update(self, param):
         v_key = id(param)
         if v_key not in self.vs:
             xp = cuda.get_array_module(param.data)
@@ -125,7 +125,7 @@ class Nesterov(Optimizer):
         self.momentum = momentum
         self.vs = {}
 
-    def update(self, param):
+    def _update(self, param):
         v_key = id(param)
         if v_key not in self.vs:
             xp = cuda.get_array_module(param.data)
@@ -146,7 +146,7 @@ class AdaGrad(Optimizer):
         self.eps = eps
         self.hs = {}
 
-    def update(self, param):
+    def _update(self, param):
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
@@ -169,7 +169,7 @@ class AdaDelta(Optimizer):
         self.msg = {}
         self.msdx = {}
 
-    def update(self, param):
+    def _update(self, param):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)
@@ -195,7 +195,7 @@ class RMSprop:
         self.eps = eps
         self.hs = {}
 
-    def update(self, param):
+    def _update(self, param):
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
@@ -221,9 +221,6 @@ class Adam(Optimizer):
         self.ms = {}
         self.vs = {}
 
-    def update(self):
-        super().update()
-
     # 学習率補正値は 12 回目まで約 0.3 ~ 0.15 の値域で単調減少、それ以降は対数関数的に 1.0 に近づく
     @property
     def biased_lr(self):
@@ -231,7 +228,7 @@ class Adam(Optimizer):
         self.product2 *= self.beta2
         return self.lr * math.sqrt(1.0 - self.product2) / (1.0 - self.product1)
 
-    def update(self, param):
+    def _update(self, param):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)

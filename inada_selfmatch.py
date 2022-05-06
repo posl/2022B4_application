@@ -117,7 +117,10 @@ class DQN(SelfMatch):
             buffer = transition_infos[board.turn]
             buffer.append((state, action))
 
-            if len(buffer) == 2:
+            # 学習開始前にターゲットネットワークを現在の学習対象ネットワークと同期させる
+            if len(buffer) == 1:
+                agent.sync_qnet()
+            else:
                 state, action = buffer.popleft()
                 next_state = buffer[0][0]
 
