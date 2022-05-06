@@ -341,10 +341,12 @@ class Board:
     def log_runtime(self, n):
         self.add_log()
         self.put_stone(n)
-        self.turn_change()
+        flag = self.can_continue()
         yield
 
-        self.turn_change()
+        if flag == 1:
+            self.turn_change()
+        
         self.undo_log()
 
     # ログを追加する
