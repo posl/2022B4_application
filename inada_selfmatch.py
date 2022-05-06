@@ -148,13 +148,13 @@ class DQN(SelfMatch):
 
 
 class REINFORCE(SelfMatch):
-    def fit_one_episode(self, progress = None):
+    def fit_one_episode(self, progress):
         board = self.board
         board.reset()
 
         while True:
             agent = self.agents[board.turn]
-            action, prob = agent.get_action(board)
+            action, prob = agent.get_action(board, progress)
             board.put_stone(action)
 
             # 報酬はゲーム終了まで出ない
