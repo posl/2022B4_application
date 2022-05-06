@@ -70,9 +70,18 @@ class SumTree:
     def __init__(self, capacity):
         self.capacity = self.__get_capacity(capacity)
 
-    # 容量は必ず２のべき乗であるものとする
-    def __get_capacity(self, capacity):
-        return Board.get_powerof2(capacity)
+    # 引数以上の数で最小の２のべき乗を取得する (容量は必ず２のべき乗であるものとする)
+    @staticmethod
+    def __get_capacity(capacity: int):
+        if capacity > 0:
+            # 指定された値が２のべき乗でない場合は目的の出力を作成する
+            if capacity & (capacity - 1):
+                return 1 << capacity.bit_length()
+        elif capacity:
+            message = f"argument must be positive integer, but \"{capacity}\" were given."
+            raise AssertionError(message)
+
+        return capacity
 
     # 使用する前に呼ぶ必要がある
     def reset(self):

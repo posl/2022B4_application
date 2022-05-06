@@ -150,49 +150,24 @@ class Board:
         self.turn = 1
 
 
-    # 引数以上の数で最小の２のべき乗を取得する (任意の bit 数の整数に対応可能)
-    @staticmethod
-    def get_powerof2(x: int):
-        if x > 0:
-            # 指定された値が２のべき乗でない場合は目的の出力を作成する
-            if x & (x - 1):
-                return 1 << x.bit_length()
-        elif x:
-            message = f"argument must be positive integer, but \"{x}\" were given."
-            raise AssertionError(message)
-
-        return x
-
-    # 1 が立っているビットの数を取得する (255 bit の整数まで対応可能)
-    def __bits_count(self, x):
-        # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
-        x -= (x >> 1) & 0x5555555555555555
-
-        # 4 bit ごとにブロック分けして、各ブロックに 上位 2 bit + 下位 2 bit を計算した値を入れる
-        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333)
-
-        # 8 bit ごとにブロック分けして、各ブロックに 上位 4 bit + 下位 4 bit を計算した値を入れる
-        x += x >> 4
-        x &= 0x0f0f0f0f0f0f0f0f
-
-        # 以下、同様
-        n = 8
-        max_n = self.get_powerof2(x)
-        while n < max_n:
-            x += x >> n
-            n <<= 1
-
-        # 下位 8 bit のみを取り出して出力とする (出力は 0 ~ 255 になる)
-        return x & 0xff
-
-
     @property
     def black_num(self):
-        return self.__bits_count(self.stone_black)
+        return self.stone_black.bit_count()
 
     @property
     def white_num(self):
-        return self.__bits_count(self.stone_exist ^ self.stone_black)
+        return (self.stone_exist ^ self.stone_black).bit_count()
+
+    # ゲーム終了後、勝敗に応じて報酬を与えるための属性 (最後の手番の人から見て、勝ち : 1, 負け : -1, 分け : 0)
+    @property
+    def reward(self):
+        diff = self.black_num - self.white_num
+        if diff:
+            if (diff > 0) ^ self.turn:
+                return -1
+            return 1
+        return 0
+
 
     def get_stone_num(self):
         if self.turn:
@@ -272,16 +247,15 @@ class Board:
     def get_action(self):
         if self.turn:
             return self.player1_plan(self)
-        else:
-            return self.player2_plan(self)
+        return self.player2_plan(self)
 
 
-    # n に駒を置き、返す
+    # n に石を置き、返す
     def put_stone(self, n):
         self.__set_stone(n)
         self.__reverse(n)
 
-    # n に駒を置く
+    # n に石を置く
     def __set_stone(self, n):
         self.setbit_stone_exist(n)
         if self.turn:
@@ -300,6 +274,7 @@ class Board:
                             continue
                         self.setbit_stone_black(mask)
                     break
+
 
     # ターンを交代
     def turn_change(self):
@@ -329,10 +304,12 @@ class Board:
                 # 引数は pass があったかどうかの真偽値
                 render_func(flag == 2)
 
-    def play(self, player1_plan, player2_plan):
+    def play(self):
         self.reset()
 
         # start 表示 (コンピュータの設定選択)
+        player1_plan = None
+        player2_plan = None
 
         self.set_plan(player1_plan, player2_plan)
 
@@ -400,7 +377,7 @@ if __name__ == "__main__":
     # プレイヤー先行でゲーム開始
     #board.set_plan(player, com_random, 1)
     #board.set_plan(player, player, 1)
-    board.set_plan(com_random, com_random, 1)
+    board.set_plan(com_random, com_random)
 
     print(board.game())
 
