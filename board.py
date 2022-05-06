@@ -296,6 +296,7 @@ class Board:
     def game(self, render_func = None):
         flag = 1
         while flag:
+            self.print_state()
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
@@ -308,8 +309,7 @@ class Board:
         self.reset()
 
         # start 表示 (コンピュータの設定選択)
-        player1_plan = None
-        player2_plan = None
+        player1_plan, player2_plan = f()
 
         self.set_plan(player1_plan, player2_plan)
 
@@ -371,15 +371,15 @@ if __name__ == "__main__":
     def com_random(board : Board):
         return random.choice(board.list_placable())
 
+    def f():
+        return com_random, com_random
 
     board = Board()
     # それぞれのプレイヤーの戦略の関数をわたす
     # プレイヤー先行でゲーム開始
     #board.set_plan(player, com_random, 1)
     #board.set_plan(player, player, 1)
-    board.set_plan(com_random, com_random)
-
-    print(board.game())
+    board.play()
 
 
     #詰み手順の確認
