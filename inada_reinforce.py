@@ -24,7 +24,7 @@ class PolicyNet(Model):
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.98, lr = 0.0002):
+    def __init__(self, action_size, gamma = 0.99, lr = 0.0002):
         self.memory = []
 
         self.action_size = action_size
@@ -36,6 +36,7 @@ class ReinforceAgent:
         self.pi = PolicyNet(self.action_size)
         self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
 
+        self.current_stage = 0
         self.rng = xp.random.default_rng()
 
     def save_weights(self, file_name):
@@ -47,24 +48,12 @@ class ReinforceAgent:
         action, _ = self.get_action(board)
         return action
 
-    def get_action(self, board, progress = None):
+    def get_action(self, board):
         state = board.state2ndarray(board.state, xp)
         policy = self.pi(state[None, :])
         placable = board.list_placable()
 
-        # 学習時以外はスコアが最大の行動を選択する
-        if progress is None:
-            scores = policy.data[0, placable]
-            action_indexs = np.where(scores == max(scores))[0]
-
-            if len(action_indexs) == 1:
-                action_index = 0
-            else:
-                action_index = self.rng.choice(action_indexs)
-            return placable[action_index], None
-
         # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
-        policy **= (1.0 + progress)
         probs = dzf.softmax(policy[:, placable])
 
         if len(placable) == 1:
@@ -80,7 +69,13 @@ class ReinforceAgent:
         self.memory.append(data)
 
     # ニューラルネットワークで近似したある方策に従った時の収益の期待値の勾配を求め、パラメータを更新する
-    def update(self):
+    def update(self, progress):
+        # 学習の進行度合いに応じて、lr を調整する
+        stage = progress // 0.25
+        if self.current_stage < stage:
+            self.current_stage = stage
+            self.optimizer.lr = self.lr / stage
+
         G, loss = 0, 0
         for reward, prob in reversed(self.memory):
             G *= self.gamma
@@ -143,3 +138,10 @@ if __name__ == "__main__":
 
     self_match = REINFORCE(board, first_agent, second_agent)
     self_match.fit(runs = 100, episodes = 10000, file_name = "reinforce")
+
+
+    import random
+    def random_computer(board : Board):
+        return random.choice(board.list_placable())
+    print(self_match.eval(1, random_computer), "%")
+    print(self_match.eval(0, random_computer), "%")

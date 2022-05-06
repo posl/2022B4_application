@@ -42,6 +42,14 @@ class SelfMatch:
         self.agents = [second_agent, first_agent]
 
     def fit(self, runs, episodes, file_name):
+        try:
+            self.__fit(runs, episodes, file_name)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            print()
+
+    def __fit(self, runs, episodes, file_name):
         print("\033[92m=== Final Winning Percentage ===\033[0m")
         print(" run || first | second")
 
@@ -70,10 +78,10 @@ class SelfMatch:
     def fit_one_episode(self, progress):
         raise NotImplementedError()
 
-    def eval(self, turn):
+    def eval(self, turn, enemy_plan = simple_plan):
         board = self.board
         agent_plan = self.agents[turn]
-        plans = (agent_plan, simple_plan) if turn else (simple_plan, agent_plan)
+        plans = (agent_plan, enemy_plan) if turn else (enemy_plan, agent_plan)
         board.set_plan(*plans)
 
         win_count = 0
@@ -154,7 +162,7 @@ class REINFORCE(SelfMatch):
 
         while True:
             agent = self.agents[board.turn]
-            action, prob = agent.get_action(board, progress)
+            action, prob = agent.get_action(board)
             board.put_stone(action)
 
             # 報酬はゲーム終了まで出ない
@@ -166,12 +174,12 @@ class REINFORCE(SelfMatch):
             else:
                 reward = board.reward
                 agent.add((reward, prob))
-                agent.update()
+                agent.update(progress)
                 break
 
         agent = self.agents[board.turn ^ 1]
         agent.add((-reward, Variable(np.array(0))))
-        agent.update()
+        agent.update(progress)
 
     # 評価用方策に対しての勝率の高い順で８人分のパラメータを保存する (先攻・後攻は別々のファイル)
     def save(self, turn, win_rate, file_name):
