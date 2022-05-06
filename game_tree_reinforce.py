@@ -50,13 +50,8 @@ class GTReinforce:
             board.reset()
             agent_alphabeta = AlphaBeta(self.__agent.get_new_data())
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
-            board.play(self.player1, agent_alphabeta.get_next_move)
-            reward = -1
-            if board.black_num > board.white_num:
-                reward = 1
-            elif board.black_num == board.white_num:
-                reward = -1
-            self.__agent.update(reward)
+            board.game()
+            self.__agent.update(board.reward)
         return self.__agent.get_data()
     
     def makefile(self, filename):
