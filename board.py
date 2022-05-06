@@ -97,7 +97,6 @@ class Board:
     def __new__(cls):
         assert not cls.height & 1
         assert not cls.width & 1
-        assert cls.action_size.bit_length() < 256
 
         return super().__new__(cls)
 
@@ -118,6 +117,9 @@ class Board:
     @property
     def state(self):
         return self.stone_exist, self.stone_black
+
+    def set_state(self, state):
+        self.stone_exist, self.stone_black = state
 
     # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
     @staticmethod
@@ -351,8 +353,7 @@ class Board:
 
     # 最新のログの盤面に戻る
     def undo_log(self):
-        state = self.log_stack.pop()
-        self.stone_exist, self.stone_black = state
+        self.set_state(self.log_stack.pop())
 
 
 

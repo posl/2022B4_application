@@ -49,13 +49,13 @@ class SelfMatch:
             for turn in (1, 0):
                 self.agents[turn].reset()
 
-            with tqdm(range(1, episodes + 1), desc = f"run {run}", leave = False) as pbar:
+            with tqdm(range(0, episodes + 1), desc = f"run {run}", leave = False) as pbar:
                 for episode in pbar:
                     self.fit_one_episode(progress = episode / episodes)
 
                     # 定期的に、プログレスバーの後ろに現在の勝率を出力する
                     if not episode % 100:
-                        win_rate = self.eval(turn)
+                        win_rate = (self.eval(0) + self.eval(1)) / 2
                         pbar.set_postfix(dict(rate = f"{win_rate}%"))
 
             # 最終結果の表示とパラメータの保存
@@ -72,7 +72,7 @@ class SelfMatch:
     def eval(self, turn):
         board = self.board
         agent_plan = self.agents[turn]
-        plans = agent_plan, simple_plan if turn else simple_plan, agent_plan
+        plans = (agent_plan, simple_plan) if turn else (simple_plan, agent_plan)
         board.set_plan(*plans)
 
         win_count = 0
