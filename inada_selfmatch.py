@@ -102,7 +102,7 @@ class DQN(SelfMatch):
         while flag:
             agent = self.agents[board.turn]
             action, state = agent.get_action(board)
-            board.put(action)
+            board.put_stone(action)
 
             # 遷移情報を一時バッファに格納する
             buffer = transition_infos[board.turn]
@@ -154,7 +154,7 @@ class REINFORCE(SelfMatch):
         while True:
             agent = self.agents[board.turn]
             action, prob = agent.get_action(board)
-            board.put(action)
+            board.put_stone(action)
 
             # 報酬はゲーム終了まで出ない
             flag = board.can_continue()
