@@ -246,6 +246,9 @@ class Board:
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
 
+    def plans(self):
+        return self.player1_plan, self.player2_plan
+
     # 置くマスを取得
     def get_action(self):
         if self.turn:
