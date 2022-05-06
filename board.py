@@ -107,7 +107,8 @@ class Board:
         self.turn = 1
 
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
-        self.log_stack = []
+        self.log_state = []
+        self.log_plans = []
 
         # somewhere_placable() で保存した n を次の list_placable() に使うための変数
         self.tmp_n = None
@@ -338,24 +339,32 @@ class Board:
 
     # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
     @contextmanager
-    def log_runtime(self, n):
-        self.add_log()
+    def log_runtime(self, n, info = "state"):
+        add_log = getattr(self, "add_" + info)
+        add_log()
         self.put_stone(n)
         flag = self.can_continue()
         yield
 
         if flag == 1:
             self.turn_change()
-        
-        self.undo_log()
+        undo_log = getattr(self, "undo_" + info)
+        undo_log()
 
-    # ログを追加する
-    def add_log(self):
-        self.log_stack.append(self.state)
+    def add_state(self):
+        self.log_state.append(self.state)
 
-    # 最新のログの盤面に戻る
-    def undo_log(self):
-        self.set_state(self.log_stack.pop())
+    def undo_state(self):
+        self.set_state(self.log_state.pop())
+
+
+    def add_state_plans(self):
+        self.add_state()
+        self.log_plans.append(self.plans)
+
+    def undo_state_plans(self):
+        self.undo_state()
+        self.set_plan(*self.log_plans.pop())
 
 
 
@@ -374,10 +383,11 @@ if __name__ == "__main__":
     def com_random(board : Board):
         return random.choice(board.list_placable())
 
+    board = Board()
+
     def f():
         return com_random, com_random
 
-    board = Board()
     # それぞれのプレイヤーの戦略の関数をわたす
     # プレイヤー先行でゲーム開始
     #board.set_plan(player, com_random, 1)

@@ -370,7 +370,7 @@ class DQNComputer(DQNAgent):
 if __name__ == "__main__":
     # ハイパーパラメータ設定
     buffer_size = 1000000
-    step_num = 2
+    step_num = 4
     gamma = 0.99
     prioritized = True
     compress = False

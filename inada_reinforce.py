@@ -95,7 +95,7 @@ class ReinforceComputer(ReinforceAgent):
 
     def reset(self, player_num, turn, file_name):
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる
-        assert 2 <= player_num, player_num <= 8
+        assert 1 <= player_num, player_num <= 8
         self.player_probs = SumTree(player_num)
 
         # ファイル名は先攻と後攻で異なる
