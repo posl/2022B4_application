@@ -111,7 +111,6 @@ class GamePage(tk.Frame):
         if game_still_cont:
             n = self.master.board.get_action()
             self.master.board.put_stone(n)
-            game_still_cont = self.master.board.can_continue()
         print("aaaa")
         self.canvas_update()
 
