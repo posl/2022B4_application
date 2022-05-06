@@ -195,7 +195,6 @@ class Board:
 
     # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新する
     def setbit_stone_exist(self, n):
-        print("n", type(n))
         self.stone_exist |= 1 << n
 
     def setbit_stone_black(self, mask):

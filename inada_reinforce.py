@@ -53,7 +53,6 @@ class ReinforceAgent:
 
         # 方策を合法手のみに絞って、確率形式に変換し、それに従って行動を選択する
         placable = board.list_placable()
-        print(placable)
         probs = dzf.softmax(policy[:, placable])
 
         if len(placable) == 1:
