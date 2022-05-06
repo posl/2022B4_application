@@ -42,6 +42,7 @@ class AlphaBeta:
 		value = self.__min_value
 		place_list = board.list_placable()
 		if not place_list:
+			print("error")
 			return -1
 		place_max = place_list[0]
 
@@ -119,6 +120,7 @@ if __name__ == "__main__":
 				continue
 
 	board = Board()
+	board.reset()
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
