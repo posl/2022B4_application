@@ -1,5 +1,5 @@
 from board import Board
-from board import LogBoard
+from board import Board
 import numpy as np
 
 class AlphaBeta:
@@ -22,12 +22,10 @@ class AlphaBeta:
 	# 次の手を示す
 	def get_next_move(self, board : Board):
 		self.turn = board.turn
-		log_board = LogBoard()
-		log_board.set_board(board)
-		return self.__first_max_node(log_board, self.__min_value, self.__max_value)
-	
+		return self.__first_max_node(board, self.__min_value, self.__max_value)
+
 	# 評価関数
-	def __evaluate(self, board : LogBoard):
+	def __evaluate(self, board : Board):
 		value_black = 0
 
 		for i in range(Board.action_size):
@@ -40,8 +38,8 @@ class AlphaBeta:
 			return - value_black
 
 	# 評価が最大値となる場所を求める
-	def __first_max_node(self, board : LogBoard, alpha , beta):
-		
+	def __first_max_node(self, board : Board, alpha , beta):
+
 		value = self.__min_value
 		place_list = board.list_placable()
 		if not place_list:
@@ -65,7 +63,7 @@ class AlphaBeta:
 		return place_max
 
 	# 評価の最大値を求める
-	def __max_node(self, board : LogBoard, depth, alpha, beta):
+	def __max_node(self, board : Board, depth, alpha, beta):
 		if depth == AlphaBeta.__max_depth:
 			return self.__evaluate(board)
 
@@ -98,13 +96,13 @@ class AlphaBeta:
 				if value > alpha:
 					alpha = value
 
-		return value	
+		return value
 
 	# 評価の最小値を求める
-	def __min_node(self, board : LogBoard, depth, alpha, beta):
+	def __min_node(self, board : Board, depth, alpha, beta):
 		if depth == AlphaBeta.__max_depth:
 			return self.__evaluate(board)
-		
+
 		value = self.__max_value
 		place_list = board.list_placable()
 
@@ -134,10 +132,8 @@ class AlphaBeta:
 				if value < beta:
 					beta = value
 
-		return value	
-			
-				
-	
+		return value
+
 
 
 
