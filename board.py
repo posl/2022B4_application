@@ -263,17 +263,28 @@ class Board:
         return p_list
 
 
+    # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
+    def set_plan(self, player1_plan, player2_plan):
+        self.player1_plan = player1_plan
+        self.player2_plan = player2_plan
+
     # 置くマスを取得
     def get_action(self):
-        if self.turn == self.player_turn:
+        if self.turn:
             return self.player1_plan(self)
         else:
             return self.player2_plan(self)
 
+
+    # n に駒を置き、返す
+    def put_stone(self, n):
+        self.__set_stone(n)
+        self.__reverse(n)
+
     # n に駒を置く
-    def __set(self, n):
+    def __set_stone(self, n):
         self.setbit_stone_exist(n)
-        if self.turn == 1:
+        if self.turn:
             self.setbit_stone_black(1 << n)
 
     # n に置いた時に返るマスを返す
@@ -290,66 +301,46 @@ class Board:
                         self.setbit_stone_black(mask)
                     break
 
-    # n に駒を置き、返す
-    def put(self, n):
-        self.__set(n)
-        self.__reverse(n)
-
     # ターンを交代
     def turn_change(self):
         self.turn ^= 1
 
-    # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
-    def set_plan(self, player1_plan, player2_plan, first_play):
-        self.reset()
-        self.player1_plan = player1_plan
-        self.player2_plan = player2_plan
-        self.player_turn = first_play % 2
+    # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
+    def can_continue(self, pass_flag = False):
+        self.turn_change()
+        if self.somewhere_placable():
+            return 1 + pass_flag
 
-    # ゲームが正常に続行できるか判定
-    def can_continue(self):
-        if self.list_placable():
-            return "true"
+        if pass_flag:
+            return 0
         else:
-            self.turn ^= 1
-            if self.list_placable():
-                self.turn ^= 1
-                return "pass"
-            else:
-                self.turn ^= 1
-                return "gameset"
+            return self.can_continue(True)
 
-    # ゲーム終了時
-    def gameset(self):
-        print("owa\nblack:", self.black_num, "   white:", self.white_num) #表示
 
-    # ゲームの本体
-    def game(self):
-        print("start") #表示
-        while 1:
-            #ゲームが正常に続行されるか
-            flag = self.can_continue()
-            if flag == "pass":
-                print("pass") #表示
-                self.turn_change()
-                continue
-            elif flag == "gameset":
-                break
-
-            self.print_state()
-
-            # 置く場所を取得
+    # ゲーム本体
+    def game(self, render_func = None):
+        flag = 1
+        while flag:
             n = self.get_action()
-            print("put : ", n)
+            self.put_stone(n)
+            flag = self.can_continue()
 
-            # 駒を置く
-            self.put(n)
+            if render_func is not None:
+                # 引数は pass があったかどうかの真偽値
+                render_func(flag == 2)
 
-            # ターン更新
-            self.turn_change()
+    def play(self, player1_plan, player2_plan):
+        self.reset()
 
-        print("gameset") #表示
-        self.gameset()
+        # start 表示 (コンピュータの設定選択)
+
+        self.set_plan(player1_plan, player2_plan)
+
+        # 最初の盤面表示
+
+        self.game()
+
+        # finish 表示 (結果の表示)
 
 
     # 一時的な盤面表示
@@ -370,7 +361,7 @@ class Board:
     @contextmanager
     def log_runtime(self, n):
         self.add_log()
-        self.put(n)
+        self.put_stone(n)
         self.turn_change()
         yield
 
