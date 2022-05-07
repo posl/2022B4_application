@@ -3,9 +3,9 @@ import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
-from inada_dqn import SumTree
 from board import Board
-from inada_selfmatch import REINFORCE
+from inada_selfmatch import REINFORCE, simple_plan
+from inada_dqn import SumTree
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -74,7 +74,7 @@ class ReinforceAgent:
         stage = progress // 0.25
         if self.current_stage < stage:
             self.current_stage = stage
-            self.optimizer.lr = self.lr / stage
+            self.optimizer.lr = self.lr / (stage + 1.0)
 
         G, loss = 0, 0
         for reward, prob in reversed(self.memory):
@@ -93,32 +93,56 @@ class ReinforceAgent:
         self.optimizer.update()
 
 
+def fit_reinforce_agent(runs, episodes, version = None):
+    # ハイパーパラメータ設定
+    gamma = 0.99
+    lr = 0.0002
+
+    file_name = "reinforce" if version is None else ("reinforce" + version)
+
+    # 環境とエージェント
+    board = Board()
+    first_agent = ReinforceAgent(board.action_size, gamma, lr)
+    second_agent = ReinforceAgent(board.action_size, gamma, lr)
+
+    # 自己対戦
+    self_match = REINFORCE(board, first_agent, second_agent)
+    self_match.fit(runs, episodes, file_name)
+
+
 
 
 # 実際にコンピュータとして使われるクラス (get_action() は親クラスのものを使う)
 class ReinforceComputer(ReinforceAgent):
     def __init__(self, action_size):
-        self.pi = PolicyNet(action_size)
+        self.each_pi = []
+        self.action_size = action_size
 
-    def reset(self, player_num, turn, file_name):
+    def reset(self, file_name, turn, player_num):
+        self.rng = xp.random.default_rng()
+
+        # ファイル名は先攻と後攻で異なる
+        file_name += f"{turn}_"
+
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる
         assert 1 <= player_num, player_num <= 8
         self.player_probs = SumTree(player_num)
+        self.player_probs.reset()
 
-        # ファイル名は先攻と後攻で異なる
-        self.file_name = file_name + f"{turn}_"
-
-        # 行動選択に使うエージェントの重みファイルの索引番号をこの時点で決定する
-        self.rng = xp.random.default_rng()
-        self.file_indexs = self.rng.choice(8, player_num, replace = False)
+        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
+        each_pi = self.each_pi
+        each_pi.clear()
+        for i in self.rng.choice(8, player_num, replace = False):
+            pi = PolicyNet(self.action_size)
+            pi.load_weights(file_name + f"{i}.npz")
+            each_pi.append(pi)
 
     def __call__(self, board):
         player_probs = self.player_probs
-        player_probs.reset()
         actions = []
 
-        for index in self.file_indexs:
-            self.pi.load_weights(self.file_name + str(index))
+        for pi in self.each_pi:
+            self.pi = pi
             action, prob = self.get_action(board)
 
             # 各エージェントが行動を選ぶ確率を重みとする
@@ -129,19 +153,33 @@ class ReinforceComputer(ReinforceAgent):
         return actions[player_probs.sample()]
 
 
+def eval_reinforce_computer(player_num, enemy_plan, version = None):
+    file_name = "reinforce" if version is None else ("reinforce" + version)
+
+    # 環境とエージェント
+    board = Board()
+    first_agent = ReinforceComputer(board.action_size)
+    second_agent = ReinforceComputer(board.action_size)
+
+    # エージェントの初期化
+    first_agent.reset(file_name, 1, player_num)
+    second_agent.reset(file_name, 0, player_num)
+    self_match = REINFORCE(board, first_agent, second_agent)
+
+    # 評価
+    print("enemy:", enemy_plan.__name__)
+    print("player_num:", player_num)
+    print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
+    print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
+
+
 
 
 if __name__ == "__main__":
-    board = Board()
-    first_agent = ReinforceAgent(board.action_size, gamma = 0.99, lr = 0.0002)
-    second_agent = ReinforceAgent(board.action_size, gamma = 0.99, lr = 0.0002)
-
-    self_match = REINFORCE(board, first_agent, second_agent)
-    self_match.fit(runs = 100, episodes = 10000, file_name = "reinforce")
-
+    # fit_reinforce_agent(runs = 100, episodes = 10000, version = "_v2_")
 
     import random
     def random_computer(board : Board):
         return random.choice(board.list_placable())
-    print(self_match.eval(1, random_computer), "%")
-    print(self_match.eval(0, random_computer), "%")
+
+    eval_reinforce_computer(player_num = 8, enemy_plan = simple_plan, version = None)

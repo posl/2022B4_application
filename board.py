@@ -241,14 +241,14 @@ class Board:
         return p_list
 
 
+    @property
+    def plans(self):
+        return self.player1_plan, self.player2_plan
+
     # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
     def set_plan(self, player1_plan, player2_plan):
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
-    
-    @property
-    def plans(self):
-        return self.player1_plan, self.player2_plan
 
     # 置くマスを取得
     def get_action(self):

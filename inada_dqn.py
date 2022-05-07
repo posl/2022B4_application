@@ -209,8 +209,9 @@ class ReplayBuffer:
         if self.count == self.buffer_size:
             self.count = 0
 
-        # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
-        self.priorities[self.count] = self.max_priority
+        if self.prioritized:
+            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
+            self.priorities[self.count] = self.max_priority
 
         if self.compress:
             # pickle.dump : ファイルに書き込む, pickle.dumps : 戻り値として返す
@@ -360,7 +361,7 @@ class DQNComputer(DQNAgent):
         self.qnet = qnet_class(action_size)
 
     # 何ステップ先の報酬まで見て学習したものを使うか選ぶことによって、難易度を変えることができる
-    def reset(self, step_num, turn, file_name):
+    def reset(self, file_name, turn, step_num):
         self.qnet.load_weights(file_name + f"{turn}_{step_num}")
 
 
@@ -371,7 +372,7 @@ if __name__ == "__main__":
     buffer_size = 1000000
     step_num = 6
     gamma = 0.99
-    prioritized = True
+    prioritized = False
     compress = False
 
     qnet_class = DuelingNet

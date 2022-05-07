@@ -51,13 +51,15 @@ class SelfMatch:
             print()
 
     def __fit(self, runs, episodes, file_name):
-        print("\033[92m=== Final Winning Percentage ===\033[0m")
+        print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
+
+        agents = self.agents
         start = time()
 
         for run in range(1, runs + 1):
-            for turn in (1, 0):
-                self.agents[turn].reset()
+            agents[1].reset()
+            agents[0].reset()
 
             with tqdm(range(episodes), desc = f"run {run}", leave = False) as pbar:
                 for episode in pbar:
@@ -81,18 +83,26 @@ class SelfMatch:
     def fit_one_episode(self, progress):
         raise NotImplementedError()
 
-    def eval(self, turn, enemy_plan = simple_plan):
+    def eval(self, turn, enemy_plan = simple_plan, verbose = False):
         board = self.board
         agent_plan = self.agents[turn]
         plans = (agent_plan, enemy_plan) if turn else (enemy_plan, agent_plan)
         board.set_plan(*plans)
 
+        # 外部からこのメソッドを呼び出すときに冗長要素を加えることができる
+        if verbose:
+            n_gen = tqdm(range(1000), desc = f"turn {turn}", leave = False)
+        else:
+            n_gen = range(100)
+
         win_count = 0
-        for _ in range(100):
+        for _ in n_gen:
             board.reset()
             board.game()
-            reward = -board.reward if turn ^ board.turn else board.reward
-            if reward > 0:
+
+            result = board.black_num - board.white_num
+            is_win = (result > 0) if turn else (result < 0)
+            if is_win:
                 win_count += 1
 
         return win_count
