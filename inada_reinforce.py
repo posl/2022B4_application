@@ -1,11 +1,10 @@
-from inada_framework import cuda, Model, optimizers
+from inada_framework import Model, optimizers, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
 from board import Board
-from inada_selfmatch import REINFORCE, simple_plan
-from inada_dqn import SumTree
+from inada_selfmatch import MultiAgentComputer, REINFORCE, simple_plan, random_plan
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -24,12 +23,13 @@ class PolicyNet(Model):
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.99, lr = 0.0002):
+    def __init__(self, action_size, gamma = 0.99, lr = 0.0002, bias = 0.1):
         self.memory = []
 
         self.action_size = action_size
         self.gamma = gamma
         self.lr = lr
+        self.bias = bias
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
@@ -48,12 +48,13 @@ class ReinforceAgent:
         action, _ = self.get_action(board)
         return action
 
-    def get_action(self, board):
-        state = board.state2ndarray(board.state, xp)
-        policy = self.pi(state[None, :])
+    def get_action(self, board, progress = 1.0):
         placable = board.list_placable()
+        state = board.state2ndarray(board.state, xp)[None, :]
+        policy = self.pi(state)
 
         # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
+        policy *= (1. + self.bias * progress)
         probs = dzf.softmax(policy[:, placable])
 
         if len(placable) == 1:
@@ -69,13 +70,7 @@ class ReinforceAgent:
         self.memory.append(data)
 
     # ニューラルネットワークで近似したある方策に従った時の収益の期待値の勾配を求め、パラメータを更新する
-    def update(self, progress):
-        # 学習の進行度合いに応じて、lr を調整する
-        stage = progress // 0.25
-        if self.current_stage < stage:
-            self.current_stage = stage
-            self.optimizer.lr = self.lr / (stage + 1.0)
-
+    def update(self):
         G, loss = 0, 0
         for reward, prob in reversed(self.memory):
             G *= self.gamma
@@ -93,64 +88,55 @@ class ReinforceAgent:
         self.optimizer.update()
 
 
-def fit_reinforce_agent(runs, episodes, version = None):
-    # ハイパーパラメータ設定
-    gamma = 0.99
-    lr = 0.0002
+# 実際にコンピュータとして使われるクラス
+class ReinforceComputer(MultiAgentComputer):
+    network_class = PolicyNet
 
+    def __call__(self, board):
+        placable = board.list_placable()
+        state = board.state2ndarray(board.state, xp)[None, :]
+
+        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        with no_grad():
+            for pi in self.each_net:
+                try:
+                    policy += pi(state)
+                except NameError:
+                    policy = pi(state)
+
+            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
+            probs = dzf.softmax(policy[:, placable])
+            probs = probs.data[0]
+
+        if len(placable) == 1:
+            action_index = 0
+        else:
+            action_index = self.rng.choice(len(placable), p = probs)
+
+        return placable[action_index]
+
+
+
+
+def fit_reinforce_agent(runs, episodes, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
-    # 環境とエージェント
+    # ハイパーパラメータ設定
+    gamma = 0.98
+    lr = 0.0001
+    bias = 0.1
+
+    # 環境
     board = Board()
-    first_agent = ReinforceAgent(board.action_size, gamma, lr)
-    second_agent = ReinforceAgent(board.action_size, gamma, lr)
+
+    # エージェント
+    agent_args = board.action_size, gamma, lr, bias
+    first_agent = ReinforceAgent(*agent_args)
+    second_agent = ReinforceAgent(*agent_args)
 
     # 自己対戦
     self_match = REINFORCE(board, first_agent, second_agent)
     self_match.fit(runs, episodes, file_name)
-
-
-
-
-# 実際にコンピュータとして使われるクラス (get_action() は親クラスのものを使う)
-class ReinforceComputer(ReinforceAgent):
-    def __init__(self, action_size):
-        self.each_pi = []
-        self.action_size = action_size
-
-    def reset(self, file_name, turn, player_num):
-        self.rng = xp.random.default_rng()
-
-        # ファイル名は先攻と後攻で異なる
-        file_name += f"{turn}_"
-
-        # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる
-        assert 1 <= player_num, player_num <= 8
-        self.player_probs = SumTree(player_num)
-        self.player_probs.reset()
-
-        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
-        each_pi = self.each_pi
-        each_pi.clear()
-        for i in self.rng.choice(8, player_num, replace = False):
-            pi = PolicyNet(self.action_size)
-            pi.load_weights(file_name + f"{i}.npz")
-            each_pi.append(pi)
-
-    def __call__(self, board):
-        player_probs = self.player_probs
-        actions = []
-
-        for pi in self.each_pi:
-            self.pi = pi
-            action, prob = self.get_action(board)
-
-            # 各エージェントが行動を選ぶ確率を重みとする
-            player_probs[len(actions)] = float(prob.data)
-            actions.append(action)
-
-        # 複数人のエージェントの意見から重み付きランダムサンプリングして、選ばれたものをコンピュータの行動とする
-        return actions[player_probs.sample()]
 
 
 def eval_reinforce_computer(player_num, enemy_plan, version = None):
@@ -168,7 +154,7 @@ def eval_reinforce_computer(player_num, enemy_plan, version = None):
 
     # 評価
     print("enemy:", enemy_plan.__name__)
-    print("player_num:", player_num)
+    print(f"player_num: {player_num}")
     print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
     print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
 
@@ -176,10 +162,8 @@ def eval_reinforce_computer(player_num, enemy_plan, version = None):
 
 
 if __name__ == "__main__":
-    # fit_reinforce_agent(runs = 100, episodes = 10000, version = "_v2_")
+    # 学習用コード
+    fit_reinforce_agent(runs = 20, episodes = 10000, version = None)
 
-    import random
-    def random_computer(board : Board):
-        return random.choice(board.list_placable())
-
-    eval_reinforce_computer(player_num = 8, enemy_plan = simple_plan, version = None)
+    # 評価用コード
+    # eval_reinforce_computer(player_num = 8, enemy_plan = simple_plan, version = None)

@@ -37,7 +37,7 @@ class StepNumGenerator:
         yield from self.__gen(-1)
 
 
-# 開始の数とステップ数、要素数を指定する range ジェネレータ
+# 開始の数とステップ数、要素数を指定する range イテラブル (再利用は想定していないので、扱い的にはジェネレータと等価)
 class ElementNumRange:
     def __init__(self, startpoint):
         self.args = [startpoint, None, None]
@@ -64,12 +64,13 @@ class ElementNumRange:
         return startpoint + step * count
 
 
-# オセロ盤の特定のマスから全方位探索を行うためのジェネレータ
+# オセロ盤の特定のマスから全方位探索を行うためのイテラブル (再利用は想定していないので、扱い的にはジェネレータと等価)
 class OmniDirectionalSearcher:
     def __init__(self, startpoint):
         self.step_num = StepNumGenerator(startpoint).generator
         self.range = ElementNumRange(startpoint)
 
+    # このメソッドで自身をジェネレータとして返す
     def __iter__(self):
         return self
 

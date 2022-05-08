@@ -1,44 +1,87 @@
-from inada_framework import cuda, Model, Function, optimizers, no_grad
-import inada_framework.layers as dzl
+from functools import lru_cache
+from inada_framework import Layer, Parameter, cuda, Model, Function, optimizers, no_grad
+import numpy as np
+xp = cuda.cp if cuda.gpu_enable else np
 import inada_framework.functions as dzf
 from board import Board
-import numpy as np
-from collections import deque
 import pickle
 import zlib
-xp = cuda.cp if cuda.gpu_enable else np
-from inada_selfmatch import DQN
+from inada_selfmatch import MultiAgentComputer, DQN, simple_plan, random_plan
 
 
-# Q 関数を近似するニューラルネットワーク
-class QNet(Model):
-    def __init__(self, action_size):
+# 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
+class NoisyAffine(Layer):
+    def __init__(self, out_size, activation = None):
         super().__init__()
-        self.l1 = dzl.Affine(512)
-        self.l2 = dzl.Affine(512)
-        self.l3 = dzl.Affine(action_size)
+        self.out_size = out_size
+        self.activation = activation
 
+        # 重みは学習が開始したときに動的に生成する
+        self.init_flag = True
+        self.W_mu = Parameter(None, name = "W_mu")
+        self.W_sigma = Parameter(None, name = "W_sigma")
+        self.b_mu = Parameter(None, name = "b_mu")
+        self.b_sigma = Parameter(None, name = "b_sigma")
+
+        self.rng = xp.random.default_rng()
+
+    # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
-        x = dzf.relu(self.l1(x))
-        x = dzf.relu(self.l2(x))
-        return self.l3(x)
+        in_size = x.shape[1]
+        out_size = self.out_size
+        if self.init_flag:
+            self.init_flag = False
+            self.init_params(in_size, out_size)
+
+        # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
+        epsilon_in = self.noise_f(self.rng.normal(0.0, 1.0, size = (in_size, 1)).astype(np.float32))
+        epsilon_out = self.noise_f(self.rng.normal(0.0, 1.0, size = (1, out_size)).astype(np.float32))
+        W_epsilon = xp.matmul(epsilon_in, epsilon_out)
+        b_epsilon = epsilon_out
+
+        # 本当はパラメータが従う正規分布の平均・分散を学習したいが、それだと逆伝播ができないので、再パラメータ化を用いる
+        W = self.W_mu + self.W_sigma * W_epsilon
+        b = self.b_mu + self.b_sigma * b_epsilon
+        x = dzf.affine(x, W, b)
+
+        # 活性化関数を挟む場合は、その関数を経由する
+        activation = self.activation
+        if activation is not None:
+            x = activation(x)
+
+        return x
+
+    # 重みの初期化方法はオリジナルの Rainbow のものを採用する
+    def init_params(self, in_size, out_size):
+        stdv = 1. / np.sqrt(in_size)
+        self.W_mu.data = self.rng.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
+        self.b_mu.data = self.rng.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
+
+        initial_sigma = 0.5 * stdv
+        self.W_sigma.data = xp.full((in_size, out_size), initial_sigma, dtype = np.float32)
+        self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
+
+    @staticmethod
+    def noise_f(x):
+        return xp.sign(x) * xp.sqrt(xp.abs(x))
 
 
 # 行動価値関数を状態価値関数とアドバンテージ関数に分けて Q 関数を近似するニューラルネットワーク (Dueling DQN)
 class DuelingNet(Model):
     def __init__(self, action_size):
         super().__init__()
-        self.l1 = dzl.Affine(512)
-        self.l2 = dzl.Affine(512)
-        self.l_value = dzl.Affine(1)
-        self.l_advantage = dzl.Affine(action_size)
+        self.v1 = NoisyAffine(512, activation = dzf.relu)
+        self.v2 = NoisyAffine(1)
+
+        self.a1 = NoisyAffine(512, activation = dzf.relu)
+        self.a2 = NoisyAffine(action_size)
 
     def forward(self, x):
-        x = dzf.relu(self.l1(x))
-        x = dzf.relu(self.l2(x))
-        advantage = self.l_advantage(x)
+        value = self.v2(self.v1(x))
+        advantage = self.a2(self.a1(x))
+
         advantage -= advantage.mean(axis = 1, keepdims = True)
-        return self.l_value(x) + advantage
+        return value + advantage
 
 
 # 重み付きの平均二乗誤差 (Function インスタンス)
@@ -150,17 +193,16 @@ class SumTree:
 
 # 学習に使う経験データ間の相関を弱め、また経験データを繰り返し使うためのバッファ (経験再生)
 class ReplayBuffer:
-    def __init__(self, buffer_size, step_num, gamma, prioritized = True, compress = False):
+    def __init__(self, buffer_size, prioritized = True, compress = False, gamma = 0.99):
         self.buffer = []
         self.buffer_size = buffer_size
 
-        # Multi-step Q Learning を実現するためのバッファ
-        self.step_num = step_num
-        self.gamma = gamma
-        self.tmp_buffer = deque(maxlen = step_num)
-
         self.prioritized = prioritized
         self.compress = compress
+
+        # Multi-step Q Learning を実現するためのバッファ
+        self.tmp_buffer = []
+        self.gamma = gamma
 
         # 優先度付き経験再生のハイパーパラメータは、オリジナルの Rainbow のものを採用する
         if prioritized:
@@ -187,42 +229,43 @@ class ReplayBuffer:
 
 
     def add(self, data):
-        tmp_buffer = self.tmp_buffer
-        tmp_buffer.append(data)
-        if len(tmp_buffer) < self.step_num:
+        next_state, reward = data[2:]
+        data = data[:2]
+        self.tmp_buffer.append(data)
+
+        # 報酬が出てから (エピソードが終了してから) そのエピソードで収集したデータを経験バッファに入れる
+        if not reward:
             return
 
-        # n step 先までの報酬の重み付き和を考える  (data = state, action, next_state, reward)
-        nstep_reward = 0
-        for i, data in enumerate(tmp_buffer):
-            next_state, reward = data[2:]
+        nstep_gamma = 1
+        count = self.count
 
-            # 報酬が出るのは、ゲーム終了時だけ
-            if reward:
-                nstep_reward = (self.gamma ** i) * reward
-                break
+        for state, action in reversed(self.tmp_buffer):
+            nstep_reward = reward * nstep_gamma
+            nstep_gamma *= self.gamma
+            nstep_data = state, action, next_state, nstep_reward, nstep_gamma
 
-        state, action = tmp_buffer[0][:2]
-        nstep_data = state, action, next_state, nstep_reward
+            # 経験データ数がバッファサイズを超えたら、古いものから上書きしていく
+            if count == self.buffer_size:
+                count = 0
 
-        # 経験データ数がバッファサイズを超えたら、古いものから上書きしていく
-        if self.count == self.buffer_size:
-            self.count = 0
+            if self.prioritized:
+                # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
+                self.priorities[count] = self.max_priority
 
-        if self.prioritized:
-            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
-            self.priorities[self.count] = self.max_priority
+            if self.compress:
+                # pickle.dump : ファイルに書き込む, pickle.dumps : 戻り値として返す
+                nstep_data = zlib.compress(pickle.dumps(nstep_data))
 
-        if self.compress:
-            # pickle.dump : ファイルに書き込む, pickle.dumps : 戻り値として返す
-            nstep_data = zlib.compress(pickle.dumps(nstep_data))
+            try:
+                self.buffer[count] = nstep_data
+            except IndexError:
+                self.buffer.append(nstep_data)
 
-        try:
-            self.buffer[self.count] = nstep_data
-        except IndexError:
-            self.buffer.append(nstep_data)
+            count += 1
 
-        self.count += 1
+        self.tmp_buffer.clear()
+        self.count = count
 
     def get_batch(self, batch_size, progress):
         if self.prioritized:
@@ -243,50 +286,53 @@ class ReplayBuffer:
         else:
             selected = [self.buffer[i] for i in indices]
 
-        state = xp.stack([Board.state2ndarray(x[0], xp) for x in selected])
-        next_state = xp.stack([Board.state2ndarray(x[2], xp) for x in selected])
+        state2ndarray_func = Board.state2ndarray
+        state = xp.stack([state2ndarray_func(x[0], xp) for x in selected])
+        next_state = xp.stack([state2ndarray_func(x[2], xp) for x in selected])
 
         action = xp.array([x[1] for x in selected], dtype = np.int32)
         reward = xp.array([x[3] for x in selected], dtype = np.float32)
+        gamma = xp.array([x[4] for x in selected], dtype = np.float32)
 
-        return (state, action, next_state, reward), indices, weights
+        return (state, action, next_state, reward, gamma), indices, weights
 
     def update_priorities(self, deltas, indices):
         if self.prioritized:
             # 優先度 = (|TD 誤差| + ε) ^ α
-            priorities = (abs(deltas) + self.epsilon) ** self.alpha
-            self.max_priority = max(self.max_priority, priorities.max())
+            new_priorities = (abs(deltas) + self.epsilon) ** self.alpha
+            self.max_priority = max(self.max_priority, new_priorities.max())
 
+            priorities = self.priorities
             for i, index in enumerate(indices):
-                self.priorities[index] = priorities[i]
+                priorities[index] = new_priorities[i]
 
 
 
 
 # TD 法の Q 学習でパラメータを修正する価値ベースのエージェント
 class DQNAgent:
-    def __init__(self, qnet_class, replay_buffer, action_size, batch_size, step_num, gamma):
-        self.qnet_class = qnet_class
-        self.replay_buffer = replay_buffer
-
+    def __init__(self, action_size, batch_size, buffer_size, prioritized = True, compress = False,
+                 gamma = 0.99, lr = 0.0005, exec_start = 50000, exec_interval = 4, sync_interval = 10000):
         self.action_size = action_size
         self.batch_size = batch_size
+        self.replay_buffer = ReplayBuffer(buffer_size, prioritized, compress, gamma)
 
-        # Q Learning 用のハイパーパラメータ
-        self.step_num = step_num
-        self.gamma = gamma ** step_num
-        lr = 0.0005
-        self.lr = lr / 4.0 if replay_buffer.prioritized else lr
-        self.epsilon = lambda progress: max(1.0 - 2.0 * progress, 0.1)
+        self.lr = lr / 4.0 if prioritized else lr
+
+        # update メソッド内の条件分岐に使う属性
+        self.exec_start = exec_start
+        self.exec_interval = exec_interval
+        self.sync_interval = sync_interval
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
-        self.qnet = self.qnet_class(self.action_size)
+        self.qnet = DuelingNet(self.action_size)
         self.optimizer = optimizers.Adam(self.lr).setup(self.qnet)
 
         # TD ターゲットの安定性のために、それを生成するためのネットワークは別で用意する (ターゲットネットワーク)
-        self.qnet_target = self.qnet_class(self.action_size)
+        self.qnet_target = DuelingNet(self.action_size)
 
+        self.total_steps = 0
         self.replay_buffer.reset()
         self.rng = np.random.default_rng()
 
@@ -303,99 +349,130 @@ class DQNAgent:
         action, _ = self.get_action(board)
         return action
 
-    # ε の確率で探索、1 - ε の確率で活用を行う (ε-greedy 法)
-    def get_action(self, board, progress = None):
-        if progress is not None and np.random.rand() < self.epsilon(progress):
-            return int(self.rng.choice(self.action_size))
+    # ニューラルネットワーク内のランダム要素が探索の役割を果たす
+    def get_action(self, board):
+        placable = board.list_placable()
+        state = board.state
 
         # オセロ盤の状態情報を変換して、ニューラルネットワークに流す
-        state = board.state
-        qs = self.qnet(board.state2ndarray(state, xp)[None, :]).data
+        with no_grad():
+            qs = self.qnet(board.state2ndarray(state, xp)[None, :])
+            qs = qs.data
 
-        # 合法手の中から Q 関数が最大のものを選択する
-        placable = board.list_placable()
+        # 合法手の中から Q 関数が最大のものを選択し、オセロ盤の状態情報と一緒に出力する
         qs = qs[0, placable]
-
-        # オセロ盤の状態情報も一緒に出力する
         return placable[qs.argmax()], state
 
 
     def update(self, data, progress):
+        total_steps = self.total_steps
+        self.total_steps = total_steps + 1
         replay_buffer = self.replay_buffer
-        batch_size = self.batch_size
-
         replay_buffer.add(data)
-        if len(replay_buffer) < batch_size:
+
+        if total_steps % self.exec_interval or total_steps < self.exec_start:
             return
+        if not total_steps % self.sync_interval:
+            self.sync_qnet()
 
         # バッチサイズ分の経験データと優先度更新用のインデックス、平均二乗誤差に使う重みを取得する
-        (state, action, next_state, reward), indices, W = replay_buffer.get_batch(batch_size, progress)
+        experiences, indices, weights = replay_buffer.get_batch(self.batch_size, progress)
+        state, action, next_state, reward, gamma = experiences
 
         # ニューラルネットワークの出力の形状は (batch_size, action_size)
-        qs = self.qnet(state)
-        sequence = np.arange(batch_size)
+        qnet = self.qnet
+        qs = qnet(state)
+        sequence = np.arange(self.batch_size)
         qs = qs[sequence, action]
 
         # 誤差を含む出力に max 演算子を使うことで過大評価を起こさないように、２つの Q 関数を使う (Double DQN)
         with no_grad():
             next_qs = self.qnet_target(next_state)
-            next_qs = next_qs.data[sequence, self.qnet(next_state).data.argmax(axis = 1)]
-            target = reward + (reward == 0) * self.gamma * next_qs
+            next_qs = next_qs.data[sequence, qnet(next_state).data.argmax(axis = 1)]
+            target = reward + (reward == 0) * gamma * next_qs
 
         # TD 誤差を使って、経験データの優先度を更新する
         replay_buffer.update_priorities(qs.data - target, indices)
 
         # Q 関数を TD ターゲットに近づけるようにパラメータを更新する
-        loss = MeanSquaredWeightedError(target, W)(qs)
+        loss = MeanSquaredWeightedError(target, weights)(qs)
 
-        self.qnet.clear_grads()
+        qnet.clear_grads()
         loss.backward()
         self.optimizer.update()
 
 
+# 実際にコンピュータとして使われるクラス
+class DQNComputer(MultiAgentComputer):
+    network_class = DuelingNet
+
+    def __call__(self, board):
+        placable = board.list_placable()
+        state = board.state2ndarray(board.state, xp)[None, :]
+
+        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        actions = []
+        with no_grad():
+            for qnet in self.each_net:
+                qs = qnet(state)
+                qs = qs.data[0, placable]
+                actions.append(placable[qs.argmax()])
+
+        # 各エージェントがそれぞれ選んだ行動価値が最大の行動の中からランダムに選択する
+        return int(self.rng.choice(actions))
 
 
-# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
-class DQNComputer(DQNAgent):
-    def __init__(self, qnet_class, action_size):
-        self.qnet = qnet_class(action_size)
 
-    # 何ステップ先の報酬まで見て学習したものを使うか選ぶことによって、難易度を変えることができる
-    def reset(self, file_name, turn, step_num):
-        self.qnet.load_weights(file_name + f"{turn}_{step_num}")
+
+def fit_dqn_agent(runs, episodes, version = None):
+    file_name = "dqn" if version is None else ("dqn" + version)
+
+    # ハイパーパラメータ設定
+    buffer_size = 1000000
+    batch_size = 32
+    gamma = 0.98
+    lr = 0.0001
+    prioritized = True
+    compress = True
+
+    # 環境
+    board = Board()
+
+    # エージェント
+    agent_args = board.action_size, batch_size, buffer_size, prioritized, compress, gamma, lr
+    first_agent = DQNAgent(*agent_args)
+    second_agent = DQNAgent(*agent_args)
+
+    # 自己対戦
+    self_match = DQN(board, first_agent, second_agent)
+    self_match.fit(runs, episodes, file_name)
+
+
+def eval_dqn_computer(agent_num, enemy_plan, version = None):
+    file_name = "dqn" if version is None else ("dqn" + version)
+
+    # 環境とエージェント
+    board = Board()
+    first_agent = DQNComputer(board.action_size)
+    second_agent = DQNComputer(board.action_size)
+
+    # エージェントの初期化
+    first_agent.reset(file_name, 1, agent_num)
+    second_agent.reset(file_name, 0, agent_num)
+    self_match = DQN(board, first_agent, second_agent)
+
+    # 評価
+    print("enemy:", enemy_plan.__name__)
+    print(f"agent_num: {agent_num}")
+    print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
+    print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
 
 
 
 
 if __name__ == "__main__":
-    # ハイパーパラメータ設定
-    buffer_size = 1000000
-    step_num = 6
-    gamma = 0.99
-    prioritized = False
-    compress = False
+    # 学習用コード
+    fit_dqn_agent(runs = 1, episodes = 3000000, version = None)
 
-    qnet_class = DuelingNet
-    batch_size = 32
-
-
-    # 経験再生バッファ
-    replay_buffer1 = ReplayBuffer(buffer_size, step_num, gamma, prioritized, compress)
-    replay_buffer2 = ReplayBuffer(buffer_size, step_num, gamma, prioritized, compress)
-
-    # 環境とエージェント
-    board = Board()
-    first_agent = DQNAgent(qnet_class, replay_buffer1, board.action_size, batch_size, step_num, gamma)
-    second_agent = DQNAgent(qnet_class, replay_buffer2, board.action_size, batch_size, step_num, gamma)
-
-
-    # 自己対戦
-    self_match = DQN(board, first_agent, second_agent)
-    self_match.fit(runs = 100, episodes = 3000, file_name = "dqn")
-
-
-    import random
-    def random_computer(board : Board):
-        return random.choice(board.list_placable())
-    print(self_match.eval(1, random_computer), "%")
-    print(self_match.eval(0, random_computer), "%")
+    # 評価用コード
+    # eval_dqn_computer(agent_num = 8, enemy_plan = simple_plan, version = None)

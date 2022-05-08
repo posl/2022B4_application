@@ -145,7 +145,6 @@ class Affine(Layer):
             self.W.data = self.init_W(x)
         return dzf.affine(x, self.W, self.b)
 
-    # 重みは Xavier の初期値
     def init_W(self, x):
         I = x.shape[1]
         xp = cuda.get_array_module(x)
