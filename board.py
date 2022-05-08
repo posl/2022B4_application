@@ -246,7 +246,7 @@ class Board:
     def set_plan(self, player1_plan, player2_plan):
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
-    
+
     @property
     def plans(self):
         return self.player1_plan, self.player2_plan

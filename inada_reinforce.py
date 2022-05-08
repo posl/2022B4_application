@@ -76,7 +76,7 @@ class ReinforceAgent:
             G *= self.gamma
             G += reward
 
-            # 負けの場合は、報酬に１回分余分に gamma が掛かっている (負け方じゃなく、勝ち方が知りたいわけだからいいか)
+            # 負けの場合は、報酬に１回分余分に gamma が掛かっている
             if prob.data:
                 loss += -G * dzf.log(prob)
 

@@ -1,4 +1,3 @@
-from functools import lru_cache
 from inada_framework import Layer, Parameter, cuda, Model, Function, optimizers, no_grad
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
@@ -11,9 +10,10 @@ from inada_selfmatch import MultiAgentComputer, DQN, simple_plan, random_plan
 
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
 class NoisyAffine(Layer):
-    def __init__(self, out_size, activation = None):
+    def __init__(self, out_size, first_sigma, activation = None):
         super().__init__()
         self.out_size = out_size
+        self.first_sigma = first_sigma
         self.activation = activation
 
         # 重みは学習が開始したときに動的に生成する
@@ -57,7 +57,7 @@ class NoisyAffine(Layer):
         self.W_mu.data = self.rng.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
         self.b_mu.data = self.rng.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
 
-        initial_sigma = 0.5 * stdv
+        initial_sigma = self.first_sigma * stdv
         self.W_sigma.data = xp.full((in_size, out_size), initial_sigma, dtype = np.float32)
         self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
 
@@ -312,7 +312,7 @@ class ReplayBuffer:
 # TD 法の Q 学習でパラメータを修正する価値ベースのエージェント
 class DQNAgent:
     def __init__(self, action_size, batch_size, buffer_size, prioritized = True, compress = False,
-                 gamma = 0.99, lr = 0.0005, exec_start = 50000, exec_interval = 4, sync_interval = 10000):
+                 gamma = 0.99, lr = 0.00025, start = 65536, update_interval = 4, sync_interval = 32768):
         self.action_size = action_size
         self.batch_size = batch_size
         self.replay_buffer = ReplayBuffer(buffer_size, prioritized, compress, gamma)
@@ -320,8 +320,8 @@ class DQNAgent:
         self.lr = lr / 4.0 if prioritized else lr
 
         # update メソッド内の条件分岐に使う属性
-        self.exec_start = exec_start
-        self.exec_interval = exec_interval
+        self.start = start
+        self.update_interval = update_interval
         self.sync_interval = sync_interval
 
     # エージェントを動かす前に呼ぶ必要がある
@@ -370,7 +370,7 @@ class DQNAgent:
         replay_buffer = self.replay_buffer
         replay_buffer.add(data)
 
-        if total_steps % self.exec_interval or total_steps < self.exec_start:
+        if total_steps % self.update_interval or total_steps < self.start:
             return
         if not total_steps % self.sync_interval:
             self.sync_qnet()
@@ -427,11 +427,11 @@ class DQNComputer(MultiAgentComputer):
 def fit_dqn_agent(runs, episodes, version = None):
     file_name = "dqn" if version is None else ("dqn" + version)
 
-    # ハイパーパラメータ設定
+    # ハイパーパラメータ設定 (ひとまず、γ 以外はオリジナルの Rainbow のもの)
     buffer_size = 1000000
     batch_size = 32
     gamma = 0.98
-    lr = 0.0001
+    lr = 0.00025
     prioritized = True
     compress = True
 
