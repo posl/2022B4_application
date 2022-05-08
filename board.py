@@ -241,14 +241,14 @@ class Board:
         return p_list
 
 
-    @property
-    def plans(self):
-        return self.player1_plan, self.player2_plan
-
     # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
     def set_plan(self, player1_plan, player2_plan):
         self.player1_plan = player1_plan
         self.player2_plan = player2_plan
+    
+    @property
+    def plans(self):
+        return self.player1_plan, self.player2_plan
 
     # 置くマスを取得
     def get_action(self):
@@ -301,7 +301,7 @@ class Board:
 
     # ゲーム本体
     def game(self, render_func = None):
-        flag = (self.stone_exist.bit_count() & 1) ^ 1
+        flag = 1
         while flag:
             n = self.get_action()
             self.put_stone(n)
@@ -337,7 +337,7 @@ class Board:
         print("-" * 20)
         self.print_board(self.stone_black)
         print("black:", self.black_num, "   white:", self.white_num)
-        print("turn:", self.turn, self.list_placable())
+        print(self.list_placable())
         print()
 
 
@@ -396,7 +396,7 @@ if __name__ == "__main__":
     # プレイヤー先行でゲーム開始
     #board.set_plan(player, com_random, 1)
     #board.set_plan(player, player, 1)
-    board.play()
+    board.play(player, com_random)
 
     print("game set")
     print("black:", board.black_num)
