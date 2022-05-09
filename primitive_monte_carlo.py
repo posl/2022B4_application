@@ -24,7 +24,7 @@ class PrimitiveMonteCarlo:
             board.turn = turn
 
             board.game()
-            if (board.black_num > board.white_num) == my_turn:
+            if (board.black_num != board.white_num) and ((board.black_num > board.white_num) == my_turn):
                 score += 1
         
         return score
@@ -43,8 +43,8 @@ class PrimitiveMonteCarlo:
             with board.log_runtime(n):
                 if not board.list_placable():
                     # ゲームが終了して勝つならその手を打つ
-                    if (board.black_num > board.white_num) == original_turn:
-                        scores.append(self.max_try)
+                    if (board.black_num != board.white_num) and ((board.black_num > board.white_num) == original_turn):
+                        scores.append(self.max_try + 1)
                         break
                     else:
                         continue
