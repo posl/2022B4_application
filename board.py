@@ -1,3 +1,4 @@
+from functools import cache
 import numpy as np
 from math import ceil
 from contextlib import contextmanager
@@ -37,38 +38,22 @@ class StepNumGenerator:
         yield from self.__gen(-1)
 
 
-# 開始の数とステップ数、要素数を指定する range イテラブル (再利用は想定していないので、扱い的にはジェネレータと等価)
-class ElementNumRange:
-    def __init__(self, startpoint):
-        self.args = [startpoint, None, None]
+# 引数の組み合わせを極力減らした上でキャッシュを利用することによる高速化
+@cache
+def element_num_range(startpoint, step, num):
+    startpoint += step
+    start = startpoint + step
+    stop = startpoint + step * num
 
-    # クラスからのインスタンス生成の回数を減らして、処理速度改善
-    def reset(self, step_num):
-        self.args[1:] = step_num
-        self.count = 0
-        return self
-
-    def __iter__(self):
-        return self
-
-    # getattr() の呼び出しが少なくなるようにして、処理速度改善
-    def __next__(self):
-        startpoint, step, num = self.args
-        count = self.count
-
-        if count >= num:
-            raise StopIteration()
-
-        count += 1
-        self.count = count
-        return startpoint + step * count
+    # 静的型付き言語で書かれているため処理が速い、 range を使うことによる高速化
+    return startpoint, range(start, stop, step)
 
 
 # オセロ盤の特定のマスから全方位探索を行うためのイテラブル (再利用は想定していないので、扱い的にはジェネレータと等価)
 class OmniDirectionalSearcher:
     def __init__(self, startpoint):
         self.step_num = StepNumGenerator(startpoint).generator
-        self.range = ElementNumRange(startpoint)
+        self.startpoint = startpoint
 
     # このメソッドで自身をジェネレータとして返す
     def __iter__(self):
@@ -76,15 +61,11 @@ class OmniDirectionalSearcher:
 
     def __next__(self):
         # この next() の呼び出しで生じる StopIteration 例外をこのジェネレータが生じさせた例外として使う
-        step_num = next(self.step_num)
-        n_gen = self.range.reset(step_num)
+        step, num = next(self.step_num)
 
-        try:
-            n = next(n_gen)
-        except StopIteration:
-            return next(self)
-
-        return n, n_gen
+        if num > 1:
+            return element_num_range(self.startpoint, step, num)
+        return next(self)
 
 
 

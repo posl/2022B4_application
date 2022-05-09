@@ -1,11 +1,11 @@
 import numpy as np
 import random
+from os.path import join
 from time import time
 from math import ceil
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from inada_framework.layers import parameters_dir
-import os
 from collections import deque
 from inada_framework import Variable
 
@@ -65,24 +65,25 @@ class SelfMatch:
 
     def fit(self, runs, episodes, eval_interval, file_name):
         # 前回の続きから学習をスタートする場合は、パラメータを読み込む
-        try:
-            for turn in (1, 0):
-                self.agents[turn].load_weights(file_name + f"{turn}_yet.npz")
-        except FileNotFoundError:
-            pass
+        for turn in (1, 0):
+            agent = self.agents[turn]
+            try:
+                agent.reset()
+                agent.load_weights(join("is_yet", file_name + f"{turn}_yet.npz"))
+            except FileNotFoundError:
+                pass
+        del turn, agent
 
         print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
         start = time()
 
         history_length = ceil(episodes / eval_interval) + 1
-        eval_historys = np.zeros(history_length), np.zeros(history_length)
+        eval_historys = np.zeros((2, history_length))
         del history_length
 
         try:
             for run in range(1, runs + 1):
-                self.agents[1].reset()
-                self.agents[0].reset()
                 self.fit_one_run(run, episodes, eval_interval, eval_historys)
 
                 # 最終評価の表示
@@ -93,11 +94,11 @@ class SelfMatch:
                     print(f"{win_rate:>3} %", end = " | " if turn else "  ")
 
                     # 描画用の時系列データに最終評価を反映させる
-                    eval_history = eval_historys[turn]
-                    eval_historys[-1] += (win_rate - eval_history[-1]) / run
+                    eval_historys[turn, -1] += (win_rate - eval_historys[turn, -1]) / run
 
-                    # パラメータの保存
+                    # パラメータの保存、エージェントの初期化
                     self.save(turn, win_rate, file_name)
+                    self.agents[turn].reset()
 
                 # 累計経過時間の表示
                 print("({:.5g} min)".format((time() - start) / 60))
@@ -123,8 +124,7 @@ class SelfMatch:
 
                     for turn in (1, 0):
                         win_rate = self.eval(turn)
-                        eval_history = eval_historys[turn]
-                        eval_history[index] += (win_rate - eval_history[index]) / run
+                        eval_historys[turn, index] += (win_rate - eval_historys[turn, index]) / run
                         win_rates.append(f"{win_rate}%")
 
                     pbar.set_postfix(dict(rates = win_rates))
@@ -138,8 +138,10 @@ class SelfMatch:
     # エージェントを指定した敵と定数回戦わせて、その時の勝利数を返す
     def eval(self, turn, enemy_plan = corners_plan, verbose = False):
         board = self.board
-        agent_plan = self.agents[turn]
-        plans = (agent_plan, enemy_plan) if turn else (enemy_plan, agent_plan)
+
+        # 方策の登録
+        agent = self.agents[turn]
+        plans = (agent, enemy_plan) if turn else (enemy_plan, agent)
         board.set_plan(*plans)
 
         # 外部からこのメソッドを呼び出すときに冗長要素を加えることができる
@@ -168,7 +170,7 @@ class SelfMatch:
     def plot(self, eval_historys, file_name, run, is_yet = False):
         for turn in (1, 0):
             if is_yet:
-                self.agents[turn].save_weights(file_name + f"{turn}_yet")
+                self.agents[turn].save_weights(join("is_yet", file_name + f"{turn}_yet"))
 
             eval_history = eval_historys[turn] / 100.
             history_label = "first" if turn else "second"
@@ -179,7 +181,7 @@ class SelfMatch:
         plt.title(file_name + f" (runs = {run})")
         plt.legend()
         plt.ylim(-0.1, 1.1)
-        plt.savefig(os.path.join(parameters_dir, "graphs", file_name))
+        plt.savefig(join(parameters_dir, "graphs", file_name))
 
 
 
