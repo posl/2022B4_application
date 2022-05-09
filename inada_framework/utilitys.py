@@ -20,7 +20,7 @@ def xp_sum_to(x, shape):
     return y
 
 
-# DeZero の sum, max, min 関数の逆伝播の際に使われる
+# DeZero の sum, average, max, min 関数の逆伝播の際に使われる
 def reshape_for_broadcast(gy, in_shape, axis, keepdims):
     # そのままブロードキャストが使えるなら、何も手を加えずに返す
     ndim = len(in_shape)

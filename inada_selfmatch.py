@@ -15,12 +15,14 @@ def simple_plan(board, placable = None):
     if placable is None:
         placable = board.list_placable()
 
-    # 30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
     rng = np.random.default_rng()
+
+    # 30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
     if np.random.rand() < 0.3:
-        if len(placable) == 1:
+        length = len(placable)
+        if length == 1:
             return placable[0]
-        return int(rng.choice(placable))
+        return placable[rng.choice(length)]
 
     current_stone_num = board.get_stone_num()
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
@@ -53,96 +55,72 @@ def random_plan(board):
     return random.choice(board.list_placable())
 
 
-# 何人のエージェントを行動選択に使うかによって、難易度を変えることができるオセロ対戦用コンピュータの基底クラス
-class MultiAgentComputer:
-    network_class = None
-
-    def __init__(self, action_size):
-        self.each_net = []
-        self.action_size = action_size
-
-    def reset(self, file_name, turn, agent_num):
-        self.rng = np.random.default_rng()
-        file_name += f"{turn}_"
-
-        # エージェント数の上限は８人
-        assert 1 <= agent_num, agent_num <= 8
-
-        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
-        each_net = self.each_net
-        each_net.clear()
-        for i in self.rng.choice(8, agent_num, replace = False):
-            network = self.network_class(self.action_size)
-            network.load_weights(file_name + f"{i}.npz")
-            each_net.append(network)
-
-
 
 
 # 自己対戦で学習・評価を行うためのクラスの基底クラス
 class SelfMatch:
     def __init__(self, board, first_agent, second_agent):
         self.board = board
-        self.agents = [second_agent, first_agent]
+        self.agents = second_agent, first_agent
 
-    def fit(self, runs, episodes, file_name):
+    def fit(self, runs, episodes, eval_interval, file_name):
         print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
 
-        history_length = ceil(episodes / 1000) + 1
-        eval_historys = [np.zeros(history_length), np.zeros(history_length)]
+        history_length = ceil(episodes / eval_interval) + 1
+        eval_historys = np.zeros(history_length), np.zeros(history_length)
         start = time()
 
         try:
-            for run in range(runs):
+            for run in range(1, runs + 1):
                 self.agents[1].reset()
                 self.agents[0].reset()
-                self.fit_one_run(run, episodes, eval_historys)
+                self.fit_one_run(run, episodes, eval_interval, eval_historys)
 
                 # 最終結果と経過時間のの表示、パラメータの保存
                 print(f"{run:>4}", end = " || ")
 
                 for turn in (1, 0):
                     win_rate = self.eval(turn)
-                    eval_historys[turn][-1] += win_rate
+                    eval_history = eval_historys[turn]
+                    eval_historys[-1] += (win_rate - eval_history[-1]) / run
                     self.save(turn, win_rate, file_name)
 
                     print(f"{win_rate:>3} %", end = " | " if turn else "  ")
                 print("({:.5g} min)".format((time() - start) / 60))
 
         except KeyboardInterrupt:
-            if run:
-                for turn in (1, 0):
-                    eval_history = eval_historys[turn] / 100.
-                    history_label = "first" if turn else "second"
-                    plt.plot(np.arange(history_length), eval_history, label = history_label)
+            pass
 
-                plt.xlabel("Thousands of Episodes")
-                plt.ylabel("Mean Winning Percentage")
-                plt.title(file_name + f" (runs = {run})")
-                plt.legend()
-                plt.ylim(0., 1.1)
-                plt.savefig(os.path.join(parameters_dir, "graphs", file_name))
-        finally:
-            print()
+        for turn in (1, 0):
+            eval_history = eval_historys[turn] / 100.
+            history_label = "first" if turn else "second"
+            plt.plot(np.arange(history_length), eval_history, label = history_label)
 
-    def fit_one_run(self, run, episodes, eval_historys):
+        plt.xlabel("Thousands of Episodes")
+        plt.ylabel("Mean Winning Percentage")
+        plt.title(file_name + f" (runs = {run})")
+        plt.legend()
+        plt.ylim(-0.1, 1.1)
+        plt.savefig(os.path.join(parameters_dir, "graphs", file_name))
+        print()
+
+    def fit_one_run(self, run, episodes, eval_interval, eval_historys):
         with tqdm(range(episodes), desc = f"run {run}", leave = False) as pbar:
-            run += 1
             index = 0
 
             for episode in pbar:
                 self.fit_one_episode(progress = (episode + 1) / episodes)
 
                 # 定期的に現在の方策を評価し、現在の勝率を配列に追加して、プログレスバーの後ろに出力する
-                if not episode % 1000:
-                    win_rates = ()
+                if not episode % eval_interval:
+                    win_rates = []
 
                     for turn in (1, 0):
                         win_rate = self.eval(turn)
                         eval_history = eval_historys[turn]
                         eval_history[index] += (win_rate - eval_history[index]) / run
-                        win_rates += (f"{win_rate}%", )
+                        win_rates.append(f"{win_rate}%")
 
                     pbar.set_postfix(dict(rates = win_rates))
                     index += 1
@@ -150,7 +128,6 @@ class SelfMatch:
     # このメソッドを継承した子クラスが実装する
     def fit_one_episode(self, progress):
         raise NotImplementedError()
-
 
     # エージェントを指定した敵と定数回戦わせて、その時の勝利数を返す
     def eval(self, turn, enemy_plan = corners_plan, verbose = False):
@@ -177,6 +154,103 @@ class SelfMatch:
 
         return win_count
 
+    # このメソッドを継承した子クラスが実装する
+    def save(self, turn, win_rate, file_name):
+        raise NotImplementedError()
+
+
+
+
+class Rainbow(SelfMatch):
+    def fit_one_episode(self, progress):
+        board = self.board
+        board.reset()
+        transition_infos = deque(), deque()
+        flag = 1
+
+        while flag:
+            turn = board.turn
+            agent = self.agents[turn]
+
+            placable = board.list_placable()
+            state = board.state
+            action = agent.get_action(board, placable)
+
+            board.put_stone(action)
+            flag = board.can_continue()
+
+            # 遷移情報を一時バッファに格納する
+            buffer = transition_infos[turn]
+            buffer.append((placable, state, action))
+
+            # 遷移情報２つセットで１回の update メソッドが呼べる
+            if len(buffer) == 2:
+                state, action = buffer.popleft()[1:]
+                next_placable, next_state = buffer[0][:2]
+
+                # 報酬はゲーム終了まで出ない
+                agent.update((state, action, 0, next_state, next_placable), progress)
+
+        reward = board.reward
+        next_state = board.state
+        next_placable = []
+
+        # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
+        while True:
+            state, action = buffer.popleft()[1:]
+            agent.update((state, action, reward, next_state, next_placable), progress)
+
+            if turn == board.turn:
+                turn ^= 1
+                buffer = transition_infos[turn]
+                agent = self.agents[turn]
+                reward = -reward
+            else:
+                break
+
+    def save(self, turn, win_rate, file_name):
+        try:
+            name = f"max_win_rate{turn}"
+            max_win_rate = getattr(self, name)
+        except AttributeError:
+            pass
+        else:
+            if max_win_rate > win_rate:
+                return
+
+        setattr(self, name, win_rate)
+        agent = self.agents[turn]
+        agent.save_weights(file_name + f"{turn}_{agent.quantiles_num}")
+
+
+
+
+class Reinforce(SelfMatch):
+    def fit_one_episode(self, progress = None):
+        board = self.board
+        board.reset()
+
+        while True:
+            agent = self.agents[board.turn]
+            action, prob = agent.get_action(board)
+            board.put_stone(action)
+
+            # 報酬はゲーム終了まで出ない
+            flag = board.can_continue()
+            if flag:
+                agent.add((0, prob))
+
+            # エージェントの学習 (update メソッド) はエピソードが終わるたびに行う
+            else:
+                reward = board.reward
+                agent.add((reward, prob))
+                agent.update()
+                break
+
+        agent = self.agents[board.turn ^ 1]
+        agent.add((-reward, Variable(np.array(0))))
+        agent.update()
+
     # 評価用方策に対しての勝率の高い順で８人分のパラメータを保存する (先攻・後攻は別々のファイル)
     def save(self, turn, win_rate, file_name):
         try:
@@ -198,74 +272,3 @@ class SelfMatch:
 
         agent = self.agents[turn]
         agent.save_weights(file_name + f"{turn}_{index}")
-
-
-
-
-class DQN(SelfMatch):
-    def fit_one_episode(self, progress):
-        board = self.board
-        board.reset()
-        transition_infos = deque(), deque()
-        flag = 1
-
-        while flag:
-            turn = board.turn
-            agent = self.agents[turn]
-            action, state = agent.get_action(board)
-            board.put_stone(action)
-
-            # 遷移情報を一時バッファに格納する
-            buffer = transition_infos[turn]
-            buffer.append((state, action))
-
-            # 学習開始前にターゲットネットワークを現在の学習対象ネットワークと同期させる
-            if len(buffer) == 2:
-                state, action = buffer.popleft()
-                next_state = buffer[0][0]
-
-                # 報酬はゲーム終了まで出ない
-                agent.update((state, action, next_state, 0), progress)
-
-            flag = board.can_continue()
-
-        # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
-        reward = board.reward
-        while True:
-            state, action = buffer.popleft()
-            agent.update((state, action, board.state, reward), progress)
-
-            if turn == board.turn:
-                turn ^= 1
-                buffer = transition_infos[turn]
-                agent = self.agents[turn]
-                reward = -reward
-            else:
-                break
-
-
-class REINFORCE(SelfMatch):
-    def fit_one_episode(self, progress):
-        board = self.board
-        board.reset()
-
-        while True:
-            agent = self.agents[board.turn]
-            action, prob = agent.get_action(board, progress)
-            board.put_stone(action)
-
-            # 報酬はゲーム終了まで出ない
-            flag = board.can_continue()
-            if flag:
-                agent.add((0, prob))
-
-            # エージェントの学習 (update メソッド) はエピソードが終わるたびに行う
-            else:
-                reward = board.reward
-                agent.add((reward, prob))
-                agent.update()
-                break
-
-        agent = self.agents[board.turn ^ 1]
-        agent.add((-reward, Variable(np.array(0))))
-        agent.update()

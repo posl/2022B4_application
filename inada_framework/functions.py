@@ -398,9 +398,23 @@ def sum(x, axis = None, keepdims = False):
     return Sum(axis, keepdims)(x)
 
 
+class Average(Function):
+    def __init__(self, axis, keepdims):
+        self.axis = axis
+        self.keepdims = keepdims
+
+    def forward(self, x):
+        return x.mean(axis = self.axis, keepdims = self.keepdims)
+
+    def backward(self, gy):
+        x = self.inputs[0].data
+        gy *= (gy.size / x.size)
+
+        gy = reshape_for_broadcast(gy, x.shape, self.axis, self.keepdims)
+        return broadcast_to(gy, x.shape)
+
 def average(x, axis = None, keepdims = False):
-    y = sum(x, axis, keepdims)
-    return y * (y.data.size / x.size)
+    return Average(axis, keepdims)(x)
 
 mean = average
 
