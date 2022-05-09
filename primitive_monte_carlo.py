@@ -1,5 +1,6 @@
-from board import Board
 import numpy as np
+
+from board import Board
 
 
 class PrimitiveMonteCarlo:
@@ -36,34 +37,30 @@ class PrimitiveMonteCarlo:
 
         # 合法手の内、勝率が最もよかったものを置く
         candidate = board.list_placable()
-        max_score = 0
-        next_n = candidate[0]
+        scores = list()
         board.set_plan(self.random_action, self.random_action)
         for n in candidate:
             with board.log_runtime(n):
                 if not board.list_placable():
                     # ゲームが終了して勝つならその手を打つ
                     if (board.black_num > board.white_num) == original_turn:
-                        next_n = n
+                        scores.append(self.max_try)
                         break
                     else:
                         continue
                 else:
                     score = self.pmc_method(board, original_turn)
+                    scores.append(score)
                     print(n, score)
-                    # 勝率100%のものが見つかったら決め打ち
-                    if score == self.max_try:
-                        next_n = n
-                        break
-                    elif score > max_score:
-                        max_score, next_n = score, n
        
         # 原状回復
         board.set_plan(*original_plans)
         board.turn = original_turn
-        
-        print("next_n ; ", next_n)
-        return next_n
+
+        # スコアが同点ならランダムで打つ
+        max_index = [i for i, s in enumerate(scores) if s == max(scores)]
+        print("put", candidate[self.rng.choice(max_index)])
+        return candidate[self.rng.choice(max_index)]
 
 
 if __name__ == "__main__":
