@@ -100,7 +100,8 @@ class Layer:
             for key, param in params_dict.items():
                 param.data = npz[key]
         else:
-            print("parameters file could not be found.")
+            message = f"\"{file_path}\" is not found."
+            raise FileNotFoundError(message)
 
     # 同じレイヤクラスのインスタンス同士でパラメータを同期させる
     def copy_weights(self, layer):

@@ -1,11 +1,11 @@
 import numpy as np
 import random
-from math import ceil
 from time import time
+from math import ceil
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from inada_framework.layers import parameters_dir
 import os
-from tqdm import tqdm
 from collections import deque
 from inada_framework import Variable
 
@@ -64,12 +64,20 @@ class SelfMatch:
         self.agents = second_agent, first_agent
 
     def fit(self, runs, episodes, eval_interval, file_name):
+        # 前回の続きから学習をスタートする場合は、パラメータを読み込む
+        try:
+            for turn in (1, 0):
+                self.agents[turn].load_weights(file_name + f"{turn}_yet.npz")
+        except FileNotFoundError:
+            pass
+
         print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
+        start = time()
 
         history_length = ceil(episodes / eval_interval) + 1
         eval_historys = np.zeros(history_length), np.zeros(history_length)
-        start = time()
+        del history_length
 
         try:
             for run in range(1, runs + 1):
@@ -77,33 +85,30 @@ class SelfMatch:
                 self.agents[0].reset()
                 self.fit_one_run(run, episodes, eval_interval, eval_historys)
 
-                # 最終結果と経過時間のの表示、パラメータの保存
+                # 最終評価の表示
                 print(f"{run:>4}", end = " || ")
 
                 for turn in (1, 0):
                     win_rate = self.eval(turn)
+                    print(f"{win_rate:>3} %", end = " | " if turn else "  ")
+
+                    # 描画用の時系列データに最終評価を反映させる
                     eval_history = eval_historys[turn]
                     eval_historys[-1] += (win_rate - eval_history[-1]) / run
+
+                    # パラメータの保存
                     self.save(turn, win_rate, file_name)
 
-                    print(f"{win_rate:>3} %", end = " | " if turn else "  ")
+                # 累計経過時間の表示
                 print("({:.5g} min)".format((time() - start) / 60))
 
         except KeyboardInterrupt:
-            pass
-
-        for turn in (1, 0):
-            eval_history = eval_historys[turn] / 100.
-            history_label = "first" if turn else "second"
-            plt.plot(np.arange(history_length), eval_history, label = history_label)
-
-        plt.xlabel("Thousands of Episodes")
-        plt.ylabel("Mean Winning Percentage")
-        plt.title(file_name + f" (runs = {run})")
-        plt.legend()
-        plt.ylim(-0.1, 1.1)
-        plt.savefig(os.path.join(parameters_dir, "graphs", file_name))
-        print()
+            is_yet = True
+        else:
+            is_yet = False
+        finally:
+            self.plot(eval_historys, file_name, run, is_yet)
+            print()
 
     def fit_one_run(self, run, episodes, eval_interval, eval_historys):
         with tqdm(range(episodes), desc = f"run {run}", leave = False) as pbar:
@@ -128,6 +133,7 @@ class SelfMatch:
     # このメソッドを継承した子クラスが実装する
     def fit_one_episode(self, progress):
         raise NotImplementedError()
+
 
     # エージェントを指定した敵と定数回戦わせて、その時の勝利数を返す
     def eval(self, turn, enemy_plan = corners_plan, verbose = False):
@@ -157,6 +163,23 @@ class SelfMatch:
     # このメソッドを継承した子クラスが実装する
     def save(self, turn, win_rate, file_name):
         raise NotImplementedError()
+
+    # キーボード割り込みによって途中終了した場合は、パラメータの保存も同時に行う
+    def plot(self, eval_historys, file_name, run, is_yet = False):
+        for turn in (1, 0):
+            if is_yet:
+                self.agents[turn].save_weights(file_name + f"{turn}_yet")
+
+            eval_history = eval_historys[turn] / 100.
+            history_label = "first" if turn else "second"
+            plt.plot(np.arange(len(eval_history)), eval_history, label = history_label)
+
+        plt.xlabel("Thousands of Episodes")
+        plt.ylabel("Mean Winning Percentage")
+        plt.title(file_name + f" (runs = {run})")
+        plt.legend()
+        plt.ylim(-0.1, 1.1)
+        plt.savefig(os.path.join(parameters_dir, "graphs", file_name))
 
 
 
@@ -270,5 +293,4 @@ class Reinforce(SelfMatch):
                 return
             max_win_rates[index] = win_rate
 
-        agent = self.agents[turn]
-        agent.save_weights(file_name + f"{turn}_{index}")
+        self.agents[turn].save_weights(file_name + f"{turn}_{index}")

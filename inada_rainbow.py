@@ -428,6 +428,9 @@ class RainbowAgent:
     def save_weights(self, file_name):
         self.qnet.save_weights(file_name)
 
+    def load_weights(self, file_name):
+        self.qnet.load_weights(file_name)
+
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
     def __call__(self, board):

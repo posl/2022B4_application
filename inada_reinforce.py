@@ -41,6 +41,9 @@ class ReinforceAgent:
     def save_weights(self, file_name):
         self.pi.save_weights(file_name)
 
+    def load_weights(self, file_name):
+        self.pi.load_weights(file_name)
+
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
     def __call__(self, board):
