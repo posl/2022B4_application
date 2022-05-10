@@ -38,7 +38,7 @@ class StepNumGenerator:
         yield from self.__gen(-1)
 
 
-# 引数の組み合わせを極力減らした上でキャッシュを利用することによる高速化
+# 引数の組み合わせを極力減らした上でキャッシュを利用することによる高速化 (引数は、304 通り -> 40 kbyte 消費される)
 @cache
 def element_num_range(startpoint, step, num):
     startpoint += step
@@ -129,9 +129,10 @@ class Board:
     # オセロ盤を初期状態にセットする
     def reset(self):
         width = self.width
-        shift = self.t2n(((self.height >> 1) - 1, (width >> 1) - 1))
-        self.stone_exist = (0b11 << shift) + (0b11 << (shift + width))
-        self.stone_black = (0b10 << shift) + (0b01 << (shift + width))
+        bottom_left = self.t2n(((self.height >> 1), ((width >> 1) - 1)))
+        upper_left = bottom_left - width
+        self.stone_exist = (0b11 << upper_left) + (0b11 << bottom_left)
+        self.stone_black = (0b10 << upper_left) + (0b01 << bottom_left)
         self.turn = 1
 
 

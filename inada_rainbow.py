@@ -557,7 +557,7 @@ class RainbowComputer(RainbowAgent):
 def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
-    # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.3 Gbyte)
+    # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.5 Gbyte)
     buffer_size = 1000000
     prioritized = True
     compress = False
@@ -610,7 +610,7 @@ if __name__ == "__main__":
     quantiles_num = 50
 
     # 学習用コード
-    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 226, version = None)
+    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
