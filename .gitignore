@@ -2,3 +2,5 @@
 Pipfile*
 .vscode/
 profiling.*
+graphs/
+is_yet/
