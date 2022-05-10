@@ -3,8 +3,8 @@ import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
-from board import Board
 from inada_selfmatch import Reinforce, simple_plan, random_plan
+from board import Board
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -34,15 +34,13 @@ class ReinforceAgent:
     def reset(self):
         self.pi = PolicyNet(self.action_size)
         self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
+        self.rng = np.random.default_rng()
 
-        self.current_stage = 0
-        self.rng = xp.random.default_rng()
+    def save(self, file_name, is_yet = None):
+        self.pi.save_weights(file_name + ".npz")
 
-    def save_weights(self, file_name):
-        self.pi.save_weights(file_name)
-
-    def load_weights(self, file_name):
-        self.pi.load_weights(file_name)
+    def load_to_restart(self, file_name):
+        self.pi.load_weights(file_name + ".npz")
 
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
@@ -78,7 +76,7 @@ class ReinforceAgent:
             G += reward
 
             # 負けの場合は、報酬に１回分余分に gamma が掛かっている
-            if prob.data:
+            if prob is not None:
                 loss += -G * dzf.log(prob)
 
         # メモリの解放を先に行う
@@ -96,8 +94,9 @@ class ReinforceComputer:
         self.action_size = action_size
 
     def reset(self, file_name, turn, agent_num):
-        self.rng = np.random.default_rng()
+        file_name = Reinforce.get_path(file_name).format("parameters")
         file_name += f"{turn}_"
+        self.rng = np.random.default_rng()
 
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
         assert isinstance(agent_num, int) and 1 <= agent_num and agent_num <= 8
@@ -133,8 +132,8 @@ class ReinforceComputer:
 
 
 
-def fit_reinforce_agent(runs, episodes, eval_interval, version = None):
-    file_name = "reinforce" if version is None else f"reinforce{version}"
+def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
+    file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # ハイパーパラメータ設定
     gamma = 0.98
@@ -150,11 +149,11 @@ def fit_reinforce_agent(runs, episodes, eval_interval, version = None):
 
     # 自己対戦
     self_match = Reinforce(board, first_agent, second_agent)
-    self_match.fit(runs, episodes, eval_interval, file_name)
+    self_match.fit(8, episodes, file_name, trained_num, restart)
 
 
-def eval_reinforce_computer(player_num, enemy_plan, version = None):
-    file_name = "reinforce" if version is None else f"reinforce{version}"
+def eval_reinforce_computer(agent_num, enemy_plan, version = None):
+    file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # 環境とエージェント
     board = Board()
@@ -162,13 +161,13 @@ def eval_reinforce_computer(player_num, enemy_plan, version = None):
     second_agent = ReinforceComputer(board.action_size)
 
     # エージェントの初期化
-    first_agent.reset(file_name, 1, player_num)
-    second_agent.reset(file_name, 0, player_num)
+    first_agent.reset(file_name, 1, agent_num)
+    second_agent.reset(file_name, 0, agent_num)
     self_match = Reinforce(board, first_agent, second_agent)
 
     # 評価
-    print(f"enemy: {enemy_plan.__name__}")
-    print(f"player_num: {player_num}")
+    print("enemy:", enemy_plan.__name__)
+    print(f"agent_num: {agent_num}")
     print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
     print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
 
@@ -177,7 +176,7 @@ def eval_reinforce_computer(player_num, enemy_plan, version = None):
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(runs = 20, episodes = 10000, eval_interval = 100, version = None)
+    fit_reinforce_agent(episodes = 10000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    # eval_reinforce_computer(player_num = 8, enemy_plan = simple_plan, version = None)
+    # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
