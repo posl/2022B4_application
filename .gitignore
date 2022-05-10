@@ -4,3 +4,4 @@ Pipfile*
 profiling.*
 graphs/
 is_yet/
+.DS_Store
