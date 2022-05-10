@@ -9,9 +9,6 @@ import inada_framework.functions as dzf
 # レイヤ・モデルの基底クラス
 # =============================================================================
 
-# 学習するパラメータを持つクラスがレイヤであるとする
-parameters_dir = os.path.join(os.path.dirname(__file__), "..", "parameters")
-
 class Layer:
     def __init__(self):
         # パラメータは集合で保持する (同じオブジェクト ID の要素は含まれない)
@@ -66,7 +63,7 @@ class Layer:
             elif isinstance(object, Parameter):
                 params_dict[key] = object
 
-    def save_weights(self, file_name = "params.npz"):
+    def save_weights(self, file_path):
         # パラメータを保存するときは必ずデータが主記憶上にあるようにする
         if cuda.gpu_enable:
             self.to_cpu()
@@ -76,9 +73,6 @@ class Layer:
         array_dict = {key : param.data for key, param in params_dict.items()}
 
         try:
-            if not os.path.exists(parameters_dir):
-                os.mkdir(parameters_dir)
-            file_path = os.path.join(parameters_dir, file_name)
             np.savez_compressed(file_path, **array_dict)
         except (Exception, KeyboardInterrupt):
             if os.path.exists(file_path):
@@ -88,12 +82,9 @@ class Layer:
             if cuda.gpu_enable:
                 self.to_gpu()
 
-    def load_weights(self, file_name = "params.npz"):
-        file_path = os.path.join(parameters_dir, file_name)
-
-        # 指定されたファイルが無ければ、何もせずに戻る
+    def load_weights(self, file_path):
         if os.path.exists(file_path):
-            npz = np.load(file_path)
+            npz = np.load(file_path, allow_pickle = True)
 
             params_dict = {}
             self.flatten_params(params_dict)

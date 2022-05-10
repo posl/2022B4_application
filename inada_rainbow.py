@@ -7,8 +7,8 @@ from functools import cache
 from collections import deque
 import pickle
 import zlib
-from board import Board
 from inada_selfmatch import Rainbow, simple_plan, random_plan
+from board import Board
 
 
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
@@ -20,7 +20,6 @@ class NoisyAffine(Layer):
         self.activation = activation
 
         # 重みは学習が開始したときに動的に生成する
-        self.init_flag = True
         self.W_mu = Parameter(None, name = "W_mu")
         self.W_sigma = Parameter(None, name = "W_sigma")
         self.b_mu = Parameter(None, name = "b_mu")
@@ -32,8 +31,7 @@ class NoisyAffine(Layer):
     def forward(self, x):
         in_size = x.shape[1]
         out_size = self.out_size
-        if self.init_flag:
-            self.init_flag = False
+        if self.W_mu.data is None:
             self.init_params(in_size, out_size)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
@@ -213,6 +211,12 @@ class SumTree:
         self.tree = np.zeros(2 * self.capacity)
         self.rng = np.random.default_rng()
 
+    def save(self, file_name):
+        np.save(file_name + "_tree.npy", self.tree)
+
+    def load(self, file_name):
+        self.tree = np.load(file_name + "_tree.npy")
+
 
     # 外部には木構造であることを見せない
     def __str__(self):
@@ -241,7 +245,7 @@ class SumTree:
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
     def sample(self, batch_size = 1):
-        indices = [self.__sample() for _ in range(batch_size)]
+        indices = [self.__sample() for __ in range(batch_size)]
         return indices if len(indices) > 1 else indices[0]
 
     def __sample(self):
@@ -308,9 +312,33 @@ class ReplayBuffer:
         else:
             self.rng = np.random.default_rng()
 
+    # エージェントの情報である合計ステップ数も一緒に保存する
+    def save(self, file_name, total_steps):
+        save_data = [self.buffer, total_steps]
+
+        if self.prioritized:
+            self.priorities.save(file_name)
+            save_data.append(self.max_priority)
+
+        with open(file_name + "_buffer.pkl", "wb") as f:
+            pickle.dump(save_data, f)
+
+    # 学習の途中からの再開によってあり得ない遷移が学習されないように、tmp_buffer は前回のものを引き継がない
+    def load(self, file_name):
+        with open(file_name + "_buffer.pkl", "rb") as f:
+            load_data = pickle.load(f)
+
+        if self.prioritized:
+            self.priorities.load(file_name)
+            self.max_priority = load_data.pop()
+
+        self.buffer, total_steps = load_data
+        self.count = len(self.buffer)
+        return total_steps
+
+
     def __len__(self):
         return len(self.buffer)
-
 
     def add(self, data):
         tmp_buffer = self.tmp_buffer
@@ -341,10 +369,6 @@ class ReplayBuffer:
         if count == self.buffer_size:
             count = 0
 
-        if self.prioritized:
-            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
-            self.priorities[count] = self.max_priority
-
         if self.compress:
             # pickle.dump : ファイルに書き込む, pickle.dumps : 戻り値として返す
             nstep_data = zlib.compress(pickle.dumps(nstep_data))
@@ -354,7 +378,16 @@ class ReplayBuffer:
         except IndexError:
             self.buffer.append(nstep_data)
 
-        self.count = count + 1
+        if self.prioritized:
+            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
+            try:
+                self.priorities[count] = self.max_priority
+                self.count = count + 1
+
+            # 優先度の不整合は IndexError を起こす可能性があるので、学習がこのタイミングで中断された場合の処理が必要
+            except KeyboardInterrupt:
+                self.priorities[count] = 0
+                raise KeyboardInterrupt()
 
     def get_batch(self, batch_size, progress):
         if self.prioritized:
@@ -421,15 +454,24 @@ class RainbowAgent:
         self.replay_buffer.reset()
         self.total_steps = 0
 
+    # キーボード例外で学習を中断した場合は、再開に必要な情報も保存する
+    def save(self, file_name, is_yet = False):
+        if is_yet:
+            self.qnet.save_weights(file_name + "_online.npz")
+            self.qnet_target.save_weights(file_name + "_target.npz")
+            self.replay_buffer.save(file_name, self.total_steps)
+        else:
+            self.qnet.save_weights(file_name + ".npz")
+
+    # 同じ条件での途中再開に必要な情報を読み込む
+    def load_to_restart(self, file_name):
+        self.qnet.load_weights(file_name + "_online.npz")
+        self.qnet_target.load_weights(file_name + "_target.npz")
+        self.total_steps = self.replay_buffer.load(file_name)
+
     # ターゲットネットワークはパラメータを学習せず、定期的に学習対象のネットワークと同期させることで学習を進行させる
     def sync_qnet(self):
         self.qnet_target.copy_weights(self.qnet)
-
-    def save_weights(self, file_name):
-        self.qnet.save_weights(file_name)
-
-    def load_weights(self, file_name):
-        self.qnet.load_weights(file_name)
 
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
@@ -504,19 +546,21 @@ class RainbowComputer(RainbowAgent):
 
     # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
     def reset(self, file_name, turn, quantiles_num):
-        self.qnet = RainbowNet(self.action_size, quantiles_num)
-        self.qnet.load_weights(file_name + f"{turn}_{quantiles_num}.npz")
+        qnet = RainbowNet(self.action_size, quantiles_num)
+        file_name = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
+        qnet.load_weights(file_name)
+        self.qnet = qnet
 
 
 
 
-def fit_rainbow_agent(quantiles_num, runs, episodes, eval_interval, version = None):
-    file_name = "rainbow" if version is None else f"rainbow{version}"
+def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
+    file_name = "rainbow" if version is None else ("rainbow" + version)
 
-    # ハイパーパラメータ設定 (ひとまず、γ 以外はオリジナルの Rainbow のもの)
+    # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.3 Gbyte)
     buffer_size = 1000000
     prioritized = True
-    compress = True
+    compress = False
     step_num = 3
     gamma = 0.98
     batch_size = 32
@@ -537,11 +581,11 @@ def fit_rainbow_agent(quantiles_num, runs, episodes, eval_interval, version = No
 
     # 自己対戦
     self_match = Rainbow(board, first_agent, second_agent)
-    self_match.fit(runs, episodes, eval_interval, file_name)
+    self_match.fit(1, episodes, file_name, 0, restart)
 
 
 def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
-    file_name = "rainbow" if version is None else f"rainbow{version}"
+    file_name = "rainbow" if version is None else ("rainbow" + version)
 
     # 環境とエージェント
     board = Board()
@@ -554,7 +598,7 @@ def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
     self_match = Rainbow(board, first_computer, second_computer)
 
     # 評価
-    print(f"enemy: {enemy_plan.__name__}")
+    print("enemy:", enemy_plan.__name__)
     print(f"quantiles_num: {quantiles_num}")
     print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
     print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
@@ -563,10 +607,10 @@ def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
 
 
 if __name__ == "__main__":
-    quantiles_num = 200
+    quantiles_num = 50
 
-    # 学習用コード (compress = False の時、468 min で 8579 episodes)
-    fit_rainbow_agent(quantiles_num, runs = 1, episodes = 3000000, eval_interval = 30000, version = None)
+    # 学習用コード
+    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 226, version = None)
 
     # 評価用コード
-    # eval_rainbow_computer(quantiles_num = 8, enemy_plan = simple_plan, version = None)
+    # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)

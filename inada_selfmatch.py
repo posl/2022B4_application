@@ -1,13 +1,11 @@
 import numpy as np
 import random
-from os.path import join
+from os.path import join, dirname
 from time import time
-from math import ceil
 from tqdm import tqdm
+from math import ceil
 import matplotlib.pyplot as plt
-from inada_framework.layers import parameters_dir
 from collections import deque
-from inada_framework import Variable
 
 
 # エージェントの評価に使う単純な方策
@@ -63,71 +61,83 @@ class SelfMatch:
         self.board = board
         self.agents = second_agent, first_agent
 
-    def fit(self, runs, episodes, eval_interval, file_name):
-        # 前回の続きから学習をスタートする場合は、パラメータを読み込む
+    @staticmethod
+    def get_path(file_name):
+        return join(dirname(__file__), "data", "{}", file_name)
+
+
+    # 前回の状態を引き継いで、学習を途中再開することができる
+    def fit(self, runs, episodes, file_name, trained_num: int = 0, restart: int = 0):
+        assert runs > trained_num
+        assert not episodes % 100
+        file_name = self.get_path(file_name)
+
+        # 勝率の推移を描画するための配列の用意 (エージェントの評価は、学習中の 100 回 + 最終評価の 1 回)
+        if restart:
+            load_file = file_name.format("is_yet")
+            eval_historys = np.load(load_file + "_history.npy")
+        else:
+            eval_historys = np.zeros((2, 101), dtype = np.float32)
+
+        # エージェントの初期化
         for turn in (1, 0):
             agent = self.agents[turn]
-            try:
-                agent.reset()
-                agent.load_weights(join("is_yet", file_name + f"{turn}_yet.npz"))
-            except FileNotFoundError:
-                pass
-        del turn, agent
+            agent.reset()
+            if restart:
+                agent.load_to_restart(f"{load_file}{turn}")
+
+        # ここで定義した変数は学習中ずっと残ることになるので、不要なものは削除する
+        if restart:
+            del load_file, turn, agent
+        else:
+            del turn, agent
 
         print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
-        start = time()
-
-        history_length = ceil(episodes / eval_interval) + 1
-        eval_historys = np.zeros((2, history_length))
-        del history_length
+        win_rates = np.zeros(2, dtype = np.int32)
+        start_time = time()
 
         try:
-            for run in range(1, runs + 1):
-                self.fit_one_run(run, episodes, eval_interval, eval_historys)
+            for run in range(trained_num + 1, runs + 1):
+                self.fit_one_run(run, restart, episodes, eval_historys, win_rates)
+                restart = 0
 
-                # 最終評価の表示
-                print(f"{run:>4}", end = " || ")
-
+                # パラメータの保存、最終評価、エージェントの初期化 (パラメータの保存を優先する)
                 for turn in (1, 0):
-                    win_rate = self.eval(turn)
-                    print(f"{win_rate:>3} %", end = " | " if turn else "  ")
-
-                    # 描画用の時系列データに最終評価を反映させる
-                    eval_historys[turn, -1] += (win_rate - eval_historys[turn, -1]) / run
-
-                    # パラメータの保存、エージェントの初期化
-                    self.save(turn, win_rate, file_name)
+                    self.save(turn, file_name.format("parameters"), index = run - 1)
+                    win_rates[turn] = self.eval(turn)
                     self.agents[turn].reset()
 
-                # 累計経過時間の表示
-                print("({:.5g} min)".format((time() - start) / 60))
+                # 評価結果と累計経過時間の表示
+                print("{:>4} || {:>3} % | {:>3} %".format(run, win_rates[1], win_rates[0]), end = "  ")
+                print("({:.5g} min)".format((time() - start_time) / 60))
+
+                # 評価結果の描画用配列への反映
+                eval_historys[:, 100] += (win_rates - eval_historys[:, 100]) / run
 
         except KeyboardInterrupt:
             is_yet = True
         else:
             is_yet = False
         finally:
-            self.plot(eval_historys, file_name, run, is_yet)
+            self.plot(eval_historys, file_name, is_yet)
             print()
 
-    def fit_one_run(self, run, episodes, eval_interval, eval_historys):
-        with tqdm(range(episodes), desc = f"run {run}", leave = False) as pbar:
-            index = 0
+    def fit_one_run(self, run, restart, episodes, eval_historys, win_rates):
+        with tqdm(range(restart, episodes), desc = f"run {run}", leave = False) as pbar:
+            eval_interval = episodes // 100
+            index = ceil(restart / eval_interval)
 
             for episode in pbar:
                 self.fit_one_episode(progress = (episode + 1) / episodes)
 
-                # 定期的に現在の方策を評価し、現在の勝率を配列に追加して、プログレスバーの後ろに出力する
+                # 定期的に現在の方策を評価し、現在の勝率をプログレスバーの後ろに出力して、描画用配列に追加する
                 if not episode % eval_interval:
-                    win_rates = []
+                    win_rates[...] = self.eval(0), self.eval(1)
+                    pbar.set_postfix(dict(rates = "({}%, {}%)".format(win_rates[1], win_rates[0])))
 
-                    for turn in (1, 0):
-                        win_rate = self.eval(turn)
-                        eval_historys[turn, index] += (win_rate - eval_historys[turn, index]) / run
-                        win_rates.append(f"{win_rate}%")
-
-                    pbar.set_postfix(dict(rates = win_rates))
+                    # 学習の中断によって描画用配列の整合性を損なうことがなるべくないように、この反映はまとめて行う
+                    eval_historys[:, index] += (win_rates - eval_historys[:, index]) / run
                     index += 1
 
     # このメソッドを継承した子クラスが実装する
@@ -135,11 +145,9 @@ class SelfMatch:
         raise NotImplementedError()
 
 
-    # エージェントを指定した敵と定数回戦わせて、その時の勝利数を返す
+    # エージェントを指定した敵と定数回戦わせた時の勝利数を取得する
     def eval(self, turn, enemy_plan = corners_plan, verbose = False):
         board = self.board
-
-        # 方策の登録
         agent = self.agents[turn]
         plans = (agent, enemy_plan) if turn else (enemy_plan, agent)
         board.set_plan(*plans)
@@ -163,14 +171,18 @@ class SelfMatch:
         return win_count
 
     # このメソッドを継承した子クラスが実装する
-    def save(self, turn, win_rate, file_name):
+    def save(self, turn, file_name, index):
         raise NotImplementedError()
 
     # キーボード割り込みによって途中終了した場合は、パラメータの保存も同時に行う
-    def plot(self, eval_historys, file_name, run, is_yet = False):
+    def plot(self, eval_historys, file_name, is_yet = False):
+        if is_yet:
+            save_file = file_name.format("is_yet")
+            np.save(save_file + "_history.npy", eval_historys)
+
         for turn in (1, 0):
             if is_yet:
-                self.agents[turn].save_weights(join("is_yet", file_name + f"{turn}_yet"))
+                self.agents[turn].save(f"{save_file}{turn}", is_yet)
 
             eval_history = eval_historys[turn] / 100.
             history_label = "first" if turn else "second"
@@ -178,10 +190,9 @@ class SelfMatch:
 
         plt.xlabel("Thousands of Episodes")
         plt.ylabel("Mean Winning Percentage")
-        plt.title(file_name + f" (runs = {run})")
         plt.legend()
         plt.ylim(-0.1, 1.1)
-        plt.savefig(join(parameters_dir, "graphs", file_name))
+        plt.savefig(file_name.format("graphs"))
 
 
 
@@ -233,19 +244,9 @@ class Rainbow(SelfMatch):
             else:
                 break
 
-    def save(self, turn, win_rate, file_name):
-        try:
-            name = f"max_win_rate{turn}"
-            max_win_rate = getattr(self, name)
-        except AttributeError:
-            pass
-        else:
-            if max_win_rate > win_rate:
-                return
-
-        setattr(self, name, win_rate)
+    def save(self, turn, file_name, index = None):
         agent = self.agents[turn]
-        agent.save_weights(file_name + f"{turn}_{agent.quantiles_num}")
+        agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
 
 
 
@@ -265,7 +266,7 @@ class Reinforce(SelfMatch):
             if flag:
                 agent.add((0, prob))
 
-            # エージェントの学習 (update メソッド) はエピソードが終わるたびに行う
+            # エージェントの学習はエピソードが終わるごとに行う
             else:
                 reward = board.reward
                 agent.add((reward, prob))
@@ -273,26 +274,9 @@ class Reinforce(SelfMatch):
                 break
 
         agent = self.agents[board.turn ^ 1]
-        agent.add((-reward, Variable(np.array(0))))
+        agent.add((-reward, None))
         agent.update()
 
-    # 評価用方策に対しての勝率の高い順で８人分のパラメータを保存する (先攻・後攻は別々のファイル)
-    def save(self, turn, win_rate, file_name):
-        try:
-            name = f"max_win_rates{turn}"
-            max_win_rates = getattr(self, name)
-        except AttributeError:
-            max_win_rates = []
-            setattr(self, name, max_win_rates)
-
-        length = len(max_win_rates)
-        if length < 8:
-            index = length
-            max_win_rates.append(win_rate)
-        else:
-            index = np.argmin(max_win_rates)
-            if max_win_rates[index] >= win_rate:
-                return
-            max_win_rates[index] = win_rate
-
-        self.agents[turn].save_weights(file_name + f"{turn}_{index}")
+    def save(self, turn, file_name, index):
+        agent = self.agents[turn]
+        agent.save(f"{file_name}{turn}_{index}")
