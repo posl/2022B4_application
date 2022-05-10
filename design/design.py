@@ -97,10 +97,17 @@ class GamePage(tk.Frame):
         self.game_canvas.place(x=50, y=30)
         self.game_canvas.bind("<Button-1>", self.cell_click)
 
+        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080")
+        self.black_conter_label.place(x=10, y=10)
+
+        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080")
+        self.white_conter_label.place(x=500, y=10)
+
         self.button1 = tk.Button(self, text="Next", font = (master.font_name, 50), command=lambda:self.button1_click())
         self.button1.place(x=450, y=380)
     
     def canvas_update(self):
+        self.stone_counter_update()
         self.game_canvas.configure(bg="#44EE88")
         self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
         for i in range(9):
@@ -120,6 +127,21 @@ class GamePage(tk.Frame):
             j = w//8
             self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#11EEEE")
     
+    def stone_counter_update(self):
+        bnum = 0
+        wnum = 0
+        for i in range(8):
+            for j in range(8):
+                t = (j, i)
+                if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
+                    if (self.master.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                        bnum += 1
+                    else:
+                        wnum += 1
+        self.black_conter_label.configure(text=str(bnum))
+        self.white_conter_label.configure(text=str(wnum))
+        return
+        
     def button1_click(self):
         if self.master.board.turn==1 and self.player1==0:
             return
