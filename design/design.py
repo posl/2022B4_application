@@ -106,7 +106,7 @@ class GamePage(tk.Frame):
         self.button1 = tk.Button(self, text="Next", font = (master.font_name, 50), command=lambda:self.button1_click())
         self.button1.place(x=450, y=380)
     
-    def canvas_update(self):
+    def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
         self.stone_counter_update()
         self.game_canvas.configure(bg="#44EE88")
         self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
@@ -121,12 +121,26 @@ class GamePage(tk.Frame):
                         self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#111111")
                     else:
                         self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#EEEEEE")
-        x = self.master.board.list_placable()
-        for w in x:
-            i = w%8
-            j = w//8
-            self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#11EEEE")
-    
+        lp = self.master.board.list_placable()
+        if state==0:
+            for w in lp:
+                i = w%8
+                j = w//8
+                self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#11EEEE")
+        if state==1:
+            self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#DDDD11")
+            self.master.after(800, self.canvas_update, 2, x, y, self.master.board.stone_black)
+        if state==2:
+            for i in range(8):
+                for j in range(8):
+                    t = (j, i)
+                    if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
+                        if (self.master.board.stone_black >> (board.Board.t2n(t)) &1) ^ (oldcolor >> (board.Board.t2n(t)) &1)==1 :
+                            self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#777777")
+            self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#DDDD11")
+            self.master.after(800, self.canvas_update, 0, 0, 0, 0)
+
+
     def stone_counter_update(self):
         bnum = 0
         wnum = 0
@@ -155,11 +169,11 @@ class GamePage(tk.Frame):
         self.game_still_cont = self.master.board.can_continue(True)
         if self.game_still_cont:
             n = self.master.board.get_action()
+            self.canvas_update(1, n%8, n//8)
             self.master.board.put_stone(n)
             self.game_still_cont = self.master.board.can_continue()
         print("aaaa")
-        self.canvas_update()
-        self.master.after(1000, self.button1_click)
+        self.master.after(1800, self.button1_click)
     
     def human_put_stone(self, x, y):
         if x<0 or y<0 or x>=8 or y>=8:
@@ -169,13 +183,14 @@ class GamePage(tk.Frame):
             return
         if self.master.board.is_placable(board.Board.t2n(t))==False:
             return
+        self.canvas_update(1, x, y)
         self.game_still_cont = self.master.board.can_continue(True)
         self.game_still_cont = self.master.board.can_continue(True)
         if self.game_still_cont:
             n = board.Board.t2n(t)
             self.master.board.put_stone(n)
             self.game_still_cont = self.master.board.can_continue()
-        self.master.after(1000, self.button1_click)
+        self.master.after(1800, self.button1_click)
         return
 
     def cell_click(self, event):
@@ -197,7 +212,7 @@ class GamePage(tk.Frame):
         if x<0 or y<0 or x>=8 or y>=8:
             return
         self.human_put_stone(x, y)
-        self.canvas_update()
+        #self.canvas_update()
         print(x, "bbbb", y)
 
 
