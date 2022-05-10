@@ -24,7 +24,7 @@ class PrimitiveMonteCarlo:
             board.turn = turn
 
             board.game()
-            if (board.black_num > board.white_num) == my_turn:
+            if (board.black_num != board.white_num) and ((board.black_num > board.white_num) == my_turn):
                 score += 1
         
         return score
@@ -34,19 +34,20 @@ class PrimitiveMonteCarlo:
         # 原状回復用
         original_plans = board.plans
         original_turn = board.turn
-
+        
         # 合法手の内、勝率が最もよかったものを置く
-        candidate = board.list_placable()
+        placable = board.list_placable()
         scores = list()
         board.set_plan(self.random_action, self.random_action)
-        for n in candidate:
+        for n in placable:
             with board.log_runtime(n):
                 if not board.list_placable():
                     # ゲームが終了して勝つならその手を打つ
-                    if (board.black_num > board.white_num) == original_turn:
-                        scores.append(self.max_try)
+                    if (board.black_num != board.white_num) and ((board.black_num > board.white_num) == original_turn):
+                        scores.append(self.max_try + 1)
                         break
                     else:
+                        scores.append(-1)
                         continue
                 else:
                     score = self.pmc_method(board, original_turn)
@@ -59,8 +60,9 @@ class PrimitiveMonteCarlo:
 
         # スコアが同点ならランダムで打つ
         max_index = [i for i, s in enumerate(scores) if s == max(scores)]
-        print("put", candidate[self.rng.choice(max_index)])
-        return candidate[self.rng.choice(max_index)]
+        move = placable[self.rng.choice(max_index)]
+        print("put : ", move)
+        return move
 
 
 if __name__ == "__main__":
