@@ -1,6 +1,8 @@
 from audioop import reverse
+from tkinter import *
 import tkinter as tk
 import tkinter.ttk as ttk
+
 import numpy as np
 import random
 import math
@@ -8,6 +10,11 @@ import sys
 import os
 sys.path.append(os.path.abspath(".."))
 import board
+
+
+import pygame
+
+
 
 
 class StartPage(tk.Frame):
@@ -19,12 +26,15 @@ class StartPage(tk.Frame):
         self.label = tk.Label(self, text="Othello", font = (master.font_name, 50), fg="#119911", bg="#881111")
         self.label.pack(anchor="center", expand=True)
         #self.label.place(x=200, y=50)
-        self.button1 = tk.Button(self, text="Play", font = (master.font_name, 50), command=lambda:master.option_page.tkraise())
+        self.button1 = tk.Button(self, text="Play", font = (master.font_name, 50), command=lambda:self.goto_option_page())
         self.button1.pack(anchor="center", expand=True)
         #self.button1.place(x=200, y=200)
         self.button2 = tk.Button(self, text="Quit", font = (master.font_name, 50), command=lambda:master.quit())
         self.button2.pack(anchor="center", expand=True)
         #self.button2.place(x=200, y=270)
+
+    def goto_option_page(self):
+        self.master.option_page.tkraise()
 
 
 class OptionFrame(tk.Frame):
@@ -59,16 +69,16 @@ class OptionFrame(tk.Frame):
         self.master.game_page.player2 = self.combobox2.current()
         player1_plan = 0
         if self.combobox1.current() == 0:
-            print(10)
+            print("先攻：",0)
             player1_plan = self.master.com_random
         elif self.combobox1.current() == 1:
-            print(11)
+            print("先攻：",1)
             player1_plan = self.master.com_random
         if self.combobox2.current() == 0:
-            print(20)
+            print("後攻",0)
             player2_plan = self.master.com_random
         elif self.combobox2.current() == 1:
-            print(21)
+            print("後攻",1)
             player2_plan = self.master.com_random
         self.master.board.set_plan(player1_plan, player2_plan)
         self.master.game_page.canvas_update()
@@ -112,10 +122,17 @@ class GamePage(tk.Frame):
         self.white_conter_label.place(x=530, y=10)
 
         self.button1 = tk.Button(self, text="Next", font = (master.font_name, 50), command=lambda:self.button1_click())
-        self.button1.place(x=550, y=380)
+        self.button1.place(x=750, y=380)
     
     def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
+        if state==0:
+            self.master.se1.play()
+        elif state==1:
+            self.master.se2.play()
+        elif state==2:
+            self.master.se3.play()
         self.stone_counter_update()
+        self.game_canvas.delete("all")
         self.game_canvas.configure(bg="#44EE88")
         self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
         for i in range(9):
@@ -202,9 +219,10 @@ class GamePage(tk.Frame):
                         bnum += 1
                     else:
                         wnum += 1
-        self.black_conter_label.configure(text=str(bnum))
-        self.white_conter_label.configure(text=str(wnum))
+        self.black_conter_label.configure(text=format(bnum, "02d") )
+        self.white_conter_label.configure(text=format(wnum, "02d") )
 
+        self.counter_bar.delete("all")
         bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum)-0.5)*3 )+1) / 2  )
         self.counter_bar.create_rectangle(0, 0, self.canvas_width+10, 100, fill = "#22FF77")
         self.counter_bar.create_rectangle(0, 0, bw_bounder_x, 100, fill = "#000000", outline="#000000")
@@ -221,10 +239,12 @@ class GamePage(tk.Frame):
         
     def button1_click(self):
         if self.master.board.turn==1 and self.player1==0:
+            print("COMは石を置けなかった(先攻)")
             return
         if self.master.board.turn==1 and self.player1==1:
             print()
         if self.master.board.turn==0 and self.player2==0:
+            print("COMは石を置けなかった(後攻)")
             return
         if self.master.board.turn==0 and self.player2==1:
             print()
@@ -235,7 +255,7 @@ class GamePage(tk.Frame):
             self.canvas_update(1, n%8, n//8)
             self.master.board.put_stone(n)
             self.game_still_cont = self.master.board.can_continue()
-        print("aaaa")
+        print("COMが石を置いた")
         self.master.after(1800, self.button1_click)
     
     def human_put_stone(self, x, y):
@@ -257,16 +277,18 @@ class GamePage(tk.Frame):
         return
 
     def cell_click(self, event):
-        print(self.master.board.turn)
-        print(self.player1)
+        #print(self.master.board.turn)
+        #print(self.player1)
 
         if self.master.board.turn==1 and self.player1==0:
             print()
         if self.master.board.turn==1 and self.player1==1:
+            print("あなたの番ではありません：")
             return
         if self.master.board.turn==0 and self.player2==0:
             print()
         if self.master.board.turn==0 and self.player2==1:
+            print("あなたの番ではありません：")
             return
         x = event.x
         y = event.y
@@ -276,13 +298,14 @@ class GamePage(tk.Frame):
             return
         self.human_put_stone(x, y)
         #self.canvas_update()
-        print(x, "bbbb", y)
+        print("セルが押された：", x, ",", y)
 
 
 
 class ResultPage(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
+        pygame.init()
         self.master = master
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
@@ -307,6 +330,15 @@ class App(tk.Tk):
         self.result_page = ResultPage(self)
 
         self.board = board.Board()
+
+        sound_folder_path = "../sound/"
+
+        self.bgm1 = pygame.mixer.Sound(sound_folder_path+"maou09.mp3")
+        self.bgm1.play(loops=-1)
+
+        self.se1 = pygame.mixer.Sound(sound_folder_path+"maou47.wav")
+        self.se2 = pygame.mixer.Sound(sound_folder_path+"maou41.wav")
+        self.se3 = pygame.mixer.Sound(sound_folder_path+"maou48.wav")
         
         self.start_page.tkraise()
 
