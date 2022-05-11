@@ -9,7 +9,7 @@ import math
 import sys
 import os
 
-sys.path.append(os.path.abspath(".."))
+sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__),  "../../")))
 import board
 from monte_carlo import monte_carlo_tree_search
 import game_tree
@@ -430,17 +430,18 @@ class App(tk.Tk):
 
         self.game_playing = 0
         self.board = board.Board()
-        self.mcts = monte_carlo_tree_search.MonteCarloTreeSearch(192)
+        self.mcts = monte_carlo_tree_search.MonteCarloTreeSearch()
         self.ab0 = game_tree.AlphaBeta(0)
         self.ab1 = game_tree.AlphaBeta(1)
 
-        sound_folder_path = "../sound/"
-        self.bgm1 = pygame.mixer.Sound(sound_folder_path+"maou09.mp3")
+
+        sound_folder_path = os.path.normpath(os.path.join(os.path.abspath(__file__),  "../../sound"))
+        self.bgm1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))
         self.bgm1.play(loops=-1)
-        self.se1 = pygame.mixer.Sound(sound_folder_path+"maou47.wav")
-        self.se2 = pygame.mixer.Sound(sound_folder_path+"maou41.wav")
-        self.se3 = pygame.mixer.Sound(sound_folder_path+"maou48.wav")
-        self.se4 = pygame.mixer.Sound(sound_folder_path+"maou19.wav")
+        self.se1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou47.wav"))
+        self.se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
+        self.se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
+        self.se4 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou19.wav"))
         
         self.start_page.tkraise()
 
@@ -459,6 +460,7 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+
     # アプリケーションを開始
     tkapp = App()
     tkapp.title('おせろ')
