@@ -7,6 +7,9 @@ class PrimitiveMonteCarlo:
     def __init__(self, max_try = 200):
         self.max_try = max_try
         self.rng = np.random.default_rng()
+    
+    def __call__(self, board : Board):
+        return self.get_next_move_by_pmc(board)
 
     # ランダムで手を打つplan
     def random_action(self, board : Board):
@@ -78,7 +81,7 @@ if __name__ == "__main__":
 
     board = Board()
     pMC = PrimitiveMonteCarlo(200)
-    board.play(pMC.random_action, pMC.get_next_move_by_pmc)
+    board.play(pMC.random_action, pMC)
 
     print("game set")
     print("black:", board.black_num)
