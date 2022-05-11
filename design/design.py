@@ -260,11 +260,16 @@ class GamePage(tk.Frame):
     
     def human_put_stone(self, x, y):
         if x<0 or y<0 or x>=8 or y>=8:
+            self.master.se4.play()
             return
         t = (y, x)
         if (self.master.board.stone_exist >> board.Board.t2n(t)) & 1:
+            print("既に石があります")
+            self.master.se4.play()
             return
         if self.master.board.is_placable(board.Board.t2n(t))==False:
+            print("石を底に置くことはできません")
+            self.master.se4.play()
             return
         self.canvas_update(1, x, y)
         self.game_still_cont = self.master.board.can_continue(True)
@@ -339,6 +344,7 @@ class App(tk.Tk):
         self.se1 = pygame.mixer.Sound(sound_folder_path+"maou47.wav")
         self.se2 = pygame.mixer.Sound(sound_folder_path+"maou41.wav")
         self.se3 = pygame.mixer.Sound(sound_folder_path+"maou48.wav")
+        self.se4 = pygame.mixer.Sound(sound_folder_path+"maou19.wav")
         
         self.start_page.tkraise()
 
