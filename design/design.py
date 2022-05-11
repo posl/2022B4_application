@@ -2,6 +2,10 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import numpy as np
 import random
+import math
+import sys
+import os
+sys.path.append(os.path.abspath(".."))
 import board
 
 
@@ -29,7 +33,7 @@ class OptionFrame(tk.Frame):
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
 
-        self.combo_menus = ("手動", "COM-As")
+        self.combo_menus = ("手動", "COM-A(ランダム)")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999")
         self.label1.place(x=10, y=30)
@@ -90,21 +94,24 @@ class GamePage(tk.Frame):
         self.player2 = 0
 
         self.game_still_cont = 0
-        self.game_still_cont_check = 0
+        #self.game_still_cont_check = 0
 
 
         self.game_canvas = tk.Canvas(self, width=self.canvas_width, height=self.canvas_height)
-        self.game_canvas.place(x=50, y=30)
+        self.game_canvas.place(x=100, y=50)
         self.game_canvas.bind("<Button-1>", self.cell_click)
 
-        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080")
+        self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
+        self.counter_bar.place(x=100, y=5)
+
+        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080", font = (master.font_name, 50))
         self.black_conter_label.place(x=10, y=10)
 
-        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080")
-        self.white_conter_label.place(x=500, y=10)
+        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (master.font_name, 50))
+        self.white_conter_label.place(x=530, y=10)
 
         self.button1 = tk.Button(self, text="Next", font = (master.font_name, 50), command=lambda:self.button1_click())
-        self.button1.place(x=450, y=380)
+        self.button1.place(x=550, y=380)
     
     def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
         self.stone_counter_update()
@@ -154,6 +161,19 @@ class GamePage(tk.Frame):
                         wnum += 1
         self.black_conter_label.configure(text=str(bnum))
         self.white_conter_label.configure(text=str(wnum))
+
+        bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum)-0.5)*3 )+1) / 2  )
+        self.counter_bar.create_rectangle(0, 0, self.canvas_width+10, 100, fill = "#22FF77")
+        self.counter_bar.create_rectangle(0, 0, bw_bounder_x, 100, fill = "#000000", outline="#000000")
+        for i in range(30):
+            s = format((30-i)*4, "02X" )
+            s = "#" + s + s + s
+            self.counter_bar.create_rectangle(0, i, bw_bounder_x, 1+i, fill = s, outline=s)
+        self.counter_bar.create_rectangle(bw_bounder_x, 0, self.canvas_width+10, 100, fill = "#EEEEEE")
+        for i in range(30):
+            s = format((0xEE-30*3)+i*3, "02X" )
+            s = "#" + s + s + s
+            self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
         return
         
     def button1_click(self):
