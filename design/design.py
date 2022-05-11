@@ -65,6 +65,15 @@ class OptionFrame(tk.Frame):
 
     def start_game(self):
         self.master.board.reset()
+        #self.master.board.stone_black = 0
+        for i in range(7):
+            for j in range(7):
+                #self.master.board.stone_exist = self.master.board.stone_exist | (1<<(8*i+j))
+                if (i+j)%2==0:
+                    #self.master.board.stone_black = self.master.board.stone_black + (1<<(8*i+j))
+                    pass
+                else:
+                    pass
         self.master.game_page.player1 = self.combobox1.current()
         self.master.game_page.player2 = self.combobox2.current()
         player1_plan = 0
@@ -164,6 +173,7 @@ class GamePage(tk.Frame):
                             self.stone_gray_draw(i, j)
             self.stone_yellow_draw(x,y)
             self.master.after(800, self.canvas_update, 0, 0, 0, 0)
+            self.game_exit_check()
 
 
     def stone_black_draw(self, x, y):
@@ -281,6 +291,14 @@ class GamePage(tk.Frame):
         self.master.after(1800, self.button1_click)
         return
 
+    def game_exit_check(self):
+        flg = 0
+        flg = self.master.board.can_continue(True)
+        flg = self.master.board.can_continue(True)
+        if flg:
+            return
+        self.master.after(1500, self.goto_result_page)
+
     def cell_click(self, event):
         #print(self.master.board.turn)
         #print(self.player1)
@@ -308,14 +326,44 @@ class GamePage(tk.Frame):
         print("セルが押された：", x, ",", y)
 
 
+    def goto_result_page(self):
+        self.master.result_page.win_check()
+        self.master.result_page.tkraise()
+
+
 
 class ResultPage(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
         pygame.init()
         self.master = master
-        self.configure(bg="#992299")
+        self.configure(bg="#000099")
         self.grid(row=0, column=0, sticky="nsew")
+
+        self.button1 = tk.Button(self, text="Back", font = (master.font_name, 50), command=lambda:self.master.start_page.tkraise())
+        self.button1.place(x=350, y=380)
+
+        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (master.font_name, 50))
+        self.label1.place(x=10, y=10)
+
+    def win_check(self):
+        bnum = 0
+        wnum = 0
+        for i in range(8):
+            for j in range(8):
+                t = (j, i)
+                if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
+                    if (self.master.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                        bnum += 1
+                    else:
+                        wnum += 1
+        if bnum>wnum:
+            self.label1.configure(text="黒の勝ち")
+        elif bnum<wnum:
+            self.label1.configure(text="白の勝ち")
+        else:
+            self.label1.configure(text="引き分け")
+
 
 
 
