@@ -24,7 +24,10 @@ class MonteCarloTreeSearch:
     def __init__(self, max_tries = 2048):
         self.max_tries = max_tries
         self.rng = np.random.default_rng()
-
+    
+    def __call__(self, board : Board):
+        return self.monte_carlo_tree_search(board)
+    
     # ランダムで手を打つplan
     def random_action(self, board : Board):
         return int(self.rng.choice(board.list_placable()))
@@ -131,7 +134,7 @@ if __name__ == "__main__":
     board = Board()
     mcts = MonteCarloTreeSearch(2048)
     
-    board.play(mcts.random_action, mcts.monte_carlo_tree_search)
+    board.play(mcts.random_action, mcts)
     #board.play(player, mcts.monte_carlo_tree_search)    
     
     print("game set")
