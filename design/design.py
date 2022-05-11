@@ -8,11 +8,14 @@ import random
 import math
 import sys
 import os
+
 sys.path.append(os.path.abspath(".."))
 import board
-
+from monte_carlo import monte_carlo_tree_search
+import game_tree
 
 import pygame
+
 
 
 
@@ -44,7 +47,7 @@ class OptionFrame(tk.Frame):
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
 
-        self.combo_menus = ("手動", "COM-A(ランダム)")
+        self.combo_menus = ("手動", "COM-A(ランダム)", "COM-B(モンテカルロ)", "COM-C(alpha)")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999")
         self.label1.place(x=10, y=30)
@@ -83,12 +86,24 @@ class OptionFrame(tk.Frame):
         elif self.combobox1.current() == 1:
             print("先攻：",1)
             player1_plan = self.master.com_random
+        elif self.combobox1.current() == 2:
+            print("先攻：",2)
+            player1_plan = self.master.com_monte
+        elif self.combobox1.current() == 3:
+            print("先攻：",3)
+            player1_plan = self.master.com_alpha0
         if self.combobox2.current() == 0:
             print("後攻",0)
             player2_plan = self.master.com_random
         elif self.combobox2.current() == 1:
             print("後攻",1)
             player2_plan = self.master.com_random
+        elif self.combobox2.current() == 2:
+            print("後攻",2)
+            player2_plan = self.master.com_monte
+        elif self.combobox2.current() == 3:
+            print("後攻",3)
+            player2_plan = self.master.com_alpha1
         self.master.board.set_plan(player1_plan, player2_plan)
         self.master.game_page.canvas_update()
         self.master.game_page.tkraise()
@@ -253,10 +268,18 @@ class GamePage(tk.Frame):
             return
         if self.master.board.turn==1 and self.player1==1:
             print()
+        if self.master.board.turn==1 and self.player1==2:
+            print()
+        if self.master.board.turn==1 and self.player1==3:
+            print()
         if self.master.board.turn==0 and self.player2==0:
             print("COMは石を置けなかった(後攻)")
             return
         if self.master.board.turn==0 and self.player2==1:
+            print()
+        if self.master.board.turn==0 and self.player2==2:
+            print()
+        if self.master.board.turn==0 and self.player2==3:
             print()
         self.game_still_cont = self.master.board.can_continue(True)
         self.game_still_cont = self.master.board.can_continue(True)
@@ -309,9 +332,25 @@ class GamePage(tk.Frame):
             self.master.se4.play()
             print("あなたの番ではありません：")
             return
+        if self.master.board.turn==1 and self.player1==2:
+            self.master.se4.play()
+            print("あなたの番ではありません：")
+            return
+        if self.master.board.turn==1 and self.player1==3:
+            self.master.se4.play()
+            print("あなたの番ではありません：")
+            return
         if self.master.board.turn==0 and self.player2==0:
             print()
         if self.master.board.turn==0 and self.player2==1:
+            self.master.se4.play()
+            print("あなたの番ではありません：")
+            return
+        if self.master.board.turn==0 and self.player2==2:
+            self.master.se4.play()
+            print("あなたの番ではありません：")
+            return
+        if self.master.board.turn==0 and self.player2==3:
             self.master.se4.play()
             print("あなたの番ではありません：")
             return
@@ -385,12 +424,13 @@ class App(tk.Tk):
         self.result_page = ResultPage(self)
 
         self.board = board.Board()
+        self.mcts = monte_carlo_tree_search.MonteCarloTreeSearch(192)
+        self.ab0 = game_tree.AlphaBeta(0)
+        self.ab1 = game_tree.AlphaBeta(1)
 
         sound_folder_path = "../sound/"
-
         self.bgm1 = pygame.mixer.Sound(sound_folder_path+"maou09.mp3")
         self.bgm1.play(loops=-1)
-
         self.se1 = pygame.mixer.Sound(sound_folder_path+"maou47.wav")
         self.se2 = pygame.mixer.Sound(sound_folder_path+"maou41.wav")
         self.se3 = pygame.mixer.Sound(sound_folder_path+"maou48.wav")
@@ -401,6 +441,15 @@ class App(tk.Tk):
 
     def com_random(self, board : board.Board):
         return random.choice(board.list_placable())
+
+    def com_monte(self, board : board.Board):
+        return self.mcts.monte_carlo_tree_search(board)
+
+    def com_alpha0(self, board : board.Board):
+        return self.ab0.get_next_move(board)
+
+    def com_alpha1(self, board : board.Board):
+        return self.ab1.get_next_move(board)
 
 
 if __name__ == "__main__":
