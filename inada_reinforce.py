@@ -12,13 +12,11 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
         self.l1 = dzl.Affine(512)
-        self.l2 = dzl.Affine(512)
-        self.l3 = dzl.Affine(action_size)
+        self.l2 = dzl.Affine(action_size)
 
     def forward(self, x):
         x = dzf.relu(self.l1(x))
-        x = dzf.relu(self.l2(x))
-        return self.l3(x)
+        return self.l2(x)
 
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント

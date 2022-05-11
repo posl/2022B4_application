@@ -560,7 +560,7 @@ def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.5 Gbyte)
     buffer_size = 1000000
     prioritized = True
-    compress = False
+    compress = True
     step_num = 3
     gamma = 0.98
     batch_size = 32
@@ -609,8 +609,8 @@ def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
 if __name__ == "__main__":
     quantiles_num = 50
 
-    # 学習用コード
-    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
+    # 学習用コード (13 hours -> 48307 episodes)
+    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 48307, version = None)
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
