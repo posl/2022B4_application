@@ -1,3 +1,4 @@
+from audioop import reverse
 import tkinter as tk
 import tkinter.ttk as ttk
 import numpy as np
@@ -125,17 +126,17 @@ class GamePage(tk.Frame):
                 t = (j, i)
                 if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
                     if (self.master.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
-                        self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#111111")
+                        self.stone_black_draw(i, j)
                     else:
-                        self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#EEEEEE")
+                        self.stone_white_draw(i, j)
         lp = self.master.board.list_placable()
         if state==0:
             for w in lp:
                 i = w%8
                 j = w//8
-                self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#11EEEE")
+                self.stone_blue_draw(i,j)
         if state==1:
-            self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#DDDD11")
+            self.stone_yellow_draw(x,y)
             self.master.after(800, self.canvas_update, 2, x, y, self.master.board.stone_black)
         if state==2:
             for i in range(8):
@@ -143,9 +144,51 @@ class GamePage(tk.Frame):
                     t = (j, i)
                     if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
                         if (self.master.board.stone_black >> (board.Board.t2n(t)) &1) ^ (oldcolor >> (board.Board.t2n(t)) &1)==1 :
-                            self.game_canvas.create_oval(11+self.cell_width*i, 11+self.cell_height*j, 9+self.cell_width*(i+1), 9+self.cell_height*(j+1), fill="#777777")
-            self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#DDDD11")
+                            self.stone_gray_draw(i, j)
+            self.stone_yellow_draw(x,y)
             self.master.after(800, self.canvas_update, 0, 0, 0, 0)
+
+
+    def stone_black_draw(self, x, y):
+        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#111111")
+        for k in range(17):
+            k_ = 17 - k
+            s = format(3*k, "02X")
+            s = "#" + s + s + s
+            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+
+    def stone_white_draw(self, x, y):
+        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#EEEEEE")
+        for k in range(17):
+            k_ = 17 - k
+            s = format((0xEE-17*3)+3*k_, "02X")
+            s = "#" + s + s + s
+            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+
+    def stone_gray_draw(self, x, y):
+        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#777777")
+        for k in range(17):
+            k_ = 17 - k
+            s = format(0x77+k, "02X")
+            s = "#" + s + s + s
+            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+
+
+    def stone_blue_draw(self, x, y):
+        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#11FFFF")
+        for k in range(17):
+            k_ = 17 - k
+            s = format(0xff-3*k, "02X")
+            s = "#" + "11" + s + s
+            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+
+    def stone_yellow_draw(self, x, y):
+        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#FFFF44")
+        for k in range(17):
+            k_ = 17 - k
+            s = format(0xff-3*k, "02X")
+            s = "#" + s + s + "44"
+            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
 
     def stone_counter_update(self):
