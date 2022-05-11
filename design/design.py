@@ -68,6 +68,7 @@ class OptionFrame(tk.Frame):
 
     def start_game(self):
         self.master.board.reset()
+        self.master.game_playing = 1
         #self.master.board.stone_black = 0
         for i in range(7):
             for j in range(7):
@@ -289,7 +290,8 @@ class GamePage(tk.Frame):
             self.master.board.put_stone(n)
             self.game_still_cont = self.master.board.can_continue()
         print("COMが石を置いた")
-        self.master.after(1800, self.button1_click)
+        if self.master.game_playing:
+            self.master.after(1800, self.button1_click)
     
     def human_put_stone(self, x, y):
         if x<0 or y<0 or x>=8 or y>=8:
@@ -311,7 +313,8 @@ class GamePage(tk.Frame):
             n = board.Board.t2n(t)
             self.master.board.put_stone(n)
             self.game_still_cont = self.master.board.can_continue()
-        self.master.after(1800, self.button1_click)
+        if self.master.game_playing:
+            self.master.after(1800, self.button1_click)
         return
 
     def game_exit_check(self):
@@ -319,7 +322,9 @@ class GamePage(tk.Frame):
         flg = self.master.board.can_continue(True)
         flg = self.master.board.can_continue(True)
         if flg:
+            self.master.game_playing = 1
             return
+        self.master.game_playing = 0
         self.master.after(1500, self.goto_result_page)
 
     def cell_click(self, event):
@@ -423,6 +428,7 @@ class App(tk.Tk):
         self.game_page = GamePage(self)
         self.result_page = ResultPage(self)
 
+        self.game_playing = 0
         self.board = board.Board()
         self.mcts = monte_carlo_tree_search.MonteCarloTreeSearch(192)
         self.ab0 = game_tree.AlphaBeta(0)
