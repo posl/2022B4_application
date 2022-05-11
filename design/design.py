@@ -288,11 +288,13 @@ class GamePage(tk.Frame):
         if self.master.board.turn==1 and self.player1==0:
             print()
         if self.master.board.turn==1 and self.player1==1:
+            self.master.se4.play()
             print("あなたの番ではありません：")
             return
         if self.master.board.turn==0 and self.player2==0:
             print()
         if self.master.board.turn==0 and self.player2==1:
+            self.master.se4.play()
             print("あなたの番ではありません：")
             return
         x = event.x
