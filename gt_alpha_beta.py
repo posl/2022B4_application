@@ -3,7 +3,7 @@ from board import Board
 import numpy as np
 
 class GTValue:
-	def __init__(self):
+	def __init__(self, select_value = 1):
 		self.corner = 1
 		self.around_corner = 1
 		self.edge = 1
@@ -43,45 +43,37 @@ class GTValue:
 			return self.around_edge
 		return self.others
 
+	#黒側の評価値を返す
 	def evaluate_black(self, board : Board):
 		#石の数の評価
 		value_black = 0
 		for i in range(Board.action_size):
 			value_black += self.get_board_value(i) * \
-				board.getbit_stone_exist(i) * (board.getbit_stone_black(i) - (1^board.getbit_stone_black(i)))
+				board.getbit_stone_exist(i) * (board.getbit_stone_black(i) - (1 ^ board.getbit_stone_black(i)))
 	
 		#置ける場所の数の評価	
 		tmp_turn = board.turn
 		board.turn = 1
-		value_black += self.place * len(board.list_placable)
+		value_black += self.place * len(board.list_placable())
 		board.turn = 1
-		value_black -= self.place * len(board.list_placable)
-		
+		value_black -= self.place * len(board.list_placable())
+		board.turn = tmp_turn
 		return value_black
 
 
 class AlphaBeta:
 	def __init__(self, select_value = 0):
-		self.set_value_list(select_value)
+		self.value = GTValue(select_value)
+		self.__min_value = -999
+		self.__max_value = 999
 		self.set_depth(2)
 
 	def __call__(self, board : Board):
 		return self.get_next_move(board)
 
-	def reset(self, select_value):
-		self.set_value_list(select_value)
+	def reset(self, select_value = 0):
+		self.value = GTValue(select_value)
 		self.set_depth(2)
-
-	# マスごとの評価値を決定する(未完)
-	def set_value_list(self, select_value):
-		if select_value == 1:
-			self.__value_list = np.ones(Board.action_size) * -1
-		else:
-			self.__value_list = np.ones(Board.action_size)
-
-		self.__max_value = np.abs(self.__value_list).sum()
-		self.__min_value = - self.__max_value
-		return
 
 	def set_depth(self, depth):
 		self.__max_depth = depth
@@ -93,16 +85,10 @@ class AlphaBeta:
 
 	# 評価関数
 	def __evaluate(self, board : Board):
-		value_black = 0
-
-		for i in range(Board.action_size):
-			value_black += self.__value_list[i] * \
-				board.getbit_stone_exist(i) * (board.getbit_stone_black(i) - (1^board.getbit_stone_black(i)))
-
 		if self.turn == 1:
-			return value_black
+			return self.value.evaluate_black(board)
 		else:
-			return - value_black
+			return - self.value.evaluate_black(board)
 
 	# 評価が最大値となる場所を求める
 	def __first_max_node(self, board : Board, alpha , beta):
