@@ -31,7 +31,7 @@ class GTValue:
 		except:
 			pass
 
-	def write_value_list(self, filename = "./data/gt_data"):
+	def write_value_list(self, filename = "./data/gt/data"):
 		with open(filename, mode = "w") as f:
 			f.write(" ".join(map(str, self.get_raw_value_list())))
 

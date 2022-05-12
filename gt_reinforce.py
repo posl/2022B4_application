@@ -52,6 +52,7 @@ class GTReinforce:
         for i in range(repeat_num):
             board.reset()
             agent_alphabeta = AlphaBeta(self.agent.new_data)
+            agent_alphabeta.set_depth(4)
             # board.set_plan(agent_alphabeta.get_next_move, self.player1)
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
             board.game()
@@ -77,5 +78,5 @@ if __name__ == "__main__":
     # gtr.set_player1(ab.get_next_move)
     gtr.set_player1(simple_plan)
     while 1:
-        print(gtr.start(50))
+        print(gtr.start(1))
         gtr.agent.data.write_value_list()
