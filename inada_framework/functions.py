@@ -1,7 +1,10 @@
 from inada_framework import Function, cuda, as_array, as_variable, Variable, Config
 import numpy as np
 from inada_framework.utilitys import xp_sum_to, reshape_for_broadcast
-xpx = cupyx if cuda.gpu_enable else np
+try:
+    import cupyx
+except:
+    pass
 
 # =============================================================================
 # 算術演算関数 (ブロードキャストに対応可能)
@@ -219,7 +222,7 @@ class GetItemGrad(Function):
         if xp is np:
             np.add.at(gx, self.slices, gy)
         elif xp is cp:
-            xpx.scatter_add(gx, self.slices, gy)
+            cupyx.scatter_add(gx, self.slices, gy)
         else:
             xp.scatter_add(gx, self.slices, gy)
         return gx
