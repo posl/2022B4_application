@@ -2,6 +2,7 @@ from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, op
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
 import inada_framework.functions as dzf
+from math import sqrt
 from inada_framework.utilitys import reshape_for_broadcast
 from functools import cache
 from collections import deque
@@ -35,7 +36,9 @@ class NoisyAffine(Layer):
             self.init_params(in_size, out_size)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
-        epsilon_in = self.noise_f(self.rng.normal(0.0, 1.0, size = (in_size, 1)).astype(np.float32))
+        a = self.rng.normal(0.0, 1.0, size = (in_size, 1)).astype(np.float32)
+        print(type(a))
+        epsilon_in = self.noise_f(a)
         epsilon_out = self.noise_f(self.rng.normal(0.0, 1.0, size = (1, out_size)).astype(np.float32))
         W_epsilon = epsilon_in.dot(epsilon_out)
         b_epsilon = epsilon_out
@@ -54,7 +57,7 @@ class NoisyAffine(Layer):
 
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
     def init_params(self, in_size, out_size):
-        stdv = 1. / np.sqrt(in_size)
+        stdv = 1. / sqrt(in_size)
         self.W_mu.data = self.rng.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
         self.b_mu.data = self.rng.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
 
@@ -469,7 +472,9 @@ class RainbowAgent:
     # 同じ条件での途中再開に必要な情報を読み込む
     def load_to_restart(self, file_name):
         self.qnet.load_weights(file_name + "_online.npz")
+        self.qnet.to_gpu()
         self.qnet_target.load_weights(file_name + "_target.npz")
+        self.qnet_target.to_gpu()
         self.total_steps = self.replay_buffer.load(file_name)
 
     # ターゲットネットワークはパラメータを学習せず、定期的に学習対象のネットワークと同期させることで学習を進行させる

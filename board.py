@@ -1,13 +1,14 @@
 from functools import cache
-import numpy as np
 from math import ceil
 from contextlib import contextmanager
 import random
 import os
 
+import numpy as np
 import pygame
 
 import display
+
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
 class StepNumGenerator:
