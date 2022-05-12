@@ -202,6 +202,48 @@ class GamePage(Page):
             self.board.after(800, self.canvas_update, 0, 0, 0, 0)
             self.game_exit_check()
 
+    def render_current_board(self):
+        bnum = 0
+        wnum = 0
+        self.game_canvas.delete("all")
+        self.game_canvas.configure(bg="#44EE88")
+        self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
+        for i in range(9):
+            self.game_canvas.create_line(10+self.cell_width*i, 10, 10+self.cell_width*i, 10+self.cell_height*8, fill="#101010", width=2)
+            self.game_canvas.create_line(10, 10+self.cell_height*i, 10+self.cell_width*8, 10+self.cell_height*i, fill="#101010", width=2)
+        for i in range(8):
+            for j in range(8):
+                t = (j, i)
+                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
+                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                        self.stone_black_draw(i, j)
+                    else:
+                        self.stone_white_draw(i, j)
+        return
+    
+    def render_placeable(self):
+        lp = self.board.board.list_placable()
+        for w in lp:
+            i = w%8
+            j = w//8
+            self.stone_blue_draw(i,j)
+        return
+
+    def render_reverse(self, n, flg = True):
+        y, x = board.Board.n2t(n)
+        self.stone_yellow_draw(x, y)
+        r_list = self.board.__reverse(n)
+        if flg:
+            for i in r_list:
+                i_y, i_x = board.Board.n2t(i)
+                self.stone_gray_draw(i_x, i_y)
+            self.board.after(800, self.render_reverse, False)
+        else:
+            for i in r_list:
+                i_y, i_x = board.Board.n2t(i)
+                self.stone_gray_draw(i_x, i_y)
+        return
+
 
     def stone_black_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#111111")
@@ -345,29 +387,13 @@ class GamePage(Page):
 
         if self.board.board.turn==1 and self.player1==0:
             print()
-        if self.board.board.turn==1 and self.player1==1:
-            self.board.se4.play()
-            print("あなたの番ではありません：")
-            return
-        if self.board.board.turn==1 and self.player1==2:
-            self.board.se4.play()
-            print("あなたの番ではありません：")
-            return
-        if self.board.board.turn==1 and self.player1==3:
+        if self.board.board.turn==1 and self.player1>0:
             self.board.se4.play()
             print("あなたの番ではありません：")
             return
         if self.board.board.turn==0 and self.player2==0:
             print()
-        if self.board.board.turn==0 and self.player2==1:
-            self.board.se4.play()
-            print("あなたの番ではありません：")
-            return
-        if self.board.board.turn==0 and self.player2==2:
-            self.board.se4.play()
-            print("あなたの番ではありません：")
-            return
-        if self.board.board.turn==0 and self.player2==3:
+        if self.board.board.turn==0 and self.player2>0:
             self.board.se4.play()
             print("あなたの番ではありません：")
             return
