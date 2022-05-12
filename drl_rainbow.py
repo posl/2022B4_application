@@ -95,7 +95,7 @@ class RainbowNet(Model):
         return values + advantages
 
     # 合法手の中から Q 関数が最大の行動を選択する
-    def get_actions(self, states, placables):
+    def get_actions(self, states, valids):
         quantile_values = self(states)
         quantile_values = quantile_values.data
 
@@ -104,10 +104,10 @@ class RainbowNet(Model):
 
         # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元の placable とする
         if len(qs) == 1:
-            return placables[qs[0, placables].argmax()]
+            return valids[int(qs[0, valids].argmax())]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        return [placable[q[placable].argmax()] if placable else 0 for q, placable in zip(qs, placables)]
+        return [valid[int(q[valid].argmax())] if valid else 0 for q, valid in zip(qs, valids)]
 
     # アドバンテージ関数のみを取り出すことができる (ベースライン付き REINFORCE の重みとして使える)
     def get_advantages(self, states, actions):
