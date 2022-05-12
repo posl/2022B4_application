@@ -30,6 +30,15 @@ class GTValue:
 			= value_list
 		except:
 			pass
+
+	def write_value_list(self, filename = "./data/gt_data"):
+		with open(filename, mode = "w") as f:
+			f.write(" ".join(map(str, self.get_raw_value_list())))
+
+	def read_value_list(self, filename = "./data/gt/data"):
+		with open(filename, mode = "r") as f:
+			tmp_value_list = list(map(int, f.read().split()))
+		self.set_raw_value_list(tmp_value_list)
 	
 	#盤面の指定されたのマスの評価値を返す
 	def get_board_value(self, board_index):
