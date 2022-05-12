@@ -273,7 +273,10 @@ class SumTree:
     # 全優先度データを確率形式で返す
     @property
     def probs(self):
-        return self.tree[self.capacity:] / self.sum()
+        scores = self.tree[self.capacity:]
+        if cuda.gpu_enable:
+            scores = cuda.as_cupy(scores)
+        return scores / self.sum()
 
     def sum(self):
         return self.tree[1]
