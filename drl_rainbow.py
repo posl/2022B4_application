@@ -26,7 +26,7 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        self.rng = xp.random.default_rng()
+        self.rng = np.random.default_rng()
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
@@ -673,6 +673,7 @@ if __name__ == "__main__":
 
     # 学習用コード (13 hours -> 48307 episodes)
     fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
+
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
