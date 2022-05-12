@@ -1,10 +1,72 @@
+from matplotlib.pyplot import get
 from board import Board
 import numpy as np
+
+class GTValue:
+	def __init__(self):
+		self.corner = 1
+		self.around_corner = 1
+		self.edge = 1
+		self.around_edge = 1
+		self.others = 1
+		self.place = 1
+
+	def reset(self):
+		self.corner = 0
+		self.around_corner = 0
+		self.edge = 0
+		self.around_edge = 0
+		self.others = 0
+		self.place = 0
+
+	#評価に必要とする変数をリストとして返す
+	def get_raw_value_list(self):
+		return [self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place]
+	
+	#評価に必要とする変数を受け取る
+	def set_raw_value_list(self, value_list):
+		self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
+		 = value_list
+	
+	#盤面の指定されたのマスの評価値を返す
+	def get_board_value(self, board_index):
+		x, y = divmod(board_index, Board.width)
+		x = min(x, Board.height - x)
+		y = min(y, Board.width - y)
+		if x == 0  and y == 0:
+			return self.corner
+		if x + y == 1:
+			return self.around_corner
+		if x == 0 or y == 0:
+			return self.edge
+		if x == 1 or y == 1:
+			return self.around_edge
+		return self.others
+
+	def evaluate_black(self, board : Board):
+		#石の数の評価
+		value_black = 0
+		for i in range(Board.action_size):
+			value_black += self.get_board_value(i) * \
+				board.getbit_stone_exist(i) * (board.getbit_stone_black(i) - (1^board.getbit_stone_black(i)))
+	
+		#置ける場所の数の評価	
+		tmp_turn = board.turn
+		board.turn = 1
+		value_black += self.place * len(board.list_placable)
+		board.turn = 1
+		value_black -= self.place * len(board.list_placable)
+		
+		return value_black
+
 
 class AlphaBeta:
 	def __init__(self, select_value = 0):
 		self.set_value_list(select_value)
 		self.set_depth(2)
+
+	def __call__(self, board : Board):
+		return self.get_next_move(board)
 
 	def reset(self, select_value):
 		self.set_value_list(select_value)
@@ -131,5 +193,5 @@ if __name__ == "__main__":
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
 	board.reset()
-	board.set_plan(ab0.get_next_move, ab1.get_next_move)
+	board.set_plan(ab0, ab1)
 	board.game()
