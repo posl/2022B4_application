@@ -17,7 +17,7 @@ class GTTDAgent:
         self.__creat_new_data()
 
     def __creat_new_data(self):
-        self.new_data.set_raw_value_list([i + np.random.random() - 0.5 for i in self.data.get_raw_value_list()])
+        self.new_data.set_raw_value_list([i + min(0.5 , 1 - i, i - (-1)) * (np.random.random() * 2 - 1) for i in self.data.get_raw_value_list()])
 
     def reset(self):
         self.data.reset()
@@ -37,11 +37,11 @@ class GTTDAgent:
 
 class GTReinforce:
     def __init__(self):
-        self.__agent = GTTDAgent()
+        self.agent = GTTDAgent()
         self.player1 = AlphaBeta(0)
 
     def reset(self):
-        self.__agent.reset()
+        self.agent.reset()
 
     def set_player1(self, player):
         self.player1 = player
@@ -51,7 +51,7 @@ class GTReinforce:
         sum_reward = 0
         for i in range(repeat_num):
             board.reset()
-            agent_alphabeta = AlphaBeta(self.__agent.new_data)
+            agent_alphabeta = AlphaBeta(self.agent.new_data)
             # board.set_plan(agent_alphabeta.get_next_move, self.player1)
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
             board.game()
@@ -64,14 +64,11 @@ class GTReinforce:
             else:
                 reward = 0
 
-            self.__agent.update(-reward)
+            self.agent.update(-reward)
             sum_reward += -reward
         print(sum_reward)
-        return self.__agent.get_data()
-    
-    def makefile(self, filename):
-        f = open(filename, "w")
-        f.write(self, self.__agent.get_data())
+        return self.agent.get_data()
+
 
 if __name__ == "__main__":
     gtr = GTReinforce()
@@ -81,3 +78,4 @@ if __name__ == "__main__":
     gtr.set_player1(simple_plan)
     while 1:
         print(gtr.start(50))
+        gtr.agent.data.write_value_list()
