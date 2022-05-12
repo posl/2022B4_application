@@ -209,27 +209,22 @@ class SumTree:
 
     # 使用する前に呼ぶ必要がある
     def reset(self):
-        self.tree = np.zeros(2 * self.capacity)
+        self.tree = xp.zeros(2 * self.capacity)
         self.rng = np.random.default_rng()
 
     def save(self, file_name):
-        np.save(file_name + "_tree.npy", self.tree)
+        tree = cuda.as_numpy(self.tree)
+        np.save(file_name + "_tree.npy", tree)
 
     def load(self, file_name):
-        self.tree = np.load(file_name + "_tree.npy")
+        tree = np.load(file_name + "_tree.npy")
+        if cuda.gpu_enable:
+            self.tree = cuda.as_cupy(tree)
+        else:
+            self.tree = tree
 
-
-    # 外部には木構造であることを見せない
-    def __str__(self):
-        return str(self.tree[self.capacity:])
-
-    def __getitem__(self, indices):
-        return self.tree[self.capacity:][indices]
-
-    # 優先度のセットは１つずつ行うものとする
+    # 優先度のセットは１つずつ行うものとする (value >= 0)
     def __setitem__(self, index, value):
-        assert value >= 0
-
         # 木構造を保持する ndarray の後半半分が実際の優先度データを格納する部分
         index += self.capacity
         tree = self.tree
@@ -273,10 +268,7 @@ class SumTree:
     # 全優先度データを確率形式で返す
     @property
     def probs(self):
-        scores = self.tree[self.capacity:]
-        if cuda.gpu_enable:
-            scores = cuda.as_cupy(scores)
-        return scores / self.sum()
+        return self.tree[self.capacity:] / self.sum()
 
     def sum(self):
         return self.tree[1]
