@@ -26,7 +26,7 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        self.rng = np.random.default_rng()
+        self.rng = xp.random.default_rng()
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
