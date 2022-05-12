@@ -7,7 +7,7 @@ from functools import cache
 from collections import deque
 import pickle
 import zlib
-from drl_selfmatch import SelfMatch, simple_plan, random_plan
+from drl_selfmatch import SelfMatch, simple_plan
 from board import Board
 
 
@@ -314,7 +314,7 @@ class ReplayBuffer:
 
     # エージェントの情報である合計ステップ数も一緒に保存する
     def save(self, file_name, total_steps):
-        save_data = [self.buffer, total_steps]
+        save_data = [self.buffer, self.count, total_steps]
 
         if self.prioritized:
             self.priorities.save(file_name)
@@ -332,8 +332,7 @@ class ReplayBuffer:
             self.priorities.load(file_name)
             self.max_priority = load_data.pop()
 
-        self.buffer, total_steps = load_data
-        self.count = len(self.buffer)
+        self.buffer, self.count, total_steps = load_data
         return total_steps
 
 
@@ -450,6 +449,10 @@ class RainbowAgent:
 
         # TD ターゲットの安定性のために、それを生成するためのネットワークは別で用意する (ターゲットネットワーク)
         self.qnet_target = RainbowNet(*qnet_args)
+
+        if cuda.gpu_enable:
+            self.qnet.to_gpu()
+            self.qnet_target.to_gpu()
 
         self.replay_buffer.reset()
         self.total_steps = 0
@@ -614,7 +617,7 @@ def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.5 Gbyte)
     buffer_size = 1000000
     prioritized = True
-    compress = True
+    compress = False
     step_num = 3
     gamma = 0.98
     batch_size = 32
@@ -664,7 +667,7 @@ if __name__ == "__main__":
     quantiles_num = 50
 
     # 学習用コード (13 hours -> 48307 episodes)
-    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 73245, version = None)
+    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
