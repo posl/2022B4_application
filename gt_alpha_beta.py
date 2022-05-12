@@ -4,12 +4,12 @@ import numpy as np
 
 class GTValue:
 	def __init__(self, select_value = 1):
-		self.corner = 1
-		self.around_corner = 1
-		self.edge = 1
-		self.around_edge = 1
-		self.others = 1
-		self.place = 1
+		self.corner = select_value
+		self.around_corner = select_value
+		self.edge = select_value
+		self.around_edge = select_value
+		self.others = select_value
+		self.place = select_value
 
 	def reset(self):
 		self.corner = 0
@@ -25,8 +25,11 @@ class GTValue:
 	
 	#評価に必要とする変数を受け取る
 	def set_raw_value_list(self, value_list):
-		self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
-		 = value_list
+		try:
+			self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
+			= value_list
+		except:
+			pass
 	
 	#盤面の指定されたのマスの評価値を返す
 	def get_board_value(self, board_index):
@@ -55,7 +58,7 @@ class GTValue:
 		tmp_turn = board.turn
 		board.turn = 1
 		value_black += self.place * len(board.list_placable())
-		board.turn = 1
+		board.turn = 0
 		value_black -= self.place * len(board.list_placable())
 		board.turn = tmp_turn
 		return value_black
@@ -63,7 +66,10 @@ class GTValue:
 
 class AlphaBeta:
 	def __init__(self, select_value = 0):
-		self.value = GTValue(select_value)
+		if type(select_value) == type(int()):
+			self.value = GTValue(select_value)
+		else:
+			self.value = select_value
 		self.__min_value = -999
 		self.__max_value = 999
 		self.set_depth(2)
