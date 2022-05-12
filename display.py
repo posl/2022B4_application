@@ -1,16 +1,6 @@
-from audioop import reverse
 import tkinter as tk
 import tkinter.ttk as ttk
-
-import random
 import math
-import os
-
-import board
-import mc_tree_search
-import gt_alpha_beta
-
-import pygame
 
 
 
