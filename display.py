@@ -17,6 +17,9 @@ import pygame
 class Page(tk.Frame):
     def __init__(self):
         # ページに共通する属性やメソッドなどを記述
+        self.win_width = 640
+        self.win_height = 480
+        
 
 
 
@@ -497,12 +500,12 @@ class App(tk.Tk):
         return self.ab1.get_next_move(board)
 
 
-def cell_click()
+
 
 if __name__ == "__main__":
 
     # アプリケーションを開始
-    board = Board()
+    board = board.Board()
     board.play()
     
     tkapp = App()
