@@ -3,7 +3,7 @@ import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
-from inada_selfmatch import Reinforce, simple_plan, random_plan
+from drl_selfmatch import SelfMatch, simple_plan, random_plan
 from board import Board
 
 
@@ -126,6 +126,39 @@ class ReinforceComputer:
             probs = probs.data[0]
 
         return placable[self.rng.choice(len(placable), p = probs)]
+
+
+
+
+class Reinforce(SelfMatch):
+    def fit_one_episode(self, progress = None):
+        board = self.board
+        board.reset()
+
+        while True:
+            agent = self.agents[board.turn]
+            action, prob = agent.get_action(board)
+            board.put_stone(action)
+
+            # 報酬はゲーム終了まで出ない
+            flag = board.can_continue()
+            if flag:
+                agent.add((0, prob))
+
+            # エージェントの学習はエピソードが終わるごとに行う
+            else:
+                reward = board.reward
+                agent.add((reward, prob))
+                agent.update()
+                break
+
+        agent = self.agents[board.turn ^ 1]
+        agent.add((-reward, None))
+        agent.update()
+
+    def save(self, turn, file_name, index):
+        agent = self.agents[turn]
+        agent.save(f"{file_name}{turn}_{index}")
 
 
 

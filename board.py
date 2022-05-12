@@ -96,7 +96,6 @@ class Board:
         self.tmp_n = None
 
 
-    # オセロ盤の情報である 64 bit 整数を 8 bit 区切りで状態として取得する
     @property
     def state(self):
         return self.stone_exist, self.stone_black
@@ -104,21 +103,18 @@ class Board:
     def set_state(self, state):
         self.stone_exist, self.stone_black = state
 
-    # オセロ盤の状態情報である２つの 64 bit 整数を 8 bit 区切りで ndarray に格納して、それを出力する
+    # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
     @staticmethod
     def state2ndarray(state, xp = np):
-        size = ceil(Board.action_size / 8)
-        box = xp.empty(size << 1, dtype = np.float32)
+        n_gen = range(ceil(Board.action_size / 8))
         stone_exist, stone_black = state
 
-        for i in range(size):
-            box[i] = stone_exist & 0xff
-            box[i + size] = stone_black & 0xff
-            stone_exist >>= 8
-            stone_black >>= 8
+        state_list = [(stone_exist >> (i << 3)) & 0xff for i in n_gen]
+        state_list += [(stone_black >> (i << 3)) & 0xff for i in n_gen]
 
         # 正規化してから出力する
-        return box / 255.
+        ndarray = xp.array(state_list, dtype = np.float32)
+        return ndarray / 255.
 
 
     # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換する

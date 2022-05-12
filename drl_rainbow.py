@@ -7,7 +7,7 @@ from functools import cache
 from collections import deque
 import pickle
 import zlib
-from inada_selfmatch import Rainbow, simple_plan, random_plan
+from drl_selfmatch import SelfMatch, simple_plan, random_plan
 from board import Board
 
 
@@ -554,6 +554,60 @@ class RainbowComputer(RainbowAgent):
 
 
 
+class Rainbow(SelfMatch):
+    def fit_one_episode(self, progress):
+        board = self.board
+        board.reset()
+        transition_infos = deque(), deque()
+        flag = 1
+
+        while flag:
+            turn = board.turn
+            agent = self.agents[turn]
+
+            placable = board.list_placable()
+            state = board.state
+            action = agent.get_action(board, placable)
+
+            board.put_stone(action)
+            flag = board.can_continue()
+
+            # 遷移情報を一時バッファに格納する
+            buffer = transition_infos[turn]
+            buffer.append((placable, state, action))
+
+            # 遷移情報２つセットで１回の update メソッドが呼べる
+            if len(buffer) == 2:
+                state, action = buffer.popleft()[1:]
+                next_placable, next_state = buffer[0][:2]
+
+                # 報酬はゲーム終了まで出ない
+                agent.update((state, action, 0, next_state, next_placable), progress)
+
+        reward = board.reward
+        next_state = board.state
+        next_placable = []
+
+        # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
+        while True:
+            state, action = buffer.popleft()[1:]
+            agent.update((state, action, reward, next_state, next_placable), progress)
+
+            if turn == board.turn:
+                turn ^= 1
+                buffer = transition_infos[turn]
+                agent = self.agents[turn]
+                reward = -reward
+            else:
+                break
+
+    def save(self, turn, file_name, index = None):
+        agent = self.agents[turn]
+        agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
+
+
+
+
 def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
@@ -610,7 +664,7 @@ if __name__ == "__main__":
     quantiles_num = 50
 
     # 学習用コード (13 hours -> 48307 episodes)
-    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 48307, version = None)
+    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 73245, version = None)
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)

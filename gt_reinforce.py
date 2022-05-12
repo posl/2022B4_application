@@ -1,8 +1,8 @@
-from game_tree import AlphaBeta
+from gt_alpha_beta import AlphaBeta
 from board import Board
 import numpy as np
 from random import random
-from inada_selfmatch import simple_plan
+from drl_selfmatch import simple_plan
 
 # 動作確認未完了
 

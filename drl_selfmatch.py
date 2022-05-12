@@ -5,7 +5,6 @@ from time import time
 from tqdm import tqdm
 from math import ceil
 import matplotlib.pyplot as plt
-from collections import deque
 
 
 # エージェントの評価に使う単純な方策
@@ -185,98 +184,10 @@ class SelfMatch:
                 self.agents[turn].save(f"{save_file}{turn}", is_yet)
 
             eval_history = eval_historys[turn] / 100.
-            history_label = "first" if turn else "second"
-            plt.plot(np.arange(len(eval_history)), eval_history, label = history_label)
+            plt.plot(np.arange(len(eval_history)), eval_history, label = "first" if turn else "second")
 
         plt.xlabel("Thousands of Episodes")
         plt.ylabel("Mean Winning Percentage")
         plt.legend()
         plt.ylim(-0.1, 1.1)
         plt.savefig(file_name.format("graphs"))
-
-
-
-
-class Rainbow(SelfMatch):
-    def fit_one_episode(self, progress):
-        board = self.board
-        board.reset()
-        transition_infos = deque(), deque()
-        flag = 1
-
-        while flag:
-            turn = board.turn
-            agent = self.agents[turn]
-
-            placable = board.list_placable()
-            state = board.state
-            action = agent.get_action(board, placable)
-
-            board.put_stone(action)
-            flag = board.can_continue()
-
-            # 遷移情報を一時バッファに格納する
-            buffer = transition_infos[turn]
-            buffer.append((placable, state, action))
-
-            # 遷移情報２つセットで１回の update メソッドが呼べる
-            if len(buffer) == 2:
-                state, action = buffer.popleft()[1:]
-                next_placable, next_state = buffer[0][:2]
-
-                # 報酬はゲーム終了まで出ない
-                agent.update((state, action, 0, next_state, next_placable), progress)
-
-        reward = board.reward
-        next_state = board.state
-        next_placable = []
-
-        # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
-        while True:
-            state, action = buffer.popleft()[1:]
-            agent.update((state, action, reward, next_state, next_placable), progress)
-
-            if turn == board.turn:
-                turn ^= 1
-                buffer = transition_infos[turn]
-                agent = self.agents[turn]
-                reward = -reward
-            else:
-                break
-
-    def save(self, turn, file_name, index = None):
-        agent = self.agents[turn]
-        agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
-
-
-
-
-class Reinforce(SelfMatch):
-    def fit_one_episode(self, progress = None):
-        board = self.board
-        board.reset()
-
-        while True:
-            agent = self.agents[board.turn]
-            action, prob = agent.get_action(board)
-            board.put_stone(action)
-
-            # 報酬はゲーム終了まで出ない
-            flag = board.can_continue()
-            if flag:
-                agent.add((0, prob))
-
-            # エージェントの学習はエピソードが終わるごとに行う
-            else:
-                reward = board.reward
-                agent.add((reward, prob))
-                agent.update()
-                break
-
-        agent = self.agents[board.turn ^ 1]
-        agent.add((-reward, None))
-        agent.update()
-
-    def save(self, turn, file_name, index):
-        agent = self.agents[turn]
-        agent.save(f"{file_name}{turn}_{index}")
