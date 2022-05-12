@@ -23,7 +23,7 @@ class Page(tk.Frame):
 
 
 
-class StartPage(tk.Frame):
+class StartPage(Page):
     def __init__(self, board):
         tk.Frame.__init__(self, board)
         self.board = board
@@ -44,7 +44,7 @@ class StartPage(tk.Frame):
         self.board.quit()
 
 
-class OptionFrame(tk.Frame):
+class OptionFrame(Page):
     def __init__(self, board):
         tk.Frame.__init__(self, board)
         self.board = board
@@ -118,7 +118,7 @@ class OptionFrame(tk.Frame):
 
 
 
-class GamePage(tk.Frame):
+class GamePage(Page):
     def __init__(self, board):
         tk.Frame.__init__(self, board)
         self.board = board
@@ -417,87 +417,6 @@ class GamePage(tk.Frame):
 
 
 
-class ResultPage(tk.Frame):
-    def __init__(self, board):
-        tk.Frame.__init__(self, board)
-        pygame.init()
-        self.board = board
-        self.configure(bg="#000099")
-        self.grid(row=0, column=0, sticky="nsew")
-
-        self.button1 = tk.Button(self, text="Back", font = (board.font_name, 50), command=lambda:self.board.start_page.tkraise())
-        self.button1.place(x=350, y=380)
-
-        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (board.font_name, 50))
-        self.label1.place(x=10, y=10)
-
-    def win_check(self):
-        bnum = 0
-        wnum = 0
-        for i in range(8):
-            for j in range(8):
-                t = (j, i)
-                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
-                        bnum += 1
-                    else:
-                        wnum += 1
-        if bnum>wnum:
-            self.label1.configure(text="黒の勝ち")
-        elif bnum<wnum:
-            self.label1.configure(text="白の勝ち")
-        else:
-            self.label1.configure(text="引き分け")
-
-
-
-
-
-
-class App(tk.Tk):
-    def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
-        self.width = 640
-        self.height = 480
-        self.font_name = "ヒラギノ"
-        self.geometry( str(self.width) + "x" + str(self.height) )
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-
-        self.start_page = StartPage(self)
-        self.option_page = OptionFrame(self)
-        self.game_page = GamePage(self)
-        self.result_page = ResultPage(self)
-
-        self.game_playing = 0
-        self.board = board.Board()
-        self.mcts = mc_tree_search.MonteCarloTreeSearch()
-        self.ab0 = gt_alpha_beta.AlphaBeta(0)
-        self.ab1 = gt_alpha_beta.AlphaBeta(1)
-
-
-        sound_folder_path = os.path.join(os.path.dirname(__file__), "sound", "{}")
-        self.bgm1 = pygame.mixer.Sound(sound_folder_path.format("maou09.mp3"))
-        self.bgm1.play(loops = -1)
-        self.se1 = pygame.mixer.Sound(sound_folder_path.format("maou47.wav"))
-        self.se2 = pygame.mixer.Sound(sound_folder_path.format("maou41.wav"))
-        self.se3 = pygame.mixer.Sound(sound_folder_path.format("maou48.wav"))
-        self.se4 = pygame.mixer.Sound(sound_folder_path.format("maou19.wav"))
-
-        self.start_page.tkraise()
-
-
-    def com_random(self, board : board.Board):
-        return random.choice(board.list_placable())
-
-    def com_monte(self, board : board.Board):
-        return self.mcts.mc_tree_search(board)
-
-    def com_alpha0(self, board : board.Board):
-        return self.ab0.get_next_move(board)
-
-    def com_alpha1(self, board : board.Board):
-        return self.ab1.get_next_move(board)
 
 
 
