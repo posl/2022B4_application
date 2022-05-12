@@ -453,10 +453,6 @@ class RainbowAgent:
         # TD ターゲットの安定性のために、それを生成するためのネットワークは別で用意する (ターゲットネットワーク)
         self.qnet_target = RainbowNet(*qnet_args)
 
-        if cuda.gpu_enable:
-            self.qnet.to_gpu()
-            self.qnet_target.to_gpu()
-
         self.replay_buffer.reset()
         self.total_steps = 0
 
@@ -472,10 +468,12 @@ class RainbowAgent:
     # 同じ条件での途中再開に必要な情報を読み込む
     def load_to_restart(self, file_name):
         self.qnet.load_weights(file_name + "_online.npz")
-        self.qnet.to_gpu()
         self.qnet_target.load_weights(file_name + "_target.npz")
-        self.qnet_target.to_gpu()
         self.total_steps = self.replay_buffer.load(file_name)
+
+        if cuda.gpu_enable:
+            self.qnet.to_gpu()
+            self.qnet_target.to_gpu()
 
     # ターゲットネットワークはパラメータを学習せず、定期的に学習対象のネットワークと同期させることで学習を進行させる
     def sync_qnet(self):
