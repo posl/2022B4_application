@@ -1,41 +1,39 @@
 from gt_alpha_beta import AlphaBeta
+from gt_alpha_beta import GTValue
 from board import Board
 import numpy as np
 from random import random
-from drl_selfmatch import simple_plan
+from drl_selfmatch import corners_plan as simple_plan
 
 # 動作確認未完了
 
 
 class GTTDAgent:
     def __init__(self):
-        self.__alpha = 0.01
-        self.__data_size = Board.action_size
-        self.__data_list = np.zeros(self.__data_size)
-
-    def __creat_new_data(self):
-        # self.__new_data_list = list(map(lambda x : x + np.random.random() - 0.5, self.__data_list))
-        self.__new_data_list = [self.__data_list[i] + np.random.random() - 0.5 for i in range(self.__data_size)]
-
-    def reset(self):
-        self.__data_list = np.zeros(self.__data_size)
+        self.__alpha = 0.03
+        self.data = GTValue(1)
+        self.data.reset()
+        self.new_data = GTValue()
         self.__creat_new_data()
 
-    def set_data(self, data_list):
-        if len(data_list) != self.__data_size:
-            return
-        self.__data_list = data_list
+    def __creat_new_data(self):
+        self.new_data.set_raw_value_list([i + np.random.random() - 0.5 for i in self.data.get_raw_value_list()])
+
+    def reset(self):
+        self.data.reset()
         self.__creat_new_data()
 
     def update(self, reward):
-        self.set_data([self.__data_list[i] + self.__alpha * reward * (self.__new_data_list[i] - self.__data_list[i]) for i in range(self.__data_size)])
+        data_list = self.data.get_raw_value_list()
+        new_data_list = self.new_data.get_raw_value_list()
+        self.data.set_raw_value_list([data_list[i] + self.__alpha * reward * (new_data_list[i] - data_list[i]) for i in range(len(data_list))])
+        self.__creat_new_data()
 
     def get_data(self):
-        return self.__data_list  
+        return self.data.get_raw_value_list()
 
     def get_new_data(self):
-        self.__creat_new_data()
-        return self.__new_data_list
+        return self.new_data.get_raw_value_list()
 
 class GTReinforce:
     def __init__(self):
@@ -53,7 +51,7 @@ class GTReinforce:
         sum_reward = 0
         for i in range(repeat_num):
             board.reset()
-            agent_alphabeta = AlphaBeta(self.__agent.get_new_data())
+            agent_alphabeta = AlphaBeta(self.__agent.new_data)
             # board.set_plan(agent_alphabeta.get_next_move, self.player1)
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
             board.game()
