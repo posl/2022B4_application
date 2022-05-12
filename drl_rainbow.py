@@ -36,8 +36,8 @@ class NoisyAffine(Layer):
             self.init_params(in_size, out_size)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
-        epsilon_in = self.noise_f(self.rng.normal(0.0, 1.0, size = (in_size, 1)).astype(np.float32))
-        epsilon_out = self.noise_f(self.rng.normal(0.0, 1.0, size = (1, out_size)).astype(np.float32))
+        epsilon_in = self.noise_f(self.rng.standard_normal(size = (in_size, 1), dtype = np.float32))
+        epsilon_out = self.noise_f(self.rng.standard_normal(size = (1, out_size), dtype = np.float32))
         W_epsilon = epsilon_in.dot(epsilon_out)
         b_epsilon = epsilon_out
 
@@ -56,8 +56,8 @@ class NoisyAffine(Layer):
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
     def init_params(self, in_size, out_size):
         stdv = 1. / sqrt(in_size)
-        self.W_mu.data = self.rng.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
-        self.b_mu.data = self.rng.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
+        self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
+        self.b_mu.data = xp.random.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
 
         initial_sigma = self.first_sigma * stdv
         self.W_sigma.data = xp.full((in_size, out_size), initial_sigma, dtype = np.float32)

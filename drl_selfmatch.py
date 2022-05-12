@@ -1,5 +1,4 @@
 import numpy as np
-import random
 from os.path import join, dirname
 from time import time
 from tqdm import tqdm
@@ -75,7 +74,7 @@ class SelfMatch:
             eval_historys = np.zeros((2, 101), dtype = np.float32)
 
         # エージェントの初期化
-        for turn in (1, 0):
+        for turn in {1, 0}:
             agent = self.agents[turn]
             agent.reset()
             if restart:
@@ -98,7 +97,7 @@ class SelfMatch:
                 restart = 0
 
                 # パラメータの保存、最終評価、エージェントの初期化 (パラメータの保存を優先する)
-                for turn in (1, 0):
+                for turn in {1, 0}:
                     self.save(turn, file_name.format("parameters"), index = run - 1)
                     win_rates[turn] = self.eval(turn)
                     self.agents[turn].reset()
