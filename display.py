@@ -65,15 +65,16 @@ class OptionFrame(tk.Frame):
     def start_game(self):
         self.master.board.reset()
         self.master.game_playing = 1
-        #self.master.board.stone_black = 0
-        for i in range(7):
-            for j in range(7):
-                #self.master.board.stone_exist = self.master.board.stone_exist | (1<<(8*i+j))
-                if (i+j)%2==0:
-                    #self.master.board.stone_black = self.master.board.stone_black + (1<<(8*i+j))
-                    pass
-                else:
-                    pass
+        if False:
+            self.master.board.stone_black = 0
+            for i in range(7):
+                for j in range(7):
+                    self.master.board.stone_exist = self.master.board.stone_exist | (1<<(8*i+j))
+                    if (i+j)%2==0:
+                        self.master.board.stone_black = self.master.board.stone_black + (1<<(8*i+j))
+                        pass
+                    else:
+                        pass
         self.master.game_page.player1 = self.combobox1.current()
         self.master.game_page.player2 = self.combobox2.current()
         player1_plan = 0
@@ -142,8 +143,14 @@ class GamePage(tk.Frame):
         self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (master.font_name, 50))
         self.white_conter_label.place(x=530, y=10)
 
-        self.button1 = tk.Button(self, text="Next", font = (master.font_name, 50), command=lambda:self.button1_click())
+        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (master.font_name, 25))
+        self.label1.place(x=1000, y=300)
+
+        self.button1 = tk.Button(self, text="Next", font = (master.font_name, 25), command=lambda:self.button1_click())
         self.button1.place(x=750, y=380)
+
+        self.button2 = tk.Button(self, text=">", font = (master.font_name, 50), command=lambda:self.goto_start_page())
+        self.button2.place(x=750, y=380)
     
     def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
         if state==0:
@@ -367,8 +374,35 @@ class GamePage(tk.Frame):
 
 
     def goto_result_page(self):
+        self.win_check()
         self.master.result_page.win_check()
-        self.master.result_page.tkraise()
+        self.button2.place(x=520)
+        self.label1.place(x=520)
+
+    def goto_start_page(self):
+        self.master.start_page.tkraise()
+        self.button2.place(x=1000)
+        self.label1.place(x=1000)
+        self.label1.configure(text="")
+    
+
+    def win_check(self):
+        bnum = 0
+        wnum = 0
+        for i in range(8):
+            for j in range(8):
+                t = (j, i)
+                if (self.master.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
+                    if (self.master.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                        bnum += 1
+                    else:
+                        wnum += 1
+        if bnum>wnum:
+            self.label1.configure(text="黒の勝ち")
+        elif bnum<wnum:
+            self.label1.configure(text="白の勝ち")
+        else:
+            self.label1.configure(text="引き分け")
 
 
 
