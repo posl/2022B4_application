@@ -48,10 +48,6 @@ def corners_plan(board):
     return simple_plan(board, placable)
 
 
-def random_plan(board):
-    return random.choice(board.list_placable())
-
-
 
 
 # 自己対戦で学習・評価を行うためのクラスの基底クラス

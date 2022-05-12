@@ -8,7 +8,7 @@ import random
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
 class StepNumGenerator:
     def __init__(self, startpoint):
-        up, left = divmod(startpoint, Board.width)
+        up, left = Board.n2t(startpoint)
         right = Board.width - 1 - left
         down = Board.height - 1 - up
 
@@ -95,6 +95,9 @@ class Board:
         # somewhere_placable() で保存した n を次の list_placable() に使うための変数
         self.tmp_n = None
 
+        # 画面表示用の属性
+        self.click_attr = None
+
 
     @property
     def state(self):
@@ -121,6 +124,10 @@ class Board:
     @staticmethod
     def t2n(t):
         return Board.width * t[0] + t[1]
+
+    @staticmethod
+    def n2t(n):
+        return divmod(n, Board.width)
 
     # オセロ盤を初期状態にセットする
     def reset(self):
@@ -279,31 +286,47 @@ class Board:
 
 
     # ゲーム本体
-    def game(self, render_func = None):
+    def game(self, render_flag = False):
         flag = 1
         while flag:
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
 
-            if render_func is not None:
+            if render_flag:
                 # 引数は pass があったかどうかの真偽値
-                render_func()
+                self.render(flag)
 
-    def play(self, player1_plan, player2_plan):
-        self.reset()
+    # エピソード中の画面表示メソッド
+    def render(self, flag):
+        self.tkapp.game_page.canvas_update()
 
-        # # start 表示 (コンピュータの設定選択)
-        # player1_plan, player2_plan = f()
+    def play(self):
+        # ページたち
 
+        # サウンド
+
+        # tkapp の初期化
+        while True:
+            self.start_page.tkraise()
+            self.main_loop()
+            if self.click_attr:
+                self.__play()
+            else:
+                break
+
+    def __play(self):
+        self.main_loop()
+        player1_plan, player2_plan = self.click_attr
         self.set_plan(player1_plan, player2_plan)
 
         # 最初の盤面表示
+        self.reset()
         self.print_state()
 
         self.game(self.print_state)
-
-        # finish 表示 (結果の表示)
+        
+        
 
 
     # 一時的な盤面表示
