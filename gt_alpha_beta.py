@@ -58,7 +58,7 @@ class GTValue:
 		tmp_turn = board.turn
 		board.turn = 1
 		value_black += self.place * len(board.list_placable())
-		board.turn = 1
+		board.turn = 0
 		value_black -= self.place * len(board.list_placable())
 		board.turn = tmp_turn
 		return value_black
