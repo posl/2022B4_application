@@ -2,10 +2,13 @@ from board import Board
 import numpy as np
 
 class AlphaBeta:
-	__max_depth = 4
-
 	def __init__(self, select_value = 0):
 		self.set_value_list(select_value)
+		self.set_depth(2)
+
+	def reset(self, select_value):
+		self.set_value_list(select_value)
+		self.set_depth(2)
 
 	# マスごとの評価値を決定する(未完)
 	def set_value_list(self, select_value):
@@ -18,10 +21,13 @@ class AlphaBeta:
 		self.__min_value = - self.__max_value
 		return
 
+	def set_depth(self, depth):
+		self.__max_depth = depth
+
 	# 次の手を示す
 	def get_next_move(self, board : Board):
 		self.turn = board.turn
-		return self.__first_max_node(board, self.__min_value, self.__max_value)
+		return int(self.__first_max_node(board, self.__min_value, self.__max_value))
 
 	# 評価関数
 	def __evaluate(self, board : Board):
@@ -59,7 +65,7 @@ class AlphaBeta:
 
 	# 評価を求める
 	def __node(self, board : Board, depth, alpha, beta):
-		if depth == AlphaBeta.__max_depth:
+		if depth == self.__max_depth:
 			return self.__evaluate(board)
 
 		# 求める評価値が最大か最小か決定する
