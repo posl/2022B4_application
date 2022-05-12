@@ -44,7 +44,7 @@ class StartPage(Page):
         self.board.quit()
 
 
-class OptionFrame(Page):
+class OptionPage(Page):
     def __init__(self, board):
         tk.Frame.__init__(self, board)
         self.board = board
@@ -453,11 +453,11 @@ if __name__ == "__main__":
     board = board.Board()
     board.play()
     
-    tkapp = App()
-    tkapp.title('おせろ')
+    #tkapp = App()
+    #tkapp.title('おせろ')
     
-    tkapp.mainloop()
-    board.set_display(tkapp)
+    #tkapp.mainloop()
+    #board.set_display(tkapp)
 
     def player(board):
         placable = set(board.list_placable())
