@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pygame
 
-from board_speedup import get_legal_board
+from board_speedup import get_legal_board, get_reverse_board
 import display
 
 
@@ -92,7 +92,7 @@ class Board:
         # Python に対して Cython による実装は 50 倍以上速い
         if self.height == self.width == 8:
             self.__list_placable = self.__list_placable_cython
-            self.__reverse = self.__reverse_python
+            self.__reverse = self.__reverse_cython
         else:
             self.__list_placable = self.__list_placable_python
             self.__reverse = self.__reverse_python
@@ -273,8 +273,7 @@ class Board:
 
     @staticmethod
     def __reverse_cython(startpoint, move_player, opposition_player):
-        pass
-        #return get_reverse_board(startpoint, move_player, opposition_player)
+        return get_reverse_board(1 << startpoint, move_player, opposition_player)
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
