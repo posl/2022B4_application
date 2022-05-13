@@ -90,9 +90,9 @@ class Board:
 
     def __init__(self):
         if self.height == self.width == 8:
-            self.list_placable = self.list_placable_cython
+            self.__list_placable = self.list_placable_cython
         else:
-            self.list_placable = self.list_placable_python
+            self.__list_placable = self.list_placable_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -104,7 +104,7 @@ class Board:
         self.log_plans = []
 
         # can_continue で計算した、合法手のリストを再利用するための属性
-        self.p_list = []
+        self.p_list = None
 
         # 画面表示用の属性
         self.click_attr = None
@@ -185,6 +185,18 @@ class Board:
         return 0
 
 
+    def get_stone_num(self):
+        if self.turn:
+            return self.black_num
+        return self.white_num
+
+    # 通し番号 n に自身の石を打ったとき、自身の石の数が幾つになるかを取得する
+    def get_next_stone_num(self, n):
+        with self.log_runtime(n):
+            self.put_stone(n)
+            return self.get_stone_num()
+
+
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
     def get_stand_bits(self, x):
         return [n for n in range(self.action_size) if (x >> n) & 1]
@@ -196,18 +208,6 @@ class Board:
     @property
     def white_positions(self):
         return self.get_stand_bits(self.stone_white)
-
-
-    def get_stone_num(self):
-        if self.turn:
-            return self.black_num
-        return self.white_num
-
-    # 通し番号 n に自身の石を打ったとき、自身の石の数が幾つになるかを取得する
-    def get_next_stone_num(self, n):
-        with self.log_runtime(n):
-            self.put_stone(n)
-            return self.get_stone_num()
 
 
     # 空きマスに自身の石を置けるかどうかの真偽値を取得する
@@ -242,6 +242,13 @@ class Board:
         return self.get_stand_bits(get_legal_board(*players))
 
 
+    # 手番のプレイヤーとその相手のプレイヤーを判別し、それらのボード表現をタプルで取得する
+    @property
+    def players(self):
+        if self.turn:
+            return self.stone_black, self.stone_white
+        return self.stone_white, self.stone_black
+
     def list_placable(self, save_flag = False):
         p_list = self.p_list
 
@@ -250,13 +257,7 @@ class Board:
             self.p_list = None
             return p_list
 
-        # 手番のプレイヤーとその相手のプレイヤーを判別する
-        if self.turn:
-            players = self.stone_black, self.stone_white
-        else:
-            players = self.stone_white, self.stone_black
-
-        p_list = self.__list_placable(players)
+        p_list = self.__list_placable(self.players)
         if save_flag:
             self.p_list = p_list
         return p_list
@@ -280,6 +281,7 @@ class Board:
 
     # n に石を置き、返す
     def put_stone(self, n):
+        
         self.__set_stone(n)
         self.__reverse(n)
 
