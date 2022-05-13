@@ -1,13 +1,13 @@
 from functools import cache
-from math import ceil
 from contextlib import contextmanager
+from math import ceil
 import random
 import os
 
 import numpy as np
 import pygame
 
-import board_speedup
+from board_speedup import get_legal_board
 import display
 
 
@@ -117,6 +117,21 @@ class Board:
     def set_state(self, state):
         self.stone_black, self.stone_white, self.turn = state
 
+
+    # ボードの状態を一時保存するランタイムコンテキストを生成するマネージャ
+    @contextmanager
+    def log_runtime(self):
+        self.add_state()
+        yield
+        self.undo_state()
+
+    def add_state(self):
+        self.log_state.append(self.state)
+
+    def undo_state(self):
+        self.set_state(self.log_state.pop())
+
+
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
     @property
     def state_ndarray(self, xp = np):
@@ -136,6 +151,7 @@ class Board:
     def t2n(t):
         return Board.width * t[0] + t[1]
 
+    # オセロ盤の各位置を表す、通し番号を行列のインデックス (tuple) に変換する
     @staticmethod
     def n2t(n):
         return divmod(n, Board.width)
@@ -169,6 +185,19 @@ class Board:
         return 0
 
 
+    # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
+    def get_stand_bits(self, x):
+        return [n for n in range(self.action_size) if (x >> n) & 1]
+
+    @property
+    def black_positions(self):
+        return self.get_stand_bits(self.stone_black)
+
+    @property
+    def white_positions(self):
+        return self.get_stand_bits(self.stone_white)
+
+
     def get_stone_num(self):
         if self.turn:
             return self.black_num
@@ -177,14 +206,8 @@ class Board:
     # 通し番号 n に自身の石を打ったとき、自身の石の数が幾つになるかを取得する
     def get_next_stone_num(self, n):
         with self.log_runtime(n):
+            self.put_stone(n)
             return self.get_stone_num()
-
-
-    def setbit_stone_black(self, mask):
-        self.stone_black ^= mask
-
-    def setbit_stone_white(self, mask):
-        self.stone_white ^= mask
 
 
     # 空きマスに自身の石を置けるかどうかの真偽値を取得する
@@ -201,26 +224,39 @@ class Board:
         return False
 
     # エージェントが石を置ける箇所の番号をリストで取得する
-    def list_placable_python(self, save_flag = False):
-        p_list = self.p_list
-        if p_list:
-            self.p_list.clear()
-            return p_list
-
-        # 手番のプレイヤーとその相手のプレイヤーを判別する
-        if self.turn:
-            move_player, opposition_player = self.stone_black, self.stone_white
-        else:
-            move_player, opposition_player = self.stone_white, self.stone_black
-
+    def list_placable_python(self, players):
+        move_player, opposition_player = players
         stone_exist = move_player | opposition_player
         is_placable = self.is_placable
+        p_list = []
 
         for n in range(self.action_size):
             # 合法手判定は石が存在しない箇所だけでよい
             if not ((stone_exist >> n) & 1) and is_placable(n, move_player, opposition_player):
                 p_list.append(n)
 
+        return p_list
+
+    # C 言語で実装した高速なコードが利用できる条件を満たす時、それを使う
+    def list_placable_cython(self, players):
+        return self.get_stand_bits(get_legal_board(*players))
+
+
+    def list_placable(self, save_flag = False):
+        p_list = self.p_list
+
+        # can_continue で計算したものが存在する場合は、それを利用する
+        if p_list is not None:
+            self.p_list = None
+            return p_list
+
+        # 手番のプレイヤーとその相手のプレイヤーを判別する
+        if self.turn:
+            players = self.stone_black, self.stone_white
+        else:
+            players = self.stone_white, self.stone_black
+
+        p_list = self.__list_placable(players)
         if save_flag:
             self.p_list = p_list
         return p_list
@@ -253,7 +289,6 @@ class Board:
         if self.turn:
             self.setbit_stone_black(1 << n)
 
-
     # n に置いた時に返るマスを返す
     def __reverse(self, startpoint):
         for n, n_gen in OmniDirectionalSearcher(startpoint):
@@ -279,19 +314,6 @@ class Board:
             return 0
         else:
             return self.can_continue(True)
-
-    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
-    @contextmanager
-    def log_runtime(self):
-        self.add_state()
-        yield
-        self.undo_state()
-
-    def add_state(self):
-        self.log_state.append(self.state)
-
-    def undo_state(self):
-        self.set_state(self.log_state.pop())
 
 
     # ゲーム本体
