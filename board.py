@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pygame
 
+import board_speedup
 import display
 
 
@@ -88,17 +89,22 @@ class Board:
         return super().__new__(cls)
 
     def __init__(self):
+        if self.height == self.width == 8:
+            pass
+        else:
+            pass
+
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
-        self.stone_exist = 0
         self.stone_black = 0
+        self.stone_white = 0
         self.turn = 1
 
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
         self.log_state = []
         self.log_plans = []
 
-        # somewhere_placable() で保存した n を次の list_placable() に使うための変数
-        self.tmp_n = None
+        # can_continue で計算した、合法手のリストを再利用するための属性
+        self.p_list = []
 
         # 画面表示用の属性
         self.click_attr = None
@@ -106,19 +112,19 @@ class Board:
 
     @property
     def state(self):
-        return self.stone_exist, self.stone_black
+        return self.stone_black, self.stone_white, self.turn
 
     def set_state(self, state):
-        self.stone_exist, self.stone_black = state
+        self.stone_black, self.stone_white, self.turn = state
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
-    @staticmethod
-    def state2ndarray(state, xp = np):
+    @property
+    def state_ndarray(self, xp = np):
         n_gen = range(ceil(Board.action_size / 8))
-        stone_exist, stone_black = state
+        stone_black, stone_white = self.state
 
-        state_list = [(stone_exist >> (i << 3)) & 0xff for i in n_gen]
-        state_list += [(stone_black >> (i << 3)) & 0xff for i in n_gen]
+        state_list = [(stone_black >> (i << 3)) & 0xff for i in n_gen]
+        state_list += [(stone_white >> (i << 3)) & 0xff for i in n_gen]
 
         # 正規化してから出力する
         ndarray = xp.array(state_list, dtype = np.float32)
@@ -136,11 +142,11 @@ class Board:
 
     # オセロ盤を初期状態にセットする
     def reset(self):
-        width = self.width
-        bottom_left = self.t2n(((self.height >> 1), ((width >> 1) - 1)))
+        height, width = self.height, self.width
+        bottom_left = self.t2n(((height >> 1), ((width >> 1) - 1)))
         upper_left = bottom_left - width
-        self.stone_exist = (0b11 << upper_left) + (0b11 << bottom_left)
         self.stone_black = (0b10 << upper_left) + (0b01 << bottom_left)
+        self.stone_white = (0b01 << upper_left) + (0b10 << bottom_left)
         self.turn = 1
 
 
@@ -150,7 +156,7 @@ class Board:
 
     @property
     def white_num(self):
-        return (self.stone_exist ^ self.stone_black).bit_count()
+        return self.stone_white.bit_count()
 
     # ゲーム終了後、勝敗に応じて報酬を与えるための属性 (最後の手番の人から見て、勝ち : 1, 負け : -1, 分け : 0)
     @property
@@ -174,61 +180,55 @@ class Board:
             return self.get_stone_num()
 
 
-    # 指定された 64 bit 整数の下から n bit 目の値を取得する
-    def __getbit(self, name, n):
-        return (getattr(self, name) >> n) & 1
-
     def getbit_stone_exist(self, n):
-        return self.__getbit("stone_exist", n)
+        return ((self.stone_black | self.stone_white) >> n) & 1
 
     def getbit_stone_black(self, n):
-        return self.__getbit("stone_black", n)
+        return (self.stone_black >> n) & 1
 
+    def getbit_stone_white(self, n):
+        return (self.stone_white >> n) & 1
 
-    # 石が存在するかどうかを示す変数、または存在する石が黒かどうかを示す変数を更新する
-    def setbit_stone_exist(self, n):
-        self.stone_exist |= 1 << n
 
     def setbit_stone_black(self, mask):
         self.stone_black ^= mask
 
+    def setbit_stone_white(self, mask):
+        self.stone_white ^= mask
+
 
     # 空きマスに自身の石を置けるかどうかの真偽値を取得する
     def is_placable(self, startpoint):
+        if self.turn:
+            getbit_move_player, getbit_opponent = self.getbit_stone_black, self.getbit_stone_white
+        else:
+            getbit_move_player, getbit_opponent = self.getbit_stone_white, self.getbit_stone_black
+
         for n, n_gen in OmniDirectionalSearcher(startpoint):
-            if self.getbit_stone_exist(n) and (self.getbit_stone_black(n) ^ self.turn):
+            if getbit_opponent(n):
                 for n in n_gen:
-                    if self.getbit_stone_exist(n):
-                        if self.getbit_stone_black(n) ^ self.turn:
-                            continue
+                    if getbit_opponent(n):
+                        continue
+                    elif getbit_move_player(n):
                         return True
                     break
         return False
 
-    # 石を置ける箇所がどこかにあるかどうかの真偽値を取得する
-    def somewhere_placable(self):
-        for n in range(self.action_size):
-            if not self.getbit_stone_exist(n) and self.is_placable(n):
-                self.tmp_n = n
-                return True
-        return False
-
     # エージェントが石を置ける箇所の番号をリストで取得する
-    def list_placable(self):
-        p_list = []
+    def list_placable(self, save_flag = False):
+        p_list = self.p_list
+        if p_list:
+            self.p_list.clear()
+            return p_list
 
-        # このメソッドの呼び出しの直前の somewhere_placable() の結果を引き継ぐことができる
-        n = self.tmp_n
-        if n is None:
-            start = 0
-        else:
-            p_list.append(n)
-            start = n + 1
-            self.tmp_n = None
-
-        for n in range(start, self.action_size):
-            if not self.getbit_stone_exist(n) and self.is_placable(n):
+        getbit_stone_exist = self.getbit_stone_exist
+        is_placable = self.is_placable
+        for n in range(self.action_size):
+            if not getbit_stone_exist(n) and is_placable(n):
                 p_list.append(n)
+
+        if save_flag:
+            self.p_list = p_list
         return p_list
 
 
@@ -274,14 +274,10 @@ class Board:
                     break
 
 
-    # ターンを交代
-    def turn_change(self):
-        self.turn ^= 1
-
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
     def can_continue(self, pass_flag = False):
-        self.turn_change()
-        if self.somewhere_placable():
+        self.turn ^= 1
+        if self.list_placable(True):
             return 1 + pass_flag
 
         if pass_flag:
@@ -361,32 +357,19 @@ class Board:
 
     # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
     @contextmanager
-    def log_runtime(self, n, info = "state"):
-        add_log = getattr(self, "add_" + info)
-        add_log()
+    def log_runtime(self, n):
+        self.add_state()
         self.put_stone(n)
-        flag = self.can_continue()
+        self.can_continue()
         yield
 
-        if flag == 1:
-            self.turn_change()
-        undo_log = getattr(self, "undo_" + info)
-        undo_log()
+        self.undo_state()
 
     def add_state(self):
         self.log_state.append(self.state)
 
     def undo_state(self):
         self.set_state(self.log_state.pop())
-
-
-    def add_state_plans(self):
-        self.add_state()
-        self.log_plans.append(self.plans)
-
-    def undo_state_plans(self):
-        self.undo_state()
-        self.set_plan(*self.log_plans.pop())
 
 
 
