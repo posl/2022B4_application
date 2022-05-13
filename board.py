@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pygame
 
-from board_speedup import get_legal_board
+from board_speedup import get_legal_board, get_reverse_board
 import display
 
 
@@ -89,10 +89,13 @@ class Board:
         return super().__new__(cls)
 
     def __init__(self):
+        # Python に対して Cython による実装は 50 倍以上速い
         if self.height == self.width == 8:
-            self.__list_placable = self.list_placable_cython
+            self.__list_placable = self.__list_placable_cython
+            self.__reverse = self.__reverse_python
         else:
-            self.__list_placable = self.list_placable_python
+            self.__list_placable = self.__list_placable_python
+            self.__reverse = self.__reverse_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -102,6 +105,10 @@ class Board:
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
         self.log_state = []
         self.log_plans = []
+
+        # プレイヤーの方策を設定するための属性
+        self.player1_plan = None
+        self.player2_plan = None
 
         # can_continue で計算した、合法手のリストを再利用するための属性
         self.p_list = None
@@ -146,6 +153,15 @@ class Board:
         return ndarray / 255.
 
 
+    # オセロ盤を初期状態にセットする
+    def reset(self):
+        height, width = self.height, self.width
+        bottom_left = self.t2n(((height >> 1), ((width >> 1) - 1)))
+        upper_left = bottom_left - width
+        self.stone_black = (0b10 << upper_left) + (0b01 << bottom_left)
+        self.stone_white = (0b01 << upper_left) + (0b10 << bottom_left)
+        self.turn = 1
+
     # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換する
     @staticmethod
     def t2n(t):
@@ -155,15 +171,6 @@ class Board:
     @staticmethod
     def n2t(n):
         return divmod(n, Board.width)
-
-    # オセロ盤を初期状態にセットする
-    def reset(self):
-        height, width = self.height, self.width
-        bottom_left = self.t2n(((height >> 1), ((width >> 1) - 1)))
-        upper_left = bottom_left - width
-        self.stone_black = (0b10 << upper_left) + (0b01 << bottom_left)
-        self.stone_white = (0b01 << upper_left) + (0b10 << bottom_left)
-        self.turn = 1
 
 
     @property
@@ -197,35 +204,95 @@ class Board:
             return self.get_stone_num()
 
 
-    # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
-    def get_stand_bits(self, x):
-        return [n for n in range(self.action_size) if (x >> n) & 1]
-
     @property
     def black_positions(self):
-        return self.get_stand_bits(self.stone_black)
+        return self.__get_stand_bits(self.stone_black)
 
     @property
     def white_positions(self):
-        return self.get_stand_bits(self.stone_white)
+        return self.__get_stand_bits(self.stone_white)
+
+    # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
+    def __get_stand_bits(self, x):
+        return [n for n in range(self.action_size) if (x >> n) & 1]
 
 
-    # 空きマスに自身の石を置けるかどうかの真偽値を取得する
-    def is_placable(self, startpoint, move_player, opposition_player):
+    @property
+    def plans(self):
+        return self.player1_plan, self.player2_plan
+
+    def set_plan(self, player1_plan, player2_plan):
+        self.player1_plan = player1_plan
+        self.player2_plan = player2_plan
+
+    # 手番のプレイヤーが置くマスの通し番号を取得する
+    def get_action(self):
+        if self.turn:
+            return self.player1_plan(self)
+        return self.player2_plan(self)
+
+
+    # 手番のプレイヤーとその相手のプレイヤーを判別し、それらのボード表現をタプルで取得する
+    @property
+    def players_board(self):
+        if self.turn:
+            return self.stone_black, self.stone_white
+        return self.stone_white, self.stone_black
+
+    # 各プレイヤーのボード表現を更新する
+    def set_players_board(self, move_player_mask, opposition_player_mask):
+        if self.turn:
+            self.stone_black ^= move_player_mask
+            self.stone_white ^= opposition_player_mask
+        else:
+            self.stone_white ^= move_player_mask
+            self.stone_black ^= opposition_player_mask
+
+
+    # 通し番号 n に自身の石を置き、挟まれた石を返す
+    def put_stone(self, n):
+        move_player, opposition_player = self.players_board
+        mask = self.__reverse(n, move_player, opposition_player)
+        self.set_players_board(mask | (1 << n), mask)
+
+    # n に置いた時に返るマスを返す
+    @staticmethod
+    def __reverse_python(startpoint, move_player, opposition_player):
+        mask = 0
         for n, n_gen in OmniDirectionalSearcher(startpoint):
-            # 相手の石が連続して、その終端の先に自分の石がある場合だけが合法
             if (opposition_player >> n) & 1:
+                tmp_mask = 1 << n
+
                 for n in n_gen:
                     if (opposition_player >> n) & 1:
+                        tmp_mask |= 1 << n
                         continue
                     elif (move_player >> n) & 1:
-                        return True
+                        mask |= tmp_mask
                     break
-        return False
+        return mask
 
-    # エージェントが石を置ける箇所の番号をリストで取得する
-    def list_placable_python(self, players):
-        move_player, opposition_player = players
+    @staticmethod
+    def __reverse_cython(startpoint, move_player, opposition_player):
+        return get_reverse_board(startpoint, move_player, opposition_player)
+
+
+    # プレイヤーが石を置ける箇所の通し番号をリストで取得する
+    def list_placable(self, save_flag = False):
+        p_list = self.p_list
+
+        # can_continue で計算したものが存在する場合は、それを利用する
+        if p_list is not None:
+            self.p_list = None
+            return p_list
+
+        p_list = self.__list_placable(self.players_board)
+        if save_flag:
+            self.p_list = p_list
+        return p_list
+
+    def __list_placable_python(self, players_board):
+        move_player, opposition_player = players_board
         stone_exist = move_player | opposition_player
         is_placable = self.is_placable
         p_list = []
@@ -237,73 +304,22 @@ class Board:
 
         return p_list
 
-    # C 言語で実装した高速なコードが利用できる条件を満たす時、それを使う
-    def list_placable_cython(self, players):
-        return self.get_stand_bits(get_legal_board(*players))
-
-
-    # 手番のプレイヤーとその相手のプレイヤーを判別し、それらのボード表現をタプルで取得する
-    @property
-    def players(self):
-        if self.turn:
-            return self.stone_black, self.stone_white
-        return self.stone_white, self.stone_black
-
-    def list_placable(self, save_flag = False):
-        p_list = self.p_list
-
-        # can_continue で計算したものが存在する場合は、それを利用する
-        if p_list is not None:
-            self.p_list = None
-            return p_list
-
-        p_list = self.__list_placable(self.players)
-        if save_flag:
-            self.p_list = p_list
-        return p_list
-
-
-    # 盤面リセット、戦略、先攻後攻(奇数:player1先行)を設定
-    def set_plan(self, player1_plan, player2_plan):
-        self.player1_plan = player1_plan
-        self.player2_plan = player2_plan
-
-    @property
-    def plans(self):
-        return self.player1_plan, self.player2_plan
-
-    # 置くマスを取得
-    def get_action(self):
-        if self.turn:
-            return self.player1_plan(self)
-        return self.player2_plan(self)
-
-
-    # n に石を置き、返す
-    def put_stone(self, n):
-        
-        self.__set_stone(n)
-        self.__reverse(n)
-
-    # n に石を置く
-    def __set_stone(self, n):
-        self.setbit_stone_exist(n)
-        if self.turn:
-            self.setbit_stone_black(1 << n)
-
-    # n に置いた時に返るマスを返す
-    def __reverse(self, startpoint):
+    # 空きマスに自身の石を置けるかどうかの真偽値を取得する
+    @staticmethod
+    def is_placable(startpoint, move_player, opposition_player):
         for n, n_gen in OmniDirectionalSearcher(startpoint):
-            if self.getbit_stone_exist(n) and (self.getbit_stone_black(n) ^ self.turn):
-                mask = 1 << n
-
+            # 相手の石が連続して、その終端の先に自分の石がある場合だけが合法手である
+            if (opposition_player >> n) & 1:
                 for n in n_gen:
-                    if self.getbit_stone_exist(n):
-                        if self.getbit_stone_black(n) ^ self.turn:
-                            mask |= 1 << n
-                            continue
-                        self.setbit_stone_black(mask)
+                    if (opposition_player >> n) & 1:
+                        continue
+                    elif (move_player >> n) & 1:
+                        return True
                     break
+        return False
+
+    def __list_placable_cython(self, players_board):
+        return self.__get_stand_bits(get_legal_board(*players_board))
 
 
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
@@ -327,7 +343,6 @@ class Board:
             flag = self.can_continue()
 
             if render_flag:
-                # 引数は pass があったかどうかの真偽値
                 self.render(flag)
 
     # エピソード中の画面表示メソッド
