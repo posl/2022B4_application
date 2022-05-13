@@ -90,9 +90,9 @@ class Board:
 
     def __init__(self):
         if self.height == self.width == 8:
-            pass
+            self.list_placable = self.list_placable_cython
         else:
-            pass
+            self.list_placable = self.list_placable_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -180,16 +180,6 @@ class Board:
             return self.get_stone_num()
 
 
-    def getbit_stone_exist(self, n):
-        return ((self.stone_black | self.stone_white) >> n) & 1
-
-    def getbit_stone_black(self, n):
-        return (self.stone_black >> n) & 1
-
-    def getbit_stone_white(self, n):
-        return (self.stone_white >> n) & 1
-
-
     def setbit_stone_black(self, mask):
         self.stone_black ^= mask
 
@@ -198,33 +188,37 @@ class Board:
 
 
     # 空きマスに自身の石を置けるかどうかの真偽値を取得する
-    def is_placable(self, startpoint):
-        if self.turn:
-            getbit_move_player, getbit_opponent = self.getbit_stone_black, self.getbit_stone_white
-        else:
-            getbit_move_player, getbit_opponent = self.getbit_stone_white, self.getbit_stone_black
-
+    def is_placable(self, startpoint, move_player, opposition_player):
         for n, n_gen in OmniDirectionalSearcher(startpoint):
-            if getbit_opponent(n):
+            # 相手の石が連続して、その終端の先に自分の石がある場合だけが合法
+            if (opposition_player >> n) & 1:
                 for n in n_gen:
-                    if getbit_opponent(n):
+                    if (opposition_player >> n) & 1:
                         continue
-                    elif getbit_move_player(n):
+                    elif (move_player >> n) & 1:
                         return True
                     break
         return False
 
     # エージェントが石を置ける箇所の番号をリストで取得する
-    def list_placable(self, save_flag = False):
+    def list_placable_python(self, save_flag = False):
         p_list = self.p_list
         if p_list:
             self.p_list.clear()
             return p_list
 
-        getbit_stone_exist = self.getbit_stone_exist
+        # 手番のプレイヤーとその相手のプレイヤーを判別する
+        if self.turn:
+            move_player, opposition_player = self.stone_black, self.stone_white
+        else:
+            move_player, opposition_player = self.stone_white, self.stone_black
+
+        stone_exist = move_player | opposition_player
         is_placable = self.is_placable
+
         for n in range(self.action_size):
-            if not getbit_stone_exist(n) and is_placable(n):
+            # 合法手判定は石が存在しない箇所だけでよい
+            if not ((stone_exist >> n) & 1) and is_placable(n, move_player, opposition_player):
                 p_list.append(n)
 
         if save_flag:
@@ -259,6 +253,7 @@ class Board:
         if self.turn:
             self.setbit_stone_black(1 << n)
 
+
     # n に置いた時に返るマスを返す
     def __reverse(self, startpoint):
         for n, n_gen in OmniDirectionalSearcher(startpoint):
@@ -284,6 +279,19 @@ class Board:
             return 0
         else:
             return self.can_continue(True)
+
+    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
+    @contextmanager
+    def log_runtime(self):
+        self.add_state()
+        yield
+        self.undo_state()
+
+    def add_state(self):
+        self.log_state.append(self.state)
+
+    def undo_state(self):
+        self.set_state(self.log_state.pop())
 
 
     # ゲーム本体
@@ -337,8 +345,6 @@ class Board:
         self.print_state()
 
         self.game(self.print_state)
-        
-        
 
 
     # 一時的な盤面表示
@@ -353,23 +359,6 @@ class Board:
         print("black:", self.black_num, "   white:", self.white_num)
         print(self.list_placable())
         print()
-
-
-    # 実際に手を打たずに、打った時の状況を検証するためのランタイムコンテキストを生成するマネージャ
-    @contextmanager
-    def log_runtime(self, n):
-        self.add_state()
-        self.put_stone(n)
-        self.can_continue()
-        yield
-
-        self.undo_state()
-
-    def add_state(self):
-        self.log_state.append(self.state)
-
-    def undo_state(self):
-        self.set_state(self.log_state.pop())
 
 
 
