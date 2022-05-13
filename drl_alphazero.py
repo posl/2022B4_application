@@ -42,7 +42,7 @@ class AlphaZeroAgent:
     @singledispatchmethod
     def load(self, arg):
         message = f"\"{arg.__class__}\" is not supported."
-        raise NotImplementedError(message)
+        raise TypeError(message)
 
     @load.register(str)
     def __(self, file_name):

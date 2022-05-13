@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pygame
 
-from board_speedup import get_legal_board, get_reverse_board
+from board_speedup import get_legal_board
 import display
 
 
@@ -140,8 +140,7 @@ class Board:
 
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
-    @property
-    def state_ndarray(self, xp = np):
+    def get_state_ndarray(self, xp = np):
         n_gen = range(ceil(Board.action_size / 8))
         stone_black, stone_white = self.state
 
@@ -274,7 +273,8 @@ class Board:
 
     @staticmethod
     def __reverse_cython(startpoint, move_player, opposition_player):
-        return get_reverse_board(startpoint, move_player, opposition_player)
+        pass
+        #return get_reverse_board(startpoint, move_player, opposition_player)
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する

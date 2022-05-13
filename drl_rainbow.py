@@ -1,5 +1,6 @@
 from math import sqrt
 from functools import cache
+from functools import singledispatchmethod
 from collections import deque
 import pickle
 import zlib
@@ -212,7 +213,7 @@ class SumTree:
     # 使用する前に呼ぶ必要がある
     def reset(self):
         self.tree = xp.zeros(2 * self.capacity)
-        self.rng = xp.random.default_rng()
+        self.rng = np.random.default_rng()
 
     def save(self, file_name):
         tree = cuda.as_numpy(self.tree)
@@ -225,53 +226,86 @@ class SumTree:
         else:
             self.tree = tree
 
+
     # 優先度のセットは１つずつ行うものとする (value >= 0)
+    @singledispatchmethod
     def __setitem__(self, index, value):
+        message = f"\"{index.__class__}\" index is not supported."
+        raise TypeError(message)
+
+    @__setitem__.register(int)
+    def __(self, index, value):
         # 木構造を保持する ndarray の後半半分が実際の優先度データを格納する部分
         index += self.capacity
         tree = self.tree
         tree[index] = value
 
         # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
-        parent = index // 2
-        while parent:
-            left_child = 2 * parent
-            right_child = left_child + 1
-            tree[parent] = tree[left_child] + tree[right_child]
-            parent //= 2
+        while index > 1:
+            index >>= 1
+            left_child = index << 1
+            tree[index] = tree[left_child : left_child + 2].sum()
+
+    # 高速化のためにまとめて更新できるようにした
+    @__setitem__.register(list)
+    def __(self, indices, values):
+        capacity = self.capacity
+        indices += capacity
+        tree = self.tree
+        tree[indices] = values
+
+        seen_set = set(indices)
+        indices.sort()
+        indices = deque(indices)
+
+        # インデックスの大きい順に取り出して、木を更新していけば、不整合は起こらない
+        while indices:
+            index = indices.pop()
+
+            # 葉ノード (実際のデータ) 以外は２つある子ノードの和が格納されるように更新する
+            if index < capacity:
+                left_child = index << 1
+                tree[index] = tree[left_child : left_child + 2].sum()
+
+            # 重複が起こらないように、まだ見ていないインデックスかどうかを追加前にチェックする
+            index >>= 1
+            if index and index not in seen_set:
+                seen_set.add(index)
+                indices.appendleft(index)
 
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
     def sample(self, batch_size = 1):
-        indices = [self.__sample() for __ in range(batch_size)]
+        zs = self.rng.uniform(0, self.sum(), batch_size)
+        indices = [self.__sample(zs[i]) for i in range(batch_size)]
         return indices if len(indices) > 1 else indices[0]
 
-    def __sample(self):
-        z = self.rng.random() * self.sum()
+    def __sample(self, z):
         current_index = 1
+        capacity = self.capacity
+        tree = self.tree
 
         # 実際の優先度データが格納されているインデックスに行き着くまでループを続ける
-        tree = self.tree
-        while current_index < self.capacity:
-            left_child = 2 * current_index
-            right_child = left_child + 1
+        while current_index < capacity:
+            left_child = current_index << 1
 
             # 乱数 z が左子ノードより大きい場合は、z を左部分木にある全要素の和の分減じてから、右子ノードに進む
             left_value = tree[left_child]
             if z > left_value:
-                current_index = right_child
+                current_index = left_child + 1
                 z -= left_value
             else:
                 current_index = left_child
 
         # 見かけ上のインデックスに変換してから返す
-        return current_index - self.capacity
+        return current_index - capacity
 
     # 全優先度データを確率形式で返す
     @property
     def probs(self):
-        return self.tree[self.capacity:] / self.sum()
+        return self.tree[self.capacity:] / self.sum
 
+    @property
     def sum(self):
         return self.tree[1]
 
@@ -405,9 +439,8 @@ class ReplayBuffer:
         else:
             selected = [self.buffer[i] for i in indices]
 
-        state2ndarray_func = Board.state2ndarray
-        states = xp.stack([state2ndarray_func(x[0], xp) for x in selected])
-        next_states = xp.stack([state2ndarray_func(x[4], xp) for x in selected])
+        states = xp.stack([x[0] for x in selected])
+        next_states = xp.stack([x[4] for x in selected])
 
         actions = xp.array([x[1] for x in selected], dtype = np.int32)
         rewards = xp.array([x[2] for x in selected], dtype = np.float32)
@@ -420,11 +453,8 @@ class ReplayBuffer:
         if self.prioritized:
             # 優先度 = (|TD 誤差| + ε) ^ α
             new_priorities = (abs(deltas) + self.epsilon) ** self.alpha
+            self.priorities[indices] = new_priorities
             self.max_priority = max(self.max_priority, new_priorities.max())
-
-            priorities = self.priorities
-            for i, index in enumerate(indices):
-                priorities[index] = new_priorities[i]
 
 
 
@@ -477,7 +507,8 @@ class RainbowAgent:
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
     def __call__(self, board):
-        return self.get_action(board)
+        action, __ = self.get_action(board)
+        return action
 
     # ニューラルネットワーク内のランダム要素が探索の役割を果たす
     def get_action(self, board, placable = None):
@@ -485,8 +516,9 @@ class RainbowAgent:
             placable = board.list_placable()
 
         with no_grad():
-            state = board.state2ndarray(board.state, xp)
-            return self.qnet.get_actions(state[None, :], placable)
+            state = board.get_state_ndarray(xp)
+            action = self.qnet.get_actions(state[None, :], placable)
+            return action, state
 
 
     def update(self, data, progress):
@@ -519,6 +551,7 @@ class RainbowAgent:
             # TD ターゲットの形状は、(batch_size, 1, quantiles_num)
             target_quantile_values = target_quantile_values[:, None]
 
+        # 分位点数データの形状は、(batch_size, 1, quantiles_num)
         quantile_values = self.qnet(states)
         quantile_values = quantile_values[sequence, actions]
         quantile_values = quantile_values.reshape((batch_size, self.quantiles_num, 1))
@@ -529,7 +562,7 @@ class RainbowAgent:
         # TD 誤差を使って、経験データの優先度を更新する
         replay_buffer.update_priorities(td_loss.data, indices)
 
-        # 優先度付き経験再生を使っている場合は、重点サンプリングの項を掛ける
+        # 優先度付き経験再生を使っている場合は、重点サンプリングの重みを掛ける
         if weights is not None:
             td_loss *= weights
 
@@ -540,21 +573,9 @@ class RainbowAgent:
         self.optimizer.update()
 
 
-# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
-class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size):
-        self.action_size = action_size
-
-    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
-    def reset(self, file_name, turn, quantiles_num):
-        qnet = RainbowNet(self.action_size, quantiles_num)
-        file_name = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
-        qnet.load_weights(file_name)
-        self.qnet = qnet
 
 
-
-
+# Rainbow エージェント同士で対戦を行うためのクラス (自己対戦)
 class Rainbow(SelfMatch):
     def fit_one_episode(self, progress):
         board = self.board
@@ -567,8 +588,7 @@ class Rainbow(SelfMatch):
             agent = self.agents[turn]
 
             placable = board.list_placable()
-            state = board.state
-            action = agent.get_action(board, placable)
+            action, state = agent.get_action(board, placable)
 
             board.put_stone(action)
             flag = board.can_continue()
@@ -586,7 +606,7 @@ class Rainbow(SelfMatch):
                 agent.update((state, action, 0, next_state, next_placable), progress)
 
         reward = board.reward
-        next_state = board.state
+        next_state = board.get_state_ndarray(xp)
         next_placable = []
 
         # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
@@ -605,8 +625,6 @@ class Rainbow(SelfMatch):
     def save(self, turn, file_name, index = None):
         agent = self.agents[turn]
         agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
-
-
 
 
 def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
@@ -639,6 +657,21 @@ def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     self_match.fit(1, episodes, file_name, 0, restart)
 
 
+
+
+# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
+class RainbowComputer(RainbowAgent):
+    def __init__(self, action_size):
+        self.action_size = action_size
+
+    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
+    def reset(self, file_name, turn, quantiles_num):
+        qnet = RainbowNet(self.action_size, quantiles_num)
+        file_name = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
+        qnet.load_weights(file_name)
+        self.qnet = qnet
+
+
 def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
@@ -666,7 +699,6 @@ if __name__ == "__main__":
 
     # 学習用コード (13 hours -> 48307 episodes)
     fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
-
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)

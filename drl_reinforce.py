@@ -49,7 +49,7 @@ class ReinforceAgent:
 
     def get_action(self, board):
         placable = board.list_placable()
-        state = board.state2ndarray(board.state, xp)
+        state = board.get_state_ndarray(xp)
         policy = self.pi(state[None, :])
 
         # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
@@ -86,49 +86,6 @@ class ReinforceAgent:
         self.optimizer.update()
 
 
-# 実際にコンピュータとして使われるクラス
-class ReinforceComputer:
-    def __init__(self, action_size):
-        self.each_pi = []
-        self.action_size = action_size
-
-    def reset(self, file_name, turn, agent_num):
-        file_name = Reinforce.get_path(file_name).format("parameters")
-        file_name += f"{turn}_"
-        self.rng = np.random.default_rng()
-
-        # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
-        assert isinstance(agent_num, int) and 1 <= agent_num and agent_num <= 8
-
-        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
-        each_pi = self.each_pi
-        each_pi.clear()
-        for i in self.rng.choice(8, agent_num, replace = False):
-            pi = PolicyNet(self.action_size)
-            pi.load_weights(file_name + f"{i}.npz")
-            each_pi.append(pi)
-
-    def __call__(self, board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
-
-        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
-        state = board.state2ndarray(board.state, xp)[None, :]
-        with no_grad():
-            for pi in self.each_pi:
-                try:
-                    policy += pi(state)
-                except NameError:
-                    policy = pi(state)
-
-            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
-            probs = dzf.softmax(policy[:, placable])
-            probs = probs.data[0]
-
-        return placable[self.rng.choice(len(placable), p = probs)]
-
-
 
 
 class Reinforce(SelfMatch):
@@ -162,8 +119,6 @@ class Reinforce(SelfMatch):
         agent.save(f"{file_name}{turn}_{index}")
 
 
-
-
 def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
@@ -182,6 +137,51 @@ def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
     # 自己対戦
     self_match = Reinforce(board, first_agent, second_agent)
     self_match.fit(8, episodes, file_name, trained_num, restart)
+
+
+
+
+# 実際にコンピュータとして使われるクラス
+class ReinforceComputer:
+    def __init__(self, action_size):
+        self.each_pi = []
+        self.action_size = action_size
+
+    def reset(self, file_name, turn, agent_num):
+        file_name = Reinforce.get_path(file_name).format("parameters")
+        file_name += f"{turn}_"
+        self.rng = np.random.default_rng()
+
+        # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
+        assert isinstance(agent_num, int) and 1 <= agent_num and agent_num <= 8
+
+        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
+        each_pi = self.each_pi
+        each_pi.clear()
+        for i in self.rng.choice(8, agent_num, replace = False):
+            pi = PolicyNet(self.action_size)
+            pi.load_weights(file_name + f"{i}.npz")
+            each_pi.append(pi)
+
+    def __call__(self, board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
+        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        state = board.get_state_ndarray(xp)[None, :]
+        with no_grad():
+            for pi in self.each_pi:
+                try:
+                    policy += pi(state)
+                except NameError:
+                    policy = pi(state)
+
+            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
+            probs = dzf.softmax(policy[:, placable])
+            probs = probs.data[0]
+
+        return placable[self.rng.choice(len(placable), p = probs)]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):

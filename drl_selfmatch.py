@@ -1,3 +1,4 @@
+import random
 from os.path import join, dirname
 from time import time
 from math import ceil
@@ -14,25 +15,22 @@ def simple_plan(board, placable = None):
     if placable is None:
         placable = board.list_placable()
 
-    rng = np.random.default_rng()
-
     # 30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
     if np.random.rand() < 0.3:
-        length = len(placable)
-        if length == 1:
+        if len(placable) == 1:
             return placable[0]
-        return placable[rng.choice(length)]
+        return random.choice(placable)
 
     current_stone_num = board.get_stone_num()
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
 
     # np.argmax を使うと選択が偏るため、np.where で取り出したインデックスからランダムに選ぶ
-    action_indexs = np.where(flip_nums == max(flip_nums))[0]
+    action_indexs = np.where(flip_nums == flip_nums.max())[0]
 
     if len(action_indexs) == 1:
         action_index = action_indexs[0]
     else:
-        action_index = rng.choice(action_indexs)
+        action_index = random.choice(action_indexs)
     return placable[action_index]
 
 
