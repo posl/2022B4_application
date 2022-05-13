@@ -1,7 +1,8 @@
+import numpy as np
+
 from inada_framework import Model, optimizers, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-import numpy as np
 xp = cuda.cp if cuda.gpu_enable else np
 from drl_selfmatch import SelfMatch, simple_plan
 from board import Board

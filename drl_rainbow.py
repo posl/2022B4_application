@@ -1,13 +1,15 @@
-from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
-import numpy as np
-xp = cuda.cp if cuda.gpu_enable else np
-import inada_framework.functions as dzf
 from math import sqrt
-from inada_framework.utilitys import reshape_for_broadcast
 from functools import cache
 from collections import deque
 import pickle
 import zlib
+
+import numpy as np
+
+from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
+xp = cuda.cp if cuda.gpu_enable else np
+import inada_framework.functions as dzf
+from inada_framework.utilitys import reshape_for_broadcast
 from drl_selfmatch import SelfMatch, simple_plan
 from board import Board
 
@@ -95,7 +97,7 @@ class RainbowNet(Model):
         return values + advantages
 
     # 合法手の中から Q 関数が最大の行動を選択する
-    def get_actions(self, states, valids):
+    def get_actions(self, states, placables):
         quantile_values = self(states)
         quantile_values = quantile_values.data
 
@@ -104,10 +106,10 @@ class RainbowNet(Model):
 
         # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元の placable とする
         if len(qs) == 1:
-            return valids[int(qs[0, valids].argmax())]
+            return placables[int(qs[0, placables].argmax())]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        return [valid[int(q[valid].argmax())] if valid else 0 for q, valid in zip(qs, valids)]
+        return [pl[int(q[pl].argmax())] if pl else 0 for q, pl in zip(qs, placables)]
 
     # アドバンテージ関数のみを取り出すことができる (ベースライン付き REINFORCE の重みとして使える)
     def get_advantages(self, states, actions):

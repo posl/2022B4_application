@@ -1,11 +1,13 @@
+from functools import singledispatchmethod
+from math import sqrt
+from collections import deque
+
+import numpy as np
+
 from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from functools import singledispatchmethod
 from drl_selfmatch import SelfMatch
-from math import sqrt
-from collections import deque
-import numpy as np
 from board import Board
 xp = cuda.cp if cuda.gpu_enable else np
 

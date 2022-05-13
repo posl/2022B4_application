@@ -306,6 +306,7 @@ class Board:
     def render(self, flag):
         self.tkapp.game_page.canvas_update()
 
+
     def play(self):
         # ページたち
         self.start_page = display.StartPage()

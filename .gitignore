@@ -3,3 +3,5 @@ Pipfile*
 .vscode/
 profiling.*
 .DS_Store
+*.pyx
+setup.py

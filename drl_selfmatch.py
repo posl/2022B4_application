@@ -1,9 +1,12 @@
-import numpy as np
 from os.path import join, dirname
 from time import time
-from tqdm import tqdm
 from math import ceil
+
+import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
+
+
 
 
 # エージェントの評価に使う単純な方策
