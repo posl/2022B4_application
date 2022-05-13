@@ -9,6 +9,7 @@ class Page(tk.Frame):
         # ページに共通する属性やメソッドなどを記述
         self.win_width = 640
         self.win_height = 480
+        self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
         
 
 
@@ -18,7 +19,7 @@ class StartPage(Page):
         tk.Frame.__init__(self, board)
         self.board = board
         self.configure(bg="#881111")
-        self.grid(row=0, column=0, sticky="nsew")
+
         self.label = tk.Label(self, text="Othello", font = (board.font_name, 50), fg="#119911", bg="#881111")
         self.label.pack(anchor="center", expand=True)
         #self.label.place(x=200, y=50)
@@ -61,15 +62,15 @@ class OptionPage(Page):
         self.button1.place(x=450, y=380)
 
     def start_game(self):
-        self.board.board.reset()
+        self.board.reset()
         self.board.game_playing = 1
         if False:
-            self.board.board.stone_black = 0
+            self.board.stone_black = 0
             for i in range(7):
                 for j in range(7):
-                    self.board.board.stone_exist = self.board.board.stone_exist | (1<<(8*i+j))
+                    self.board.stone_exist = self.board.stone_exist | (1<<(8*i+j))
                     if (i+j)%2==0:
-                        self.board.board.stone_black = self.board.board.stone_black + (1<<(8*i+j))
+                        self.board.stone_black = self.board.stone_black + (1<<(8*i+j))
                         pass
                     else:
                         pass
@@ -100,7 +101,7 @@ class OptionPage(Page):
         elif self.combobox2.current() == 3:
             print("後攻",3)
             player2_plan = self.board.com_alpha1
-        self.board.board.set_plan(player1_plan, player2_plan)
+        self.board.set_plan(player1_plan, player2_plan)
         self.board.game_page.canvas_update()
         self.board.game_page.tkraise()
         self.board.after(1000, self.board.game_page.button1_click)
@@ -167,12 +168,12 @@ class GamePage(Page):
         for i in range(8):
             for j in range(8):
                 t = (j, i)
-                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
+                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
                         self.stone_black_draw(i, j)
                     else:
                         self.stone_white_draw(i, j)
-        lp = self.board.board.list_placable()
+        lp = self.board.list_placable()
         if state==0:
             for w in lp:
                 i = w%8
@@ -180,13 +181,13 @@ class GamePage(Page):
                 self.stone_blue_draw(i,j)
         if state==1:
             self.stone_yellow_draw(x,y)
-            self.board.after(800, self.canvas_update, 2, x, y, self.board.board.stone_black)
+            self.board.after(800, self.canvas_update, 2, x, y, self.board.stone_black)
         if state==2:
             for i in range(8):
                 for j in range(8):
                     t = (j, i)
-                    if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                        if (self.board.board.stone_black >> (board.Board.t2n(t)) &1) ^ (oldcolor >> (board.Board.t2n(t)) &1)==1 :
+                    if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
+                        if (self.board.stone_black >> (self.board.t2n(t)) &1) ^ (oldcolor >> (self.board.t2n(t)) &1)==1 :
                             self.stone_gray_draw(i, j)
             self.stone_yellow_draw(x,y)
             self.board.after(800, self.canvas_update, 0, 0, 0, 0)
@@ -204,15 +205,15 @@ class GamePage(Page):
         for i in range(8):
             for j in range(8):
                 t = (j, i)
-                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
+                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
                         self.stone_black_draw(i, j)
                     else:
                         self.stone_white_draw(i, j)
         return
     
     def render_placeable(self):
-        lp = self.board.board.list_placable()
+        lp = self.board.list_placable()
         for w in lp:
             i = w%8
             j = w//8
@@ -220,17 +221,17 @@ class GamePage(Page):
         return
 
     def render_reverse(self, n, flg = True):
-        y, x = board.Board.n2t(n)
+        y, x = self.board.n2t(n)
         self.stone_yellow_draw(x, y)
         r_list = self.board.__reverse(n)
         if flg:
             for i in r_list:
-                i_y, i_x = board.Board.n2t(i)
+                i_y, i_x = self.board.n2t(i)
                 self.stone_gray_draw(i_x, i_y)
             self.board.after(800, self.render_reverse, False)
         else:
             for i in r_list:
-                i_y, i_x = board.Board.n2t(i)
+                i_y, i_x = self.board.n2t(i)
                 self.stone_gray_draw(i_x, i_y)
         return
 
@@ -284,8 +285,8 @@ class GamePage(Page):
         for i in range(8):
             for j in range(8):
                 t = (j, i)
-                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
+                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
                         bnum += 1
                     else:
                         wnum += 1
@@ -308,31 +309,31 @@ class GamePage(Page):
         return
         
     def button1_click(self):
-        if self.board.board.turn==1 and self.player1==0:
+        if self.board.turn==1 and self.player1==0:
             print("COMは石を置けなかった(先攻)")
             return
-        if self.board.board.turn==1 and self.player1==1:
+        if self.board.turn==1 and self.player1==1:
             print()
-        if self.board.board.turn==1 and self.player1==2:
+        if self.board.turn==1 and self.player1==2:
             print()
-        if self.board.board.turn==1 and self.player1==3:
+        if self.board.turn==1 and self.player1==3:
             print()
-        if self.board.board.turn==0 and self.player2==0:
+        if self.board.turn==0 and self.player2==0:
             print("COMは石を置けなかった(後攻)")
             return
-        if self.board.board.turn==0 and self.player2==1:
+        if self.board.turn==0 and self.player2==1:
             print()
-        if self.board.board.turn==0 and self.player2==2:
+        if self.board.turn==0 and self.player2==2:
             print()
-        if self.board.board.turn==0 and self.player2==3:
+        if self.board.turn==0 and self.player2==3:
             print()
-        self.game_still_cont = self.board.board.can_continue(True)
-        self.game_still_cont = self.board.board.can_continue(True)
+        self.game_still_cont = self.board.can_continue(True)
+        self.game_still_cont = self.board.can_continue(True)
         if self.game_still_cont:
-            n = self.board.board.get_action()
+            n = self.board.get_action()
             self.canvas_update(1, n%8, n//8)
-            self.board.board.put_stone(n)
-            self.game_still_cont = self.board.board.can_continue()
+            self.board.put_stone(n)
+            self.game_still_cont = self.board.can_continue()
         print("COMが石を置いた")
         if self.board.game_playing:
             self.board.after(1800, self.button1_click)
@@ -342,29 +343,29 @@ class GamePage(Page):
             self.board.se4.play()
             return
         t = (y, x)
-        if (self.board.board.stone_exist >> board.Board.t2n(t)) & 1:
+        if (self.board.stone_exist >> self.board.t2n(t)) & 1:
             print("既に石があります")
             self.board.se4.play()
             return
-        if self.board.board.is_placable(board.Board.t2n(t))==False:
+        if self.board.is_placable(self.board.t2n(t))==False:
             print("石を底に置くことはできません")
             self.board.se4.play()
             return
         self.canvas_update(1, x, y)
-        self.game_still_cont = self.board.board.can_continue(True)
-        self.game_still_cont = self.board.board.can_continue(True)
+        self.game_still_cont = self.board.can_continue(True)
+        self.game_still_cont = self.board.can_continue(True)
         if self.game_still_cont:
-            n = board.Board.t2n(t)
-            self.board.board.put_stone(n)
-            self.game_still_cont = self.board.board.can_continue()
+            n = self.board.t2n(t)
+            self.board.put_stone(n)
+            self.game_still_cont = self.board.can_continue()
         if self.board.game_playing:
             self.board.after(1800, self.button1_click)
         return
 
     def game_exit_check(self):
         flg = 0
-        flg = self.board.board.can_continue(True)
-        flg = self.board.board.can_continue(True)
+        flg = self.board.can_continue(True)
+        flg = self.board.can_continue(True)
         if flg:
             self.board.game_playing = 1
             return
@@ -372,18 +373,18 @@ class GamePage(Page):
         self.board.after(1500, self.goto_result_page)
 
     def cell_click(self, event):
-        #print(self.board.board.turn)
+        #print(self.board.turn)
         #print(self.player1)
 
-        if self.board.board.turn==1 and self.player1==0:
+        if self.board.turn==1 and self.player1==0:
             print()
-        if self.board.board.turn==1 and self.player1>0:
+        if self.board.turn==1 and self.player1>0:
             self.board.se4.play()
             print("あなたの番ではありません：")
             return
-        if self.board.board.turn==0 and self.player2==0:
+        if self.board.turn==0 and self.player2==0:
             print()
-        if self.board.board.turn==0 and self.player2>0:
+        if self.board.turn==0 and self.player2>0:
             self.board.se4.play()
             print("あなたの番ではありません：")
             return
@@ -397,7 +398,7 @@ class GamePage(Page):
         #self.canvas_update()
         print("セルが押された：", x, ",", y)
 
-        self.board.board.player_action = n
+        #self.board.player_action = n
 
 
     def goto_result_page(self):
@@ -419,8 +420,8 @@ class GamePage(Page):
         for i in range(8):
             for j in range(8):
                 t = (j, i)
-                if (self.board.board.stone_exist >> (board.Board.t2n(t)) &1)==1 :
-                    if (self.board.board.stone_black >> (board.Board.t2n(t)) &1)==1 :
+                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
+                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
                         bnum += 1
                     else:
                         wnum += 1
@@ -440,8 +441,8 @@ class GamePage(Page):
 if __name__ == "__main__":
 
     # アプリケーションを開始
-    board = board.Board()
-    board.play()
+    #board = board.Board()
+    #board.play()
     
     #tkapp = App()
     #tkapp.title('おせろ')

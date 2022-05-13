@@ -392,9 +392,9 @@ class Board:
             print(format(x & 0b1111_1111, "08b")[::-1])
             x >>= 8
     def print_state(self):
-        self.print_board(self.stone_exist)
-        print("-" * 20)
         self.print_board(self.stone_black)
+        print("-" * 20)
+        self.print_board(self.stone_white)
         print("black:", self.black_num, "   white:", self.white_num)
         print(self.list_placable())
         print()
