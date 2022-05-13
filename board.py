@@ -89,7 +89,7 @@ class Board:
         return super().__new__(cls)
 
     def __init__(self):
-        # Python に対して Cython による実装は 50 倍以上速い
+        # list_placable : 30 ~ 40 倍、reverse : 3 倍
         if self.height == self.width == 8:
             self.__list_placable = self.__list_placable_cython
             self.__reverse = self.__reverse_cython
@@ -402,34 +402,11 @@ class Board:
 
 
 if __name__ == "__main__":
-    def player(board : Board):
-        while 1:
-            try:
-                n = int(input("enter n : "))
-                if board.is_placable(n):
-                    return n
-            except:
-                print("error")
-                continue
-
-    def com_random(board : Board):
-        return random.choice(board.list_placable())
-
     board = Board()
+    board.reset()
+    board.print_state()
 
-    def f():
-        return com_random, com_random
-
-    # それぞれのプレイヤーの戦略の関数をわたす
-    # プレイヤー先行でゲーム開始
-    #board.set_plan(player, com_random, 1)
-    #board.set_plan(player, player, 1)
-    board.play(player, com_random)
-
-    print("game set")
-    print("black:", board.black_num)
-    print("white:", board.white_num)
-
-
-    #詰み手順の確認
-    #37, 43, 34, 29, 52, 45, 38, 44, 20
+    for i in (19, 18, 26):
+        board.put_stone(i)
+        board.can_continue()
+        board.print_state()
