@@ -5,7 +5,6 @@ import numpy as np
 from random import random
 from drl_selfmatch import corners_plan as simple_plan
 
-# 動作確認未完了
 
 
 class GTTDAgent:
@@ -39,6 +38,7 @@ class GTReinforce:
     def __init__(self):
         self.agent = GTTDAgent()
         self.player1 = AlphaBeta(0)
+        self.depth = 4
 
     def reset(self):
         self.agent.reset()
@@ -46,13 +46,16 @@ class GTReinforce:
     def set_player1(self, player):
         self.player1 = player
 
+    def set_depth(self, depth):
+        self.depth = depth
+
     def start(self, repeat_num = 20):
         board = Board()
         sum_reward = 0
         for i in range(repeat_num):
             board.reset()
             agent_alphabeta = AlphaBeta(self.agent.new_data)
-            agent_alphabeta.set_depth(4)
+            agent_alphabeta.set_depth(self.depth)
             # board.set_plan(agent_alphabeta.get_next_move, self.player1)
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
             board.game()
@@ -72,11 +75,40 @@ class GTReinforce:
 
 
 if __name__ == "__main__":
-    gtr = GTReinforce()
-    gtr.reset()
-    # ab = AlphaBeta(0)
-    # gtr.set_player1(ab.get_next_move)
-    gtr.set_player1(simple_plan)
+    # def random_plan(board : Board):
+    #     place_list = board.list_placable()
+    #     num = int(np.random.random()  * len(place_list))
+    #     if num == len(place_list):
+    #         num = 0
+    #     return place_list[num]
+        
+
+    # gtr = GTReinforce()
+    # gtr.reset()
+    # gtr.set_player1(random_plan)
+    # while 1:
+    #     print(gtr.start(1))
+    #     gtr.agent.data.write_value_list()
+
+    gtr1 = GTReinforce()
+    gtr1.reset()
+    gtr1.set_depth(4)
+    gtr1.agent.data.read_value_list("./data/gt/data_random")
+    gtr1.agent.update(0)
+    gtr1_file_path = "./data/gt/self_match1"
+    gtr2 = GTReinforce()
+    gtr2.reset()
+    gtr2.set_depth(4)
+    gtr2.agent.data.read_value_list("./data/gt/data_corner")
+    gtr2.agent.update(0)
+    print(gtr2.agent.data.get_raw_value_list())
+    gtr2_file_path = "./data/gt/self_match2"
     while 1:
-        print(gtr.start(1))
-        gtr.agent.data.write_value_list()
+        tmp_gtr2_ab = AlphaBeta(gtr2.agent.data)
+        tmp_gtr2_ab.set_depth(4)
+        gtr1.set_player1(tmp_gtr2_ab)
+        print(gtr1.start(1))
+        gtr1.agent.data.write_value_list(gtr1_file_path)
+        gtr1, gtr2 = gtr2, gtr1
+        gtr1_file_path, gtr2_file_path = gtr2_file_path, gtr1_file_path
+

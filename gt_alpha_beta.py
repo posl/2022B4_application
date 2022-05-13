@@ -37,7 +37,7 @@ class GTValue:
 
 	def read_value_list(self, filename = "./data/gt/data"):
 		with open(filename, mode = "r") as f:
-			tmp_value_list = list(map(int, f.read().split()))
+			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 	
 	#盤面の指定されたのマスの評価値を返す
@@ -127,35 +127,29 @@ class AlphaBeta:
 		return place_max
 
 	# 評価を求める
-	def __node(self, board : Board, depth, alpha, beta):
+	#　動作未確認
+	def __node(self, board : Board, depth, alpha, beta, can_continue_flag = 1):
 		if depth == self.__max_depth:
 			return self.__evaluate(board)
 
 		# 求める評価値が最大か最小か決定する
-		ismax = (depth + 1) % 2
+		ismax = ~(self.turn ^ board.turn)
 
 		if ismax:
 			value = self.__min_value
 		else:
 			value = self.__max_value
 		
-		place_list = board.list_placable()
-		if not place_list:
-			board.turn_change()
-			# 自分が打てないが相手が打てる場合
-			if board.list_placable():
-				value = self.__node(board, depth + 1, alpha, beta)
-				board.turn_change()
-				return value
+		if can_continue_flag == 0:
+			return self.__evaluate(board)
 
-			#ゲームが終了している場合
-			else:
-				board.turn_change()
-				return self.__evaluate(board)
+		place_list = board.list_placable()
 
 		for i in place_list:
-			with board.log_runtime(i):
-				tmp_value = self.__node(board, depth + 1, alpha, beta)
+			with board.log_runtime():
+				board.put_stone(i)
+				flag = board.can_continue()
+				tmp_value = self.__node(board, depth + 1, alpha, beta, flag)
 
 			if ismax:
 				if tmp_value >= beta:
