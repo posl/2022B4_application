@@ -208,7 +208,7 @@ def eval_reinforce_computer(agent_num, enemy_plan, version = None):
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(episodes = 10000, trained_num = 0, restart = 0, version = None)
+    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
     # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)

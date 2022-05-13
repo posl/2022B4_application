@@ -142,7 +142,7 @@ class Board:
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
     def get_state_ndarray(self, xp = np):
         n_gen = range(ceil(Board.action_size / 8))
-        stone_black, stone_white = self.state
+        stone_black, stone_white = self.stone_black, self.stone_white
 
         state_list = [(stone_black >> (i << 3)) & 0xff for i in n_gen]
         state_list += [(stone_white >> (i << 3)) & 0xff for i in n_gen]
@@ -198,7 +198,7 @@ class Board:
 
     # 通し番号 n に自身の石を打ったとき、自身の石の数が幾つになるかを取得する
     def get_next_stone_num(self, n):
-        with self.log_runtime(n):
+        with self.log_runtime():
             self.put_stone(n)
             return self.get_stone_num()
 
