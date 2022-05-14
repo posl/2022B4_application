@@ -6,7 +6,6 @@ import numpy as np
 
 from board_speedup import get_reverse_board, get_legal_board
 import display
-import sound
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -351,7 +350,6 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
-        self.render(flag)  #初期状態の表示
         while flag:
             n = self.get_action()
             self.put_stone(n)
@@ -371,7 +369,8 @@ class Board:
 
         # サウンド
         #self.sounds = sound.Sounds()
-        
+
+        self.render(1)  #初期状態の表示
 
         # tkapp の初期化
         while True:

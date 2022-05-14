@@ -10,8 +10,6 @@ import inada_framework.functions as dzf
 from drl_selfmatch import SelfMatch
 from board import Board
 
-xp = cuda.cp if cuda.gpu_enable else np
-
 
 # PV-MCTS での過去の探索状況を近似するニューラルネットワーク
 class PolicyValueNet(Model):
@@ -96,11 +94,13 @@ class ReplayBuffer:
         if indices:
             indices, self.indices = np.split(indices, [self.batch_size])
         else:
+            self.indices = None
             raise StopIteration()
 
         buffer = self.buffer
         selected = [buffer[i] for i in indices]
 
+        xp = cuda.cp if cuda.gpu_enable else np
         state2ndarray_func = Board.state2ndarray
         states = xp.stack([state2ndarray_func(x[0], xp) for x in selected])
 
@@ -108,6 +108,8 @@ class ReplayBuffer:
         rewards = xp.array([x[2] for x in selected], dtype = np.float32)
 
         return states, mcts_policy, rewards
+
+
 
 
 # 自己対戦によって、パラメータを学習するための場
