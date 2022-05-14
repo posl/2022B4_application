@@ -27,7 +27,8 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        self.rng = None
+        xp = cuda.cp if cuda.gpu_enable else np
+        self.rng = xp.random.default_rng()
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x, stream = None):
@@ -61,7 +62,6 @@ class NoisyAffine(Layer):
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
     def init_params(self, x, in_size, out_size):
         xp = cuda.get_array_module(x)
-        self.rng = xp.random.default_rng()
 
         stdv = 1. / sqrt(in_size)
         self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
