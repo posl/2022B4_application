@@ -97,7 +97,9 @@ class RainbowNet(Model):
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
 
-    
+    @staticmethod
+    def to_pinned_memory(array):
+        
 
 
     # 合法手の中から Q 関数が最大の行動を選択する
