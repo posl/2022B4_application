@@ -7,7 +7,7 @@ class PrimitiveMonteCarlo:
     def __init__(self, max_try = 400):
         self.max_try = max_try
         self.rng = np.random.default_rng()
-    
+
     def __call__(self, board : Board):
         return self.primitive_monte_carlo(board)
 
@@ -29,7 +29,7 @@ class PrimitiveMonteCarlo:
                 score += 0.5
             elif ((board.black_num > board.white_num) == my_turn):
                 score += 1
-        
+
         return score
 
     # 次の手を原始モンテカルロ法で決定
@@ -37,7 +37,7 @@ class PrimitiveMonteCarlo:
         # 原状回復用
         original_plans = board.plans
         original_turn = board.turn
-        
+
         # 合法手の内、勝率が最もよかったものを置く
         placable = board.list_placable()
         scores = list()
@@ -45,7 +45,7 @@ class PrimitiveMonteCarlo:
         for n in placable:
             with board.log_runtime():
                 board.put_stone(n)
-                
+
                 if not board.can_continue():
                     # ゲームが終了して勝つならその手を打つ
                     if board.black_num == board.white_num:
@@ -61,7 +61,7 @@ class PrimitiveMonteCarlo:
                     score = self.play_out(board, original_turn)
                     scores.append(score)
                     print(n, score)
-       
+
         # 原状回復
         board.set_plan(*original_plans)
 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
-  
+
     pMC = PrimitiveMonteCarlo()
     board = Board()
     board.debug_game(pMC.random_action, pMC)
