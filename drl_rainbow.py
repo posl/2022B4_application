@@ -245,7 +245,7 @@ class SumTree:
         while index > 1:
             index >>= 1
             left_child = index << 1
-            tree[index] = tree[left_child : left_child + 2].sum()
+            tree[index] = tree[left_child] + tree[left_child + 1]
 
     # 高速化のためにまとめて更新できるようにした
     @__setitem__.register(list)
@@ -256,7 +256,6 @@ class SumTree:
         indices = [index + capacity for index in indices]
         tree[indices] = values
 
-        seen_set = set(indices)
         indices.sort()
         indices = deque(indices)
 
@@ -267,12 +266,11 @@ class SumTree:
             # 葉ノード (実際のデータ) 以外は２つある子ノードの和が格納されるように更新する
             if index < capacity:
                 left_child = index << 1
-                tree[index] = tree[left_child : left_child + 2].sum()
+                tree[index] = tree[left_child] + tree[left_child + 1]
 
             # 重複が起こらないように、まだ見ていないインデックスかどうかを追加前にチェックする
             index >>= 1
-            if index and index not in seen_set:
-                seen_set.add(index)
+            if index and index != indices[0]:
                 indices.appendleft(index)
 
 

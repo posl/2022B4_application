@@ -8,8 +8,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
-
-
 # エージェントの評価に使う単純な方策
 def simple_plan(board, placable = None):
     if placable is None:
