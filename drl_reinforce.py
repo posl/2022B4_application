@@ -123,8 +123,8 @@ def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # ハイパーパラメータ設定
-    gamma = 0.98
-    lr = 0.0001
+    gamma = 0.95
+    lr = 0.00005
 
     # 環境
     board = Board()
