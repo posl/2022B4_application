@@ -407,39 +407,44 @@ class ReplayBuffer:
             nstep_data = zlib.compress(pickle.dumps(nstep_data))
 
         try:
-            self.buffer[count] = nstep_data
+            buffer = self.buffer
+            buffer[count] = nstep_data
         except IndexError:
-            self.buffer.append(nstep_data)
+            buffer.append(nstep_data)
 
         if self.prioritized:
             # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
             try:
-                self.priorities[count] = self.max_priority
+                priorities = self.priorities
+                priorities[count] = self.max_priority
                 self.count = count + 1
 
             # 優先度の不整合は IndexError を起こす可能性があるので、学習がこのタイミングで中断された場合の処理が必要
             except KeyboardInterrupt:
-                self.priorities[count] = 0
+                priorities[count] = 0
                 raise KeyboardInterrupt()
 
     def get_batch(self, batch_size, progress):
+        priorities = self.priorities
+        buffer = self.buffer
+
         if self.prioritized:
             # 重複なしではないが処理上問題はなく、buffer_size >> batch_size なので大丈夫
-            indices = self.priorities.sample(batch_size)
+            indices = priorities.sample(batch_size)
 
             # 重みは等確率でサンプリングした時との確率の比の β 乗で、最大値が１になるように変換したものを使用する
-            weights = (self.priorities.probs[indices] * len(self.buffer)) ** (-1 * self.beta(progress))
+            weights = (priorities.probs[indices] * len(buffer)) ** (-1 * self.beta(progress))
             weights /= weights.max()
         else:
             # ジェネレータによる重複なしランダムサンプリング
-            indices = self.rng.choice(len(self.buffer), batch_size, replace = False)
+            indices = self.rng.choice(len(buffer), batch_size, replace = False)
             weights = None
 
         if self.compress:
             # pickle.load : ファイルから読み込む, pickle.loads : 引数を使う
-            selected = [pickle.loads(zlib.decompress(self.buffer[i])) for i in indices]
+            selected = [pickle.loads(zlib.decompress(buffer[i])) for i in indices]
         else:
-            selected = [self.buffer[i] for i in indices]
+            selected = [buffer[i] for i in indices]
 
         states = xp.stack([x[0] for x in selected])
         next_states = xp.stack([x[4] for x in selected])
