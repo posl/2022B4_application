@@ -114,7 +114,7 @@ class Board:
         self.click_attr = None
 
         # どこがひっくり返されたかを保持しておく(表示のために必要)
-        self.rev_pl = []
+        self.rev_pl = 0
 
 
     @property
