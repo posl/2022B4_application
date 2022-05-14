@@ -351,7 +351,9 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
-        self.render(flag)  #初期状態の表示
+        if render_flag:
+            self.render(flag)  #初期状態の表示
+
         while flag:
             n = self.get_action()
             self.put_stone(n)
@@ -371,7 +373,7 @@ class Board:
 
         # サウンド
         #self.sounds = sound.Sounds()
-        
+
 
         # tkapp の初期化
         while True:
