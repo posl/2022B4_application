@@ -244,7 +244,7 @@ class SumTree:
         # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
         while index > 1:
             index >>= 1
-            left_child = index << 1
+            left_child = index * 2
             tree[index] = tree[left_child] + tree[left_child + 1]
 
     # 高速化のためにまとめて更新できるようにした
@@ -256,22 +256,23 @@ class SumTree:
         indices = [index + capacity for index in indices]
         tree[indices] = values
 
-        indices.sort()
-        indices = deque(indices)
+        count = 0
+        indices.sort(reverse = True)
 
-        # インデックスの大きい順に取り出して、木を更新していけば、不整合は起こらない
-        while indices:
-            index = indices.pop()
+        # インデックスの大きいものから処理していくことで不整合は起こらなくなる
+        while count < len(indices):
+            index = indices[count]
+            count += 1
 
             # 葉ノード (実際のデータ) 以外は２つある子ノードの和が格納されるように更新する
             if index < capacity:
-                left_child = index << 1
+                left_child = index * 2
                 tree[index] = tree[left_child] + tree[left_child + 1]
 
             # 重複が起こらないように、まだ見ていないインデックスかどうかを追加前にチェックする
             index >>= 1
-            if index and index != indices[0]:
-                indices.appendleft(index)
+            if index and (index != indices[-1]):
+                indices.append(index)
 
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)

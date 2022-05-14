@@ -141,11 +141,11 @@ class Board:
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
     def get_state_ndarray(self, xp = np):
-        n_gen = range(ceil(Board.action_size / 8))
+        n_gen = range(0, 8 * ceil(Board.action_size / 8), 8)
         stone_black, stone_white = self.stone_black, self.stone_white
 
-        state_list = [(stone_black >> (i << 3)) & 0xff for i in n_gen]
-        state_list += [(stone_white >> (i << 3)) & 0xff for i in n_gen]
+        state_list = [(stone_black >> n) % 256 for n in n_gen]
+        state_list += [(stone_white >> n) % 256 for n in n_gen]
 
         # 正規化してから出力する
         ndarray = xp.array(state_list, dtype = np.float32)
