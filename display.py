@@ -9,8 +9,11 @@ import sound
 
 
 class Page(tk.Frame):
-    def __init__(self):
+    def __init__(self, par, board):
         # ページに共通する属性やメソッドなどを記述
+        tk.Frame.__init__(self, par)
+        self.par = par
+        self.board = board
 
         self.win_width = 640
         self.win_height = 480
@@ -22,9 +25,8 @@ class Page(tk.Frame):
 
 class StartPage(Page):
     def __init__(self, par, board):
-        tk.Frame.__init__(self, par)
-        self.par = par
-        self.board = board
+        Page.__init__(self, par, board)
+
         self.configure(bg="#881111")
 
         self.label = tk.Label(self, text="Othello", font = (self.font_name, 50), fg="#119911", bg="#881111")
@@ -44,7 +46,7 @@ class StartPage(Page):
 
 class OptionPage(Page):
     def __init__(self, par, board):
-        tk.Frame.__init__(self, par)
+        Page.__init__(self, par, board)
         self.par = par
         self.board = board
         self.configure(bg="#992299")
@@ -135,11 +137,8 @@ class OptionPage(Page):
 
 class GamePage(Page):
     def __init__(self, par, board):
-        tk.Frame.__init__(self, par)
-        self.par = par
-        self.board = board
+        Page.__init__(self, par, board)
         self.configure(bg="#992299")
-        self.grid(row=0, column=0, sticky="nsew")
 
         self.canvas_width = 400
         self.canvas_height = 400
@@ -162,20 +161,20 @@ class GamePage(Page):
         self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
         self.counter_bar.place(x=100, y=5)
 
-        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080", font = (board.font_name, 50))
+        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080", font = (self.font_name, 50))
         self.black_conter_label.place(x=10, y=10)
 
-        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (board.font_name, 50))
+        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (self.font_name, 50))
         self.white_conter_label.place(x=530, y=10)
 
-        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (board.font_name, 25))
+        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (self.font_name, 25))
         self.label1.place(x=1000, y=300)
 
         # 見えないところに置かれている、削除するかも？
-        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 25), command=lambda:None)
+        self.button1 = tk.Button(self, text="Next", font = (self.font_name, 25), command=lambda:None)
         self.button1.place(x=750, y=380)
 
-        self.button2 = tk.Button(self, text=">", font = (board.font_name, 50), command=lambda:self.goto_start_page())
+        self.button2 = tk.Button(self, text=">", font = (self.font_name, 50), command=lambda:self.goto_start_page())
         self.button2.place(x=750, y=380)
     
 
