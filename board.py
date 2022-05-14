@@ -9,6 +9,7 @@ import pygame
 
 from board_speedup import get_legal_board, get_reverse_board
 import display
+import sound
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -350,23 +351,16 @@ class Board:
 
 
     def play(self):
-        # ページたち
-        self.start_page = display.StartPage()
-        self.option_page = display.OptionPage()
-        self.game_page = display.GamePage()
+        #ウインドウ
+        self.main_window = display.MainWindow()
 
         # サウンド
-        sound_folder_path = os.path.normpath(os.path.join(os.path.abspath(__file__),  "sound"))
-        self.bgm1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))
-        self.bgm1.play(loops=-1)
-        self.se1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou47.wav"))
-        self.se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
-        self.se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
-        self.se4 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou19.wav"))
+        self.sounds = sound.Sounds()
+        
 
         # tkapp の初期化
         while True:
-            self.start_page.tkraise()
+            self.main_window.change_page(0)
             self.main_loop()
             if self.click_attr:
                 self.__play()
