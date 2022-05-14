@@ -357,6 +357,9 @@ class Board:
 
             if render_flag:
                 self.render(flag, n)
+        if render_flag: # 最後の１石だけ表示されない問題を解消する(1秒待機)
+            self.main_window.after(1000, self.main_window.quit)
+            self.main_window.mainloop()
 
     # エピソード中の画面表示メソッド
     def render(self, flag, n=999):
@@ -370,7 +373,7 @@ class Board:
         # サウンド
         #self.sounds = sound.Sounds()
 
-        self.render(1)  #初期状態の表示
+        #self.render(1)  #初期状態の表示
 
         # tkapp の初期化
         while True:
@@ -392,6 +395,9 @@ class Board:
         # 最初の盤面表示
         self.reset()
         self.print_state()
+        self.render(None)
+        self.main_window.after(100, self.main_window.quit)
+        self.main_window.mainloop()
 
         self.game(self.print_state)
 
