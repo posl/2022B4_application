@@ -33,20 +33,20 @@ class ReinforceAgent:
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
         pi = PolicyNet(self.action_size)
-        self.pi = pi
-        self.optimizer = optimizers.Adam(self.lr).setup(pi)
-        self.rng = np.random.default_rng()
-
         if cuda.gpu_enable:
             pi.to_gpu()
+
+        self.pi = pi
+        self.optimizer = optimizers.Adam(self.lr).setup(pi)
 
     def save(self, file_name, is_yet = None):
         self.pi.save_weights(file_name + ".npz")
 
     def load_to_restart(self, file_name):
-        self.pi.load_weights(file_name + ".npz")
+        pi = self.pi
+        pi.load_weights(file_name + ".npz")
         if cuda.gpu_enable:
-            self.pi.to_gpu()
+            pi.to_gpu()
 
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
@@ -65,7 +65,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = self.rng.choice(len(placable), p = cuda.as_numpy(probs.data[0]))
+            action_index = xp.random.choice(len(placable), p = probs.data[0])
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -157,7 +157,6 @@ class ReinforceComputer:
     def reset(self, file_name, turn, agent_num):
         file_name = Reinforce.get_path(file_name).format("parameters")
         file_name += f"{turn}_"
-        self.rng = np.random.default_rng()
 
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
         assert isinstance(agent_num, int)
@@ -167,7 +166,7 @@ class ReinforceComputer:
         each_pi = self.each_pi
         each_pi.clear()
 
-        for i in self.rng.choice(8, agent_num, replace = False):
+        for i in np.random.choice(8, agent_num, replace = False):
             pi = PolicyNet(self.action_size)
             each_pi.append(pi)
 
@@ -193,7 +192,7 @@ class ReinforceComputer:
             probs = dzf.softmax(policy[:, np.array(placable)])
             probs = probs.data[0]
 
-        return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
+        return placable[xp.random.choice(len(placable), p = probs)]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):
