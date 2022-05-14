@@ -455,12 +455,14 @@ class ReplayBuffer:
         else:
             selected = [buffer[i] for i in indices]
 
-        xp = cuda.cp if cuda.gpu_enable else np
-        states = xp.stack([x[0] for x in selected])
-        next_states = xp.stack([x[4] for x in selected])
+        # 状態データはニューラルネットワークに入力したから、必要に応じて GPU 対応を行うので、np.ndarray でよい
+        states = np.stack([x[0] for x in selected])
+        next_states = np.stack([x[4] for x in selected])
 
         # actions はインデックスとして使うだけなので、np.ndarray でよい
         actions = np.array([x[1] for x in selected])
+
+        xp = cuda.cp if cuda.gpu_enable else np
         rewards = xp.array([x[2] for x in selected], dtype = np.float32)
         gammas = xp.array([x[3] for x in selected], dtype = np.float32)
 
