@@ -258,27 +258,17 @@ class SumTree:
         self.tree = np.load(file_name + "_tree.npy")
 
 
-    # 引数のインデックスは int か np.ndarray
-    def __setitem__(self, indices, values):
-        indices += self.capacity
-        self.tree[indices] = values
-
-        if isinstance(indices, int):
-            self.__update_tree(indices)
-        else:
-            # 素直に１つずつ更新するのが一番速かった
-            update = self.__update_tree
-            for index in indices:
-                update(index)
-
-    def __update_tree(self, parent):
+    # セグメントツリーの更新は１つずつのみとする (技巧的な方法と比べてもこれが一番速かった)
+    def __setitem__(self, index, value):
         tree = self.tree
+        index += self.capacity
+        tree[index] = value
 
         # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
-        while parent > 1:
-            parent >>= 1
-            left_child = parent * 2
-            tree[parent] = tree[left_child] + tree[left_child + 1]
+        while index > 1:
+            index >>= 1
+            left_child = index * 2
+            tree[index] = tree[left_child] + tree[left_child + 1]
 
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
@@ -474,8 +464,11 @@ class ReplayBuffer:
         if self.prioritized:
             # 優先度 = (|TD 誤差| + ε) ^ α
             new_priorities = (abs(deltas) + self.epsilon) ** self.alpha
-            self.priorities[indices] = new_priorities
             self.max_priority = max(self.max_priority, new_priorities.max())
+
+            priorities = self.priorities
+            for index, value in zip(indices, new_priorities):
+                priorities[index] = value
 
 
 
