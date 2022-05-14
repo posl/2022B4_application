@@ -254,7 +254,8 @@ class SumTree:
         tree = self.tree
 
         indices = [index + capacity for index in indices]
-        tree[indices] = values
+        for i, index in enumerate(indices):
+            tree[index] = values[i]
 
         count = 0
         indices.sort(reverse = True)
