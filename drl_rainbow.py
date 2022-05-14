@@ -12,8 +12,6 @@ from inada_framework.utilitys import reshape_for_broadcast
 from drl_selfmatch import SelfMatch, simple_plan
 from board import Board
 
-xp = cuda.cp if cuda.gpu_enable else np
-
 
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
 class NoisyAffine(Layer):
@@ -29,14 +27,14 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        self.rng = xp.random.default_rng()
+        self.rng = None
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
-    def forward(self, x):
+    def forward(self, x, stream = None):
         in_size = x.shape[1]
         out_size = self.out_size
         if self.W_mu.data is None:
-            self.init_params(in_size, out_size)
+            self.init_params(x, in_size, out_size)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
         epsilon_in = self.noise_f(self.rng.standard_normal(size = (in_size, 1), dtype = np.float32))
@@ -47,6 +45,10 @@ class NoisyAffine(Layer):
         # 本当はパラメータが従う正規分布の平均・分散を学習したいが、それだと逆伝播ができないので、再パラメータ化を用いる
         W = self.W_mu + self.W_sigma * W_epsilon
         b = self.b_mu + self.b_sigma * b_epsilon
+
+        # ストリームを使い、非同期でメモリ転送を行なっていた場合は、その処理と同期させる
+        if stream is not None:
+            stream.synchronize()
         x = dzf.affine(x, W, b)
 
         # 活性化関数を挟む場合は、その関数を経由する
@@ -57,7 +59,10 @@ class NoisyAffine(Layer):
         return x
 
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
-    def init_params(self, in_size, out_size):
+    def init_params(self, x, in_size, out_size):
+        xp = cuda.get_array_module(x)
+        self.rng = xp.random.default_rng()
+
         stdv = 1. / sqrt(in_size)
         self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
         self.b_mu.data = xp.random.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
@@ -68,6 +73,7 @@ class NoisyAffine(Layer):
 
     @staticmethod
     def noise_f(x):
+        xp = cuda.get_array_module(x)
         return xp.sign(x) * xp.sqrt(xp.abs(x))
 
 
@@ -87,9 +93,10 @@ class RainbowNet(Model):
     def forward(self, x):
         batch_size = len(x)
         action_size, quantiles_num = self.sizes
+        x, stream = self.move_to_gpu(x)
 
         # 学習の円滑化のためにアドバンテージ分布はスケーリングする
-        advantages = self.a2(self.a1(x))
+        advantages = self.a2(self.a1(x, stream))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
 
@@ -98,11 +105,22 @@ class RainbowNet(Model):
         return values + advantages
 
     @staticmethod
-    def to_pinned_memory(array):
-        mem = xp.cuda.alloc_pinned_memory(array.nbytes)
-        src = np.frombuffer(mem, array.dtype, array.size).reshape(array.shape)
-        src[...] = array
-        return src
+    def move_to_gpu(array):
+        if not cuda.gpu_enable:
+            return array, None
+
+        # 非同期で GPU メモリへのデータ転送を行うために、スワップアウトされないメモリ領域にソース配列をコピーする
+        xp = cuda.cp
+        p_mem = xp.cuda.alloc_pinned_memory(array.nbytes)
+        source = np.frombuffer(p_mem, array.dtype, array.size).reshape(array.shape)
+        source[...] = array
+
+        # ストリームと GPU メモリ上の領域を確保し、DMA により非同期転送を行う
+        stream = xp.cuda.Stream(non_blocking = True)
+        destination = xp.ndarray(source.shape, source.dtype)
+        destination.set(source, stream = stream)
+
+        return destination, stream
 
 
     # 合法手の中から Q 関数が最大の行動を選択する
@@ -157,6 +175,8 @@ class QuantileHuberLoss(Function):
         self.N = quantiles_num
 
     def forward(self, x):
+        xp = cuda.get_array_module(x)
+
         #  TD 誤差の形状は、(batch_size, quantiles_num, quantiles_num)
         td_error = self.t - x
 
@@ -197,6 +217,7 @@ class QuantileHuberLoss(Function):
 # 一度計算したら、引数が変わらない限り、キャッシュにあるデータを即座に返すようになる
 @cache
 def quantiles(quantiles_num):
+    xp = cuda.cp if cuda.gpu_enable else np
     step = 1 / quantiles_num
     start = step / 2.
     return xp.array([start + i * step for i in range(quantiles_num)], dtype = np.float32)
@@ -224,6 +245,7 @@ class SumTree:
 
     # 使用する前に呼ぶ必要がある
     def reset(self):
+        xp = cuda.cp if cuda.gpu_enable else np
         self.tree = xp.zeros(2 * self.capacity)
         self.rng = xp.random.default_rng()
 
@@ -433,6 +455,7 @@ class ReplayBuffer:
         else:
             selected = [buffer[i] for i in indices]
 
+        xp = cuda.cp if cuda.gpu_enable else np
         states = xp.stack([x[0] for x in selected])
         next_states = xp.stack([x[4] for x in selected])
 
