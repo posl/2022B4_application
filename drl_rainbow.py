@@ -31,11 +31,19 @@ class NoisyAffine(Layer):
         self.rng = xp.random.default_rng()
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
-    def forward(self, x, stream = None):
+    def forward(self, x):
         in_size = x.shape[1]
         out_size = self.out_size
         if self.W_mu.data is None:
             self.init_params(x, in_size, out_size)
+
+        # GPU メモリへの転送が必要な場合は、cuda の DMA を用いて非同期で行う
+        if isinstance(x, np.ndarray) and cuda.gpu_enable:
+            x, source, stream = self.preprocess_to_gpu(x)
+            x.set(source, stream = stream)
+            sync_flag = True
+        else:
+            sync_flag = False
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
         epsilon_in = self.noise_f(self.rng.standard_normal(size = (in_size, 1), dtype = np.float32))
@@ -48,7 +56,7 @@ class NoisyAffine(Layer):
         b = self.b_mu + self.b_sigma * b_epsilon
 
         # ストリームを使い、非同期でメモリ転送を行なっていた場合は、その処理と同期させる
-        if stream is not None:
+        if sync_flag:
             stream.synchronize()
         x = dzf.affine(x, W, b)
 
@@ -72,9 +80,24 @@ class NoisyAffine(Layer):
         self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
 
     @staticmethod
+    def preprocess_to_gpu(array):
+        # 非同期で GPU メモリへのデータ転送を行うために、スワップアウトされないメモリ領域にソース配列をコピーする
+        xp = cuda.cp
+        p_mem = xp.cuda.alloc_pinned_memory(array.nbytes)
+        source = np.frombuffer(p_mem, array.dtype, array.size).reshape(array.shape)
+        source[...] = array
+
+        # ストリームを用意し、GPU メモリ上の領域を確保する
+        stream = xp.cuda.Stream(non_blocking = True)
+        destination = xp.ndarray(source.shape, source.dtype)
+        return destination, source, stream
+
+    @staticmethod
     def noise_f(x):
         xp = cuda.get_array_module(x)
         return xp.sign(x) * xp.sqrt(xp.abs(x))
+
+
 
 
 # 分位点数を指定して、行動価値分布に対応する累積分布関数の逆関数を近似する (QR-DQN (分位点回帰による分布強化学習))
@@ -103,25 +126,6 @@ class RainbowNet(Model):
         values = self.v2(self.v1(x))
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
-
-    @staticmethod
-    def move_to_gpu(array):
-        if not cuda.gpu_enable:
-            return array, None
-
-        # 非同期で GPU メモリへのデータ転送を行うために、スワップアウトされないメモリ領域にソース配列をコピーする
-        xp = cuda.cp
-        p_mem = xp.cuda.alloc_pinned_memory(array.nbytes)
-        source = np.frombuffer(p_mem, array.dtype, array.size).reshape(array.shape)
-        source[...] = array
-
-        # ストリームと GPU メモリ上の領域を確保し、DMA により非同期転送を行う
-        stream = xp.cuda.Stream(non_blocking = True)
-        destination = xp.ndarray(source.shape, source.dtype)
-        destination.set(source, stream = stream)
-
-        return destination, stream
-
 
     # 合法手の中から Q 関数が最大の行動を選択する
     def get_actions(self, states, placables):
@@ -245,20 +249,14 @@ class SumTree:
 
     # 使用する前に呼ぶ必要がある
     def reset(self):
-        xp = cuda.cp if cuda.gpu_enable else np
-        self.tree = xp.zeros(2 * self.capacity)
-        self.rng = xp.random.default_rng()
+        self.tree = np.zeros(2 * self.capacity)
+        self.rng = np.random.default_rng()
 
     def save(self, file_name):
-        tree = cuda.as_numpy(self.tree)
-        np.save(file_name + "_tree.npy", tree)
+        np.save(file_name + "_tree.npy", self.tree)
 
     def load(self, file_name):
-        tree = np.load(file_name + "_tree.npy")
-        if cuda.gpu_enable:
-            self.tree = cuda.as_cupy(tree)
-        else:
-            self.tree = tree
+        self.tree = np.load(file_name + "_tree.npy")
 
 
     # 引数のインデックスは int か np.ndarray
@@ -286,7 +284,7 @@ class SumTree:
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
     def sample(self, batch_size = 1):
-        zs = self.rng.random(batch_size) * self.sum
+        zs = self.rng.uniform(0, self.sum, batch_size)
         indices = [self.__sample(zs[i]) for i in range(batch_size)]
         return np.array(indices)
 
@@ -318,6 +316,8 @@ class SumTree:
     @property
     def sum(self):
         return self.tree[1]
+
+
 
 
 # 学習に使う経験データ間の相関を弱め、また経験データを繰り返し使うためのバッファ (経験再生)
@@ -462,9 +462,9 @@ class ReplayBuffer:
         # actions はインデックスとして使うだけなので、np.ndarray でよい
         actions = np.array([x[1] for x in selected])
 
-        xp = cuda.cp if cuda.gpu_enable else np
-        rewards = xp.array([x[2] for x in selected], dtype = np.float32)
-        gammas = xp.array([x[3] for x in selected], dtype = np.float32)
+        # パラメータの学習で使用する前に、必要に応じて GPU メモリへの非同期転送を行うので、np.ndarray でよい
+        rewards = np.array([x[2] for x in selected], dtype = np.float32)
+        gammas = np.array([x[3] for x in selected], dtype = np.float32)
 
         # 抽出した経験データごとに長さが違う可能性があるため、通常のリスト
         next_placables = [x[5] for x in selected]
@@ -560,20 +560,42 @@ class RainbowAgent:
         experiences, indices, weights = replay_buffer.get_batch(batch_size, progress)
         states, actions, rewards, gammas, next_states, next_placables = experiences
 
+        # GPU を使用する場合は、非同期メモリ転送を開始する
+        if cuda.gpu_enable:
+            preprocess = NoisyAffine.preprocess_to_gpu
+            sync_flag = True
+
+            rewards, source, rewards_stream = preprocess(rewards)
+            rewards.set(source, stream = rewards_stream)
+
+            gammas, source, gammas_stream = preprocess(gammas)
+            gammas.set(source, stream = gammas_stream)
+
+            weights, source, weights_stream = preprocess(weights)
+            weights.set(source, stream = weights_stream)
+        else:
+            sync_flag = False
+
         # 誤差を含む出力に max 演算子を使うことで過大評価を起こさないように、行動はオンライン分布から取る (Double DQN)
         with no_grad():
-            next_quantile_values = self.qnet_target(next_states)
             sequence = np.arange(batch_size)
             next_actions = self.qnet.get_actions(next_states, next_placables)
 
+            next_quantile_values = self.qnet_target(next_states)
             next_quantile_values = next_quantile_values.data[sequence, next_actions]
+
+            if sync_flag:
+                rewards_stream.synchronize()
+                gammas_stream.synchronize()
+
+            # ターゲットネットワークの出力にベルマンオペレータを適用する
             rewards = rewards[:, None]
             target_quantile_values = rewards + (rewards == 0) * gammas[:, None] * next_quantile_values
 
             # TD ターゲットの形状は、(batch_size, 1, quantiles_num)
             target_quantile_values = target_quantile_values[:, None]
 
-        # 分位点数データの形状は、(batch_size, 1, quantiles_num)
+        # 分位点数データの形状は、(batch_size, quantiles_num, 1)
         quantile_values = self.qnet(states)
         quantile_values = quantile_values[sequence, actions]
         quantile_values = quantile_values.reshape((batch_size, self.quantiles_num, 1))
@@ -586,6 +608,8 @@ class RainbowAgent:
 
         # 優先度付き経験再生を使っている場合は、重点サンプリングの重みを掛ける
         if weights is not None:
+            if sync_flag:
+                weights_stream.synchronize()
             td_loss *= weights
 
         loss = td_loss.mean()
