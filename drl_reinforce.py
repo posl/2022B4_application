@@ -65,7 +65,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = xp.random.choice(len(placable), p = probs.data[0])
+            action_index = xp.random.choice(len(placable), 1, p = probs.data[0])[0]
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -192,7 +192,8 @@ class ReinforceComputer:
             probs = dzf.softmax(policy[:, np.array(placable)])
             probs = probs.data[0]
 
-        return placable[xp.random.choice(len(placable), p = probs)]
+        action_index = xp.random.choice(len(placable), 1, p = probs)[0]
+        return placable[action_index]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):

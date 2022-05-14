@@ -99,7 +99,10 @@ class RainbowNet(Model):
 
     @staticmethod
     def to_pinned_memory(array):
-        
+        mem = xp.cuda.alloc_pinned_memory(array.nbytes)
+        src = np.frombuffer(mem, array.dtype, array.size).reshape(array.shape)
+        src[...] = array
+        return src
 
 
     # 合法手の中から Q 関数が最大の行動を選択する
