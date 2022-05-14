@@ -64,7 +64,7 @@ class OptionPage(Page):
     def start_game(self):
         self.board.reset()
         self.board.game_playing = 1
-        if False:
+        if False: #デバッグで終局を早めたい時にTrue
             self.board.stone_black = 0
             for i in range(7):
                 for j in range(7):
@@ -74,6 +74,8 @@ class OptionPage(Page):
                         pass
                     else:
                         pass
+        player1_id = self.combobox1.current()
+        player2_id = self.combobox2.current()
         self.board.game_page.player1 = self.combobox1.current()
         self.board.game_page.player2 = self.combobox2.current()
         player1_plan = 0
@@ -151,6 +153,7 @@ class GamePage(Page):
         self.button2 = tk.Button(self, text=">", font = (board.font_name, 50), command=lambda:self.goto_start_page())
         self.button2.place(x=750, y=380)
     
+    #消すかも？
     def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
         if state==0:
             self.board.se1.play()
@@ -193,25 +196,24 @@ class GamePage(Page):
             self.board.after(800, self.canvas_update, 0, 0, 0, 0)
             self.game_exit_check()
 
+    #キャンバスを全消しー＞線描画ー＞黒石、白石の描画
     def render_current_board(self):
-        bnum = 0
-        wnum = 0
         self.game_canvas.delete("all")
         self.game_canvas.configure(bg="#44EE88")
         self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
         for i in range(9):
             self.game_canvas.create_line(10+self.cell_width*i, 10, 10+self.cell_width*i, 10+self.cell_height*8, fill="#101010", width=2)
             self.game_canvas.create_line(10, 10+self.cell_height*i, 10+self.cell_width*8, 10+self.cell_height*i, fill="#101010", width=2)
-        for i in range(8):
-            for j in range(8):
-                t = (j, i)
-                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
-                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
-                        self.stone_black_draw(i, j)
-                    else:
-                        self.stone_white_draw(i, j)
-        return
-    
+        bplace = self.board.black_positions()
+        wplace = self.board.white_positions()
+        for pl in bplace:
+            j, i = self.board.n2t(pl)
+            self.stone_black_draw(i, j)
+        for pl in wplace:
+            j, i = self.board.n2t(pl)
+            self.stone_white_draw(i, j)
+        
+    #石が置けるところを青く
     def render_placeable(self):
         lp = self.board.list_placable()
         for w in lp:
@@ -220,6 +222,8 @@ class GamePage(Page):
             self.stone_blue_draw(i,j)
         return
 
+    # flg...True : ひっくり返るところをgray
+    # flg...False : ひっくり返ったところを黒/白に
     def render_reverse(self, n, flg = True):
         y, x = self.board.n2t(n)
         self.stone_yellow_draw(x, y)
@@ -262,12 +266,12 @@ class GamePage(Page):
 
 
     def stone_blue_draw(self, x, y):
-        self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#11FFFF")
+        self.game_canvas.create_rectangle(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#11FFFF")
         for k in range(17):
             k_ = 17 - k
             s = format(0xff-3*k, "02X")
             s = "#" + "11" + s + s
-            self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+            self.game_canvas.create_rectangle(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_yellow_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#FFFF44")
@@ -279,17 +283,9 @@ class GamePage(Page):
 
 
     def stone_counter_update(self):
-        bnum = 0
-        wnum = 0
+        bnum = self.board.black_num()
+        wnum = self.board.white_num()
 
-        for i in range(8):
-            for j in range(8):
-                t = (j, i)
-                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
-                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
-                        bnum += 1
-                    else:
-                        wnum += 1
         self.black_conter_label.configure(text=format(bnum, "02d") )
         self.white_conter_label.configure(text=format(wnum, "02d") )
 
@@ -415,16 +411,8 @@ class GamePage(Page):
     
 
     def win_check(self):
-        bnum = 0
-        wnum = 0
-        for i in range(8):
-            for j in range(8):
-                t = (j, i)
-                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
-                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
-                        bnum += 1
-                    else:
-                        wnum += 1
+        bnum = self.board.black_num()
+        wnum = self.board.white_num()
         if bnum>wnum:
             self.label1.configure(text="黒の勝ち")
         elif bnum<wnum:
