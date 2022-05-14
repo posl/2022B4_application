@@ -114,6 +114,9 @@ class Board:
         # 画面表示用の属性
         self.click_attr = None
 
+        # どこがひっくり返されたかを保持しておく(表示のために必要)
+        self.rev_pl = []
+
 
     @property
     def state(self):
@@ -253,6 +256,7 @@ class Board:
         move_player, opposition_player = self.players_board
         mask = self.__reverse(n, move_player, opposition_player)
         self.set_players_board(mask | (1 << n), mask)
+        self.rev_pl = mask #表示のために裏返ったところを保持
 
     # n に置いた時に返るマスを返す
     @staticmethod
@@ -274,6 +278,17 @@ class Board:
     @staticmethod
     def __reverse_cython(startpoint, move_player, opposition_player):
         return get_reverse_board(1 << startpoint, move_player, opposition_player)
+
+    # ひっくり返された場所を返す（表示のために必要）
+    def reverse_place_t(self):
+        ret = []
+        if self.rev_pl is None:
+            return ret
+        for i in range(8):
+            for j in range(8):
+                if (self.rev_pl >>(8*i+j)) & 1:
+                    ret.append(8*i+j)
+        return ret
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
@@ -336,6 +351,7 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
+        self.render(flag)  #初期状態の表示
         while flag:
             n = self.get_action()
             self.put_stone(n)
@@ -345,8 +361,8 @@ class Board:
                 self.render(flag)
 
     # エピソード中の画面表示メソッド
-    def render(self, flag):
-        self.main_window.game_page.canvas_update()
+    def render(self, flag, n=999):
+        self.main_window.game_page.canvas_update(flag, n)
 
 
     def play(self):
@@ -354,7 +370,7 @@ class Board:
         self.main_window = display.MainWindow()
 
         # サウンド
-        self.sounds = sound.Sounds()
+        #self.sounds = sound.Sounds()
         
 
         # tkapp の初期化
@@ -365,6 +381,8 @@ class Board:
                 self.__play()
             else:
                 break
+            self.main_window.game_page.result_view()
+            self.main_window.mainloop()
 
     def __play(self):
         self.main_loop()

@@ -84,6 +84,9 @@ class OptionPage(Page):
         self.par.change_page(2)
         #self.par.after()
         self.board.click_attr = True
+        #self.par.game_page.canvas_update()
+        #self.par.after(100, self.par.quit)
+        #self.par.mainloop()
         self.par.quit()
         return
         # 下のコードは後で消す
@@ -179,19 +182,45 @@ class GamePage(Page):
         self.button2.place(x=750, y=380)
     
 
-    def canvas_update(self):
+    def canvas_update(self, flag=None, n=999):
+        print("canvas_update:",self.game_canvas_state)
         self.stone_counter_update()
         if self.game_canvas_state==0:
             self.render_current_board()
+            self.game_canvas_state = 1
+            self.par.after(50, self.canvas_update)
+            self.par.mainloop()
         elif self.game_canvas_state==1:
-            self.render_reverse()
-        elif self.game_canvas_state==2:
             self.render_placeable()
-        self.par.after(10, self.par.quit)
-        self.par.mainloop()
+            self.game_canvas_state = 2
+            self.par.after(200, self.par.quit)
+        elif self.game_canvas_state==2:
+            self.render_reverse(n, 0)
+            self.game_canvas_state = 3
+            self.par.after(400, self.canvas_update)
+            self.par.mainloop()
+        elif self.game_canvas_state==3:
+            self.render_reverse(n, 1)
+            self.game_canvas_state = 4
+            self.par.after(400, self.canvas_update)
+        elif self.game_canvas_state==4:
+            self.render_reverse(n, 2)
+            self.game_canvas_state = 5
+            self.par.after(400, self.canvas_update)
+        elif self.game_canvas_state==5:
+            self.render_current_board()
+            self.game_canvas_state = 1
+            self.par.after(500, self.canvas_update)
+
+    
+    def game_canvas_state_update(self, v):
+        self.game_canvas_state = v
+        
+        
 
     #キャンバスを全消しー＞線描画ー＞黒石、白石の描画
     def render_current_board(self):
+        self.par.sounds.play(1)
         self.game_canvas.delete("all")
         self.game_canvas.configure(bg="#44EE88")
         self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
@@ -209,6 +238,7 @@ class GamePage(Page):
         
     #石が置けるところを青く
     def render_placeable(self):
+        #self.par.sounds.play(2)
         lp = self.board.list_placable()
         for w in lp:
             j, i = self.board.n2t(w)
@@ -217,19 +247,30 @@ class GamePage(Page):
 
     # flg...True : ひっくり返るところをgray
     # flg...False : ひっくり返ったところを黒/白に
-    def render_reverse(self, n, flg = True):
+    def render_reverse(self, n, flg = 0):
         y, x = self.board.n2t(n)
-        self.stone_yellow_draw(x, y)
-        r_list = self.board.__reverse_python(n)
-        if flg:
+        r_list =  self.board.reverse_place_t()
+        bplace = self.board.black_positions
+        wplace = self.board.white_positions
+        if flg==0:
+            self.par.sounds.play(2)
+            self.stone_yellow_draw(x, y)
+        elif flg==1:
+            self.par.sounds.play(3)
             for i in r_list:
                 i_y, i_x = self.board.n2t(i)
                 self.stone_gray_draw(i_x, i_y)
-            self.board.after(800, self.render_reverse, False)
-        else:
+            #self.par.after(500, self.render_reverse, False)
+        elif flg==2:
+            self.par.sounds.play(3)
             for i in r_list:
                 i_y, i_x = self.board.n2t(i)
-                self.stone_gray_draw(i_x, i_y)
+                if i in bplace:
+                    self.stone_black_draw(i_x, i_y)
+                if i in wplace:
+                    self.stone_white_draw(i_x, i_y)
+                #self.stone_gray_draw(i_x, i_y)
+                #self.par.after(500, self.canvas_update, False)
         return
 
 
@@ -283,7 +324,7 @@ class GamePage(Page):
         self.white_conter_label.configure(text=format(wnum, "02d") )
 
         self.counter_bar.delete("all")
-        bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum)-0.5)*3 )+1) / 2  )
+        bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum+0.1)-0.5)*3 )+1) / 2  )
         self.counter_bar.create_rectangle(0, 0, self.canvas_width+10, 100, fill = "#22FF77")
         self.counter_bar.create_rectangle(0, 0, bw_bounder_x, 100, fill = "#000000", outline="#000000")
         for i in range(30):
@@ -323,6 +364,7 @@ class GamePage(Page):
             print("あなたの番ではありません：")
             return
         """
+        print("cell_click:",self.game_canvas_state)
         x = event.x
         y = event.y
         x = (x-10) // self.cell_width
@@ -375,6 +417,7 @@ class MainWindow(tk.Tk):
         self.option_page = OptionPage(self, self.board)
         self.game_page = GamePage(self, self.board)
 
+        self.sounds = sound.Sounds()
         self.human = Human(self)
 
     def change_page(self, page_id):
