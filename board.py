@@ -346,7 +346,7 @@ class Board:
 
     # エピソード中の画面表示メソッド
     def render(self, flag):
-        self.tkapp.game_page.canvas_update()
+        self.main_window.game_page.canvas_update()
 
 
     def play(self):
@@ -360,7 +360,7 @@ class Board:
         # tkapp の初期化
         while True:
             self.main_window.change_page(0)
-            self.main_loop()
+            self.main_window.main_loop()
             if self.click_attr:
                 self.__play()
             else:
@@ -368,7 +368,8 @@ class Board:
 
     def __play(self):
         self.main_loop()
-        player1_plan, player2_plan = self.click_attr
+        #player1_plan, player2_plan = self.click_attr
+        player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
         self.set_plan(player1_plan, player2_plan)
 
         # 最初の盤面表示
