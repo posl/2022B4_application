@@ -4,6 +4,8 @@ import math
 
 import pygame
 
+import sound
+
 
 
 class Page(tk.Frame):
@@ -46,7 +48,6 @@ class OptionPage(Page):
         self.par = par
         self.board = board
         self.configure(bg="#992299")
-        self.grid(row=0, column=0, sticky="nsew")
 
         self.combo_menus = ("手動", "COM-A(ランダム)", "COM-B(モンテカルロ)", "COM-C(alpha)")
 
@@ -64,10 +65,25 @@ class OptionPage(Page):
         self.combobox2.place(x=200, y=90 )
         self.combobox2.current(1)
 
-        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 50), command=lambda:self.start_game())
+        self.button1 = tk.Button(self, text="Next", font = (self.font_name, 50), command=lambda:self.start_game())
         self.button1.place(x=450, y=380)
 
+    # ゲームの設定を有効化
+    def game_config_validate(self):
+        player1_id = self.combobox1.current()
+        player2_id = self.combobox2.current()
+        player1_diff = 0  #難易度
+        player2_diff = 0  #難易度
+        # ボード側に上の値を渡して設定させる処理をここに書く
+        return
+
     def start_game(self):
+        self.game_config_validate()
+        self.par.change_page(2)
+        self.par.after()
+        self.par.quit()
+        return
+        # 下のコードは後で消す
         self.board.reset()
         self.board.game_playing = 1
         if False: #デバッグで終局を早めたい時にTrue
@@ -120,6 +136,7 @@ class OptionPage(Page):
 class GamePage(Page):
     def __init__(self, par, board):
         tk.Frame.__init__(self, par)
+        self.par = par
         self.board = board
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
@@ -140,6 +157,7 @@ class GamePage(Page):
         self.game_canvas = tk.Canvas(self, width=self.canvas_width, height=self.canvas_height)
         self.game_canvas.place(x=100, y=50)
         self.game_canvas.bind("<Button-1>", self.cell_click)
+        self.game_canvas_state = 0
 
         self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
         self.counter_bar.place(x=100, y=5)
@@ -153,54 +171,22 @@ class GamePage(Page):
         self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (board.font_name, 25))
         self.label1.place(x=1000, y=300)
 
-        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 25), command=lambda:self.machine_put())
+        # 見えないところに置かれている、削除するかも？
+        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 25), command=lambda:None)
         self.button1.place(x=750, y=380)
 
         self.button2 = tk.Button(self, text=">", font = (board.font_name, 50), command=lambda:self.goto_start_page())
         self.button2.place(x=750, y=380)
     
-    #消すかも？
-    def canvas_update(self, state=0, x=0, y=0, oldcolor=0):
-        if state==0:
-            self.board.se1.play()
-        elif state==1:
-            self.board.se2.play()
-        elif state==2:
-            self.board.se3.play()
+
+    def canvas_update(self):
         self.stone_counter_update()
-        self.game_canvas.delete("all")
-        self.game_canvas.configure(bg="#44EE88")
-        self.game_canvas.create_rectangle(0, 0, self.canvas_width+10, self.canvas_height+10, fill = "#22FF77")
-        for i in range(9):
-            self.game_canvas.create_line(10+self.cell_width*i, 10, 10+self.cell_width*i, 10+self.cell_height*8, fill="#101010", width=2)
-            self.game_canvas.create_line(10, 10+self.cell_height*i, 10+self.cell_width*8, 10+self.cell_height*i, fill="#101010", width=2)
-        for i in range(8):
-            for j in range(8):
-                t = (j, i)
-                if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
-                    if (self.board.stone_black >> (self.board.t2n(t)) &1)==1 :
-                        self.stone_black_draw(i, j)
-                    else:
-                        self.stone_white_draw(i, j)
-        lp = self.board.list_placable()
-        if state==0:
-            for w in lp:
-                i = w%8
-                j = w//8
-                self.stone_blue_draw(i,j)
-        if state==1:
-            self.stone_yellow_draw(x,y)
-            self.board.after(800, self.canvas_update, 2, x, y, self.board.stone_black)
-        if state==2:
-            for i in range(8):
-                for j in range(8):
-                    t = (j, i)
-                    if (self.board.stone_exist >> (self.board.t2n(t)) &1)==1 :
-                        if (self.board.stone_black >> (self.board.t2n(t)) &1) ^ (oldcolor >> (self.board.t2n(t)) &1)==1 :
-                            self.stone_gray_draw(i, j)
-            self.stone_yellow_draw(x,y)
-            self.board.after(800, self.canvas_update, 0, 0, 0, 0)
-            self.game_exit_check()
+        if self.game_canvas_state==0:
+            self.render_current_board()
+        elif self.game_canvas_state==1:
+            self.render_reverse()
+        elif self.game_canvas_state==2:
+            self.render_placeable()
 
     #キャンバスを全消しー＞線描画ー＞黒石、白石の描画
     def render_current_board(self):
@@ -223,8 +209,7 @@ class GamePage(Page):
     def render_placeable(self):
         lp = self.board.list_placable()
         for w in lp:
-            i = w%8
-            j = w//8
+            j, i = self.board.n2t(w)
             self.stone_blue_draw(i,j)
         return
 
@@ -309,7 +294,8 @@ class GamePage(Page):
             s = "#" + s + s + s
             self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
         return
-        
+
+     #消すかも？   
     def machine_put(self):
         if self.board.turn==1 and self.player1==0:
             print("COMは石を置けなかった(先攻)")
@@ -332,18 +318,19 @@ class GamePage(Page):
         if self.board.game_playing:
             self.board.after(1800, self.machine_put)
     
+    #消す予定
     def human_put_stone(self, x, y):
         if x<0 or y<0 or x>=8 or y>=8:
-            self.board.se4.play()
+            self.par.sounds.play(4)
             return
         t = (y, x)
         if (self.board.stone_exist >> self.board.t2n(t)) & 1:
             print("既に石があります")
-            self.board.se4.play()
+            self.par.sounds.play(4)
             return
         if self.board.is_placable(self.board.t2n(t))==False:
             print("石を底に置くことはできません")
-            self.board.se4.play()
+            self.par.sounds.play(4)
             return
         self.canvas_update(1, x, y)
         self.game_still_cont = self.board.can_continue(True)
@@ -364,12 +351,10 @@ class GamePage(Page):
             self.board.game_playing = 1
             return
         self.board.game_playing = 0
-        self.board.after(1500, self.goto_result_page)
+        self.board.after(1500, self.result_view)
 
     def cell_click(self, event):
-        #print(self.board.turn)
-        #print(self.player1)
-
+        """
         if self.board.turn==1 and self.player1==0:
             print()
         if self.board.turn==1 and self.player1>0:
@@ -379,33 +364,31 @@ class GamePage(Page):
         if self.board.turn==0 and self.player2==0:
             print()
         if self.board.turn==0 and self.player2>0:
-            self.board.se4.play()
+            self.par.play(4)
             print("あなたの番ではありません：")
             return
+        """
         x = event.x
         y = event.y
         x = (x-10) // self.cell_width
         y = (y-10) // self.cell_height
-        if x<0 or y<0 or x>=8 or y>=8:
-            self.board.click_flag = -1
-        self.human_put_stone(x, y)
-        #self.canvas_update()
-        print("セルが押された：", x, ",", y)
-
+        self.board.click_attr = self.board.t2n(y, x)
+        print("セルが押された：", x+1, ",", y+1)
+        self.par.after(800, self.quit)
         #self.board.player_action = n
 
-
-    def goto_result_page(self):
+    def result_view(self):
         self.win_check()
         self.board.result_page.win_check()
         self.button2.place(x=520)
         self.label1.place(x=520)
 
     def goto_start_page(self):
-        self.board.start_page.tkraise()
+        self.par.page_change(0)
         self.button2.place(x=1000)
         self.label1.place(x=1000)
         self.label1.configure(text="")
+        self.par.quit()
     
 
     def win_check(self):
@@ -422,18 +405,19 @@ class GamePage(Page):
 
 
 class MainWindow(tk.Tk):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, board, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         pygame.init()
+        self.board = board
         self.width = 640
         self.height = 480
         self.geometry( str(self.width) + "x" + str(self.height) )
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.start_page = StartPage(self, None)
-        self.option_page = OptionPage(self, None)
-        self.game_page = GamePage(self, None)
+        self.start_page = StartPage(self, self.board)
+        self.option_page = OptionPage(self, self.board)
+        self.game_page = GamePage(self, self.board)
 
     def change_page(self, page_id):
         if page_id==0:
@@ -442,13 +426,29 @@ class MainWindow(tk.Tk):
             self.option_page.tkraise()
         elif page_id==2:
             self.game_page.tkraise()
+
+
+#本来はここに書くべきではなかろう
+class Human:
+    def __init__(self, par):
+        self.par = par  # par : MainWindow , main_loopを呼び出すために必要
+
+    def player(self, board):
+        placable = set(board.list_placable())
+        while True:
+            self.par.main_loop()
+            n = board.click_attr
+            board.click_attr = None
+            if n in placable:
+                break
+        return n
     
 
 
 
 
 if __name__ == "__main__":
-
+    pass
     # アプリケーションを開始
     #board = board.Board()
     #board.play()
@@ -458,12 +458,3 @@ if __name__ == "__main__":
     
     #tkapp.mainloop()
     #board.set_display(tkapp)
-
-    def player(board):
-        placable = set(board.list_placable())
-        while True:
-            board.main_loop()
-            n = board.click_flag
-            if n in placable:
-                break
-        return n
