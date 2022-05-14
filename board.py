@@ -387,7 +387,7 @@ class Board:
             self.main_window.mainloop()
 
     def __play(self):
-        self.main_window.mainloop()
+        #self.main_window.mainloop()
         #player1_plan, player2_plan = self.click_attr
         player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
         self.set_plan(player1_plan, player2_plan)
