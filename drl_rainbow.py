@@ -227,7 +227,6 @@ class SumTree:
             self.tree = tree
 
 
-    # 優先度のセットは１つずつ行うものとする (value >= 0)
     @singledispatchmethod
     def __setitem__(self, index, value):
         message = f"\"{index.__class__}\" index is not supported."
@@ -235,47 +234,29 @@ class SumTree:
 
     @__setitem__.register(int)
     def __(self, index, value):
-        tree = self.tree
-
-        # 木構造を保持する ndarray の後半半分が実際の優先度データを格納する部分
         index += self.capacity
-        tree[index] = value
+        self.tree[index] = value
 
-        # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
-        while index > 1:
-            index >>= 1
-            left_child = index * 2
-            tree[index] = tree[left_child] + tree[left_child + 1]
+        self.__update_tree(index)
 
     # 高速化のためにまとめて更新できるようにした
     @__setitem__.register(np.ndarray)
     def __(self, indices, values):
-        capacity = self.capacity
+        indices += self.capacity
+        self.tree[indices] = values
+
+        # 素直に１つずつ更新するのが一番速かった
+        for index in indices:
+            self.__update_tree(index)
+
+    def __update_tree(self, parent):
         tree = self.tree
 
-        indices += capacity
-        tree[indices] = values
-
-        indices.sort()
-        indices = deque(indices)
-
-        # インデックスの大きいものから処理していくことで不整合は起こらなくなる
-        while True:
-            index = indices.pop()
-
-            # 葉ノード (実際のデータ) 以外は２つある子ノードの和が格納されるように更新する
-            if index < capacity:
-                left_child = index * 2
-                tree[index] = tree[left_child] + tree[left_child + 1]
-
-            # 重複が起こらないように、まだ見ていないインデックスかどうかを追加前にチェックする
-            index >>= 1
-            if index:
-                if indices and (index == indices[0]):
-                    continue
-                indices.appendleft(index)
-            else:
-                break
+        # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
+        while parent > 1:
+            parent >>= 1
+            left_child = parent * 2
+            tree[parent] = tree[left_child] + tree[left_child + 1]
 
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
