@@ -9,6 +9,7 @@ import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 from drl_selfmatch import SelfMatch
 from board import Board
+
 xp = cuda.cp if cuda.gpu_enable else np
 
 

@@ -7,11 +7,12 @@ import zlib
 import numpy as np
 
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
-xp = cuda.cp if cuda.gpu_enable else np
 import inada_framework.functions as dzf
 from inada_framework.utilitys import reshape_for_broadcast
 from drl_selfmatch import SelfMatch, simple_plan
 from board import Board
+
+xp = cuda.cp if cuda.gpu_enable else np
 
 
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
@@ -32,8 +33,6 @@ class NoisyAffine(Layer):
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
-        
-
         in_size = x.shape[1]
         out_size = self.out_size
         if self.W_mu.data is None:
@@ -97,6 +96,9 @@ class RainbowNet(Model):
         values = self.v2(self.v1(x))
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
+
+    
+
 
     # 合法手の中から Q 関数が最大の行動を選択する
     def get_actions(self, states, placables):

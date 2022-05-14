@@ -3,9 +3,10 @@ import numpy as np
 from inada_framework import Model, optimizers, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-xp = cuda.cp if cuda.gpu_enable else np
 from drl_selfmatch import SelfMatch, simple_plan, corners_plan
 from board import Board
+
+xp = cuda.cp if cuda.gpu_enable else np
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -34,7 +35,7 @@ class ReinforceAgent:
         pi = PolicyNet(self.action_size)
         self.pi = pi
         self.optimizer = optimizers.Adam(self.lr).setup(pi)
-        self.rng = xp.random.default_rng()
+        self.rng = np.random.default_rng()
 
         if cuda.gpu_enable:
             pi.to_gpu()
@@ -64,7 +65,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = int(self.rng.choice(len(placable), p = probs.data[0]))
+            action_index = self.rng.choice(len(placable), p = probs.data[0])
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -156,7 +157,7 @@ class ReinforceComputer:
     def reset(self, file_name, turn, agent_num):
         file_name = Reinforce.get_path(file_name).format("parameters")
         file_name += f"{turn}_"
-        self.rng = xp.random.default_rng()
+        self.rng = np.random.default_rng()
 
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
         assert isinstance(agent_num, int)
@@ -172,7 +173,7 @@ class ReinforceComputer:
 
             pi.load_weights(file_name + f"{i}.npz")
             if cuda.gpu_enable:
-                self.pi.to_gpu()
+                pi.to_gpu()
 
     def __call__(self, board):
         placable = board.list_placable()
@@ -192,7 +193,7 @@ class ReinforceComputer:
             probs = dzf.softmax(policy[:, np.array(placable)])
             probs = probs.data[0]
 
-        return placable[int(self.rng.choice(len(placable), p = probs))]
+        return placable[self.rng.choice(len(placable), p = probs)]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):
