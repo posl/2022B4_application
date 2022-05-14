@@ -23,7 +23,7 @@ class Sounds:
     def play(self, id, loop=0):
         if id<0 or id>=self.sounds.count():
             return
-        self.sounds[id].play(loop)
+        self.sounds[id].play(loops=loop)
     
     def stop(self, id):
         if id<0 or id>=self.sounds.count():
