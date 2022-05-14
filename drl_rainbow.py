@@ -32,6 +32,8 @@ class NoisyAffine(Layer):
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
+        
+
         in_size = x.shape[1]
         out_size = self.out_size
         if self.W_mu.data is None:
@@ -104,12 +106,16 @@ class RainbowNet(Model):
         # 分位点が等間隔であることを想定しているので、確率変数の期待値は分位点の単純平均に一致する
         qs = quantile_values.mean(axis = 2)
 
-        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元の placable とする
+        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元リストの placable とする
         if len(qs) == 1:
-            return placables[int(qs[0, placables].argmax())]
+            return placables[int(qs[0, np.array(placables)].argmax())]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        return [pl[int(q[pl].argmax())] if pl else 0 for q, pl in zip(qs, placables)]
+        actions =  [placable[ int( q[placable].argmax() ) ] if placable.size > 0 else 0
+                    for q, placable in zip(qs, placables)]
+
+        # インデックスとして使うので、高速化のために np.ndarray に変換する
+        return np.array(actions)
 
     # アドバンテージ関数のみを取り出すことができる (ベースライン付き REINFORCE の重みとして使える)
     def get_advantages(self, states, actions):
@@ -193,12 +199,12 @@ def quantiles(quantiles_num):
 
 # ランダムサンプリングを高速化するためのセグメントツリー
 class SumTree:
-    def __init__(self, capacity):
+    def __init__(self, capacity: int):
         self.capacity = self.__get_capacity(capacity)
 
     # 引数以上の数で最小の２のべき乗を取得する (容量は必ず２のべき乗であるものとする)
     @staticmethod
-    def __get_capacity(capacity: int):
+    def __get_capacity(capacity):
         if capacity > 0:
             # 指定された値が２のべき乗でない場合は目的の出力を作成する
             if capacity & (capacity - 1):
@@ -367,8 +373,9 @@ class ReplayBuffer:
                 nstep_reward = reward_gamma * reward
                 break
 
+        # next_placable はモデルの出力を合法手のものに絞るために使うので、高速化のために np.ndarray に変換する
         state, action = tmp_buffer[0][:2]
-        nstep_data = state, action, nstep_reward, nstep_gamma, next_state, next_placable
+        nstep_data = state, action, nstep_reward, nstep_gamma, next_state, np.array(next_placable)
 
         # 経験データ数がバッファサイズを超えたら、古いものから上書きしていく
         count = self.count
@@ -422,11 +429,14 @@ class ReplayBuffer:
         states = xp.stack([x[0] for x in selected])
         next_states = xp.stack([x[4] for x in selected])
 
-        actions = xp.array([x[1] for x in selected], dtype = np.int32)
+        # actions はインデックスとして使うだけなので、np.ndarray でよい
+        actions = np.array([x[1] for x in selected])
         rewards = xp.array([x[2] for x in selected], dtype = np.float32)
         gammas = xp.array([x[3] for x in selected], dtype = np.float32)
 
+        # 抽出した経験データごとに長さが違う可能性があるため、通常のリスト
         next_placables = [x[5] for x in selected]
+
         return (states, actions, rewards, gammas, next_states, next_placables), indices, weights
 
     def update_priorities(self, deltas, indices):
@@ -496,7 +506,7 @@ class RainbowAgent:
             placable = board.list_placable()
 
         with no_grad():
-            state = board.get_state_ndarray(xp)
+            state = board.get_state_ndarray()
             action = self.qnet.get_actions(state[None, :], placable)
             return action, state
 
@@ -586,7 +596,7 @@ class Rainbow(SelfMatch):
                 agent.update((state, action, 0, next_state, next_placable), progress)
 
         reward = board.reward
-        next_state = board.get_state_ndarray(xp)
+        next_state = board.get_state_ndarray()
         next_placable = []
 
         # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
@@ -647,9 +657,12 @@ class RainbowComputer(RainbowAgent):
     # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
     def reset(self, file_name, turn, quantiles_num):
         qnet = RainbowNet(self.action_size, quantiles_num)
+        self.qnet = qnet
+
         file_name = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
         qnet.load_weights(file_name)
-        self.qnet = qnet
+        if cuda.gpu_enable:
+            qnet.to_gpu()
 
 
 def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):

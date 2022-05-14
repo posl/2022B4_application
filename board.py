@@ -1,10 +1,8 @@
 from functools import cache
 from contextlib import contextmanager
 from math import ceil
-import os
 
 import numpy as np
-import pygame
 
 from board_speedup import get_reverse_board, get_legal_board
 import display

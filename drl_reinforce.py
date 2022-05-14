@@ -31,9 +31,13 @@ class ReinforceAgent:
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
-        self.pi = PolicyNet(self.action_size)
-        self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
+        pi = PolicyNet(self.action_size)
+        self.pi = pi
+        self.optimizer = optimizers.Adam(self.lr).setup(pi)
         self.rng = xp.random.default_rng()
+
+        if cuda.gpu_enable:
+            pi.to_gpu()
 
     def save(self, file_name, is_yet = None):
         self.pi.save_weights(file_name + ".npz")
@@ -218,5 +222,5 @@ if __name__ == "__main__":
     fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
-    eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
+    # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
+    # eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
