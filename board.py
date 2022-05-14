@@ -1,13 +1,12 @@
 from functools import cache
 from contextlib import contextmanager
 from math import ceil
-import random
 import os
 
 import numpy as np
 import pygame
 
-from board_speedup import get_legal_board, get_reverse_board
+from board_speedup import get_reverse_board, get_legal_board
 import display
 
 
@@ -89,7 +88,7 @@ class Board:
         return super().__new__(cls)
 
     def __init__(self):
-        # list_placable : 30 ~ 40 倍、reverse : 3 倍
+        # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
             self.__list_placable = self.__list_placable_cython
             self.__reverse = self.__reverse_cython
@@ -141,15 +140,17 @@ class Board:
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
     def get_state_ndarray(self, xp = np):
-        n_gen = range(0, 8 * ceil(Board.action_size / 8), 8)
+        size = ceil(Board.action_size / 8)
+        box = xp.empty(size * 2, dtype = np.float32)
         stone_black, stone_white = self.stone_black, self.stone_white
 
-        state_list = [(stone_black >> n) % 256 for n in n_gen]
-        state_list += [(stone_white >> n) % 256 for n in n_gen]
+        for i in range(size):
+            n = i * 8
+            box[i] = (stone_black >> n) % 256
+            box[i + size] = (stone_white >> n) % 256
 
         # 正規化してから出力する
-        ndarray = xp.array(state_list, dtype = np.float32)
-        return ndarray / 255.
+        return box / 255.
 
 
     # オセロ盤を初期状態にセットする

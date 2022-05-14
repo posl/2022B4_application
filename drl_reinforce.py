@@ -4,7 +4,7 @@ from inada_framework import Model, optimizers, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 xp = cuda.cp if cuda.gpu_enable else np
-from drl_selfmatch import SelfMatch, simple_plan
+from drl_selfmatch import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
@@ -33,13 +33,15 @@ class ReinforceAgent:
     def reset(self):
         self.pi = PolicyNet(self.action_size)
         self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
-        self.rng = np.random.default_rng()
+        self.rng = xp.random.default_rng()
 
     def save(self, file_name, is_yet = None):
         self.pi.save_weights(file_name + ".npz")
 
     def load_to_restart(self, file_name):
         self.pi.load_weights(file_name + ".npz")
+        if cuda.gpu_enable:
+            self.pi.to_gpu()
 
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
@@ -53,12 +55,12 @@ class ReinforceAgent:
         policy = self.pi(state[None, :])
 
         # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
-        probs = dzf.softmax(policy[:, placable])
+        probs = dzf.softmax(policy[:, np.array(placable)])
 
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = self.rng.choice(len(placable), p = probs.data[0])
+            action_index = int(self.rng.choice(len(placable), p = probs.data[0]))
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -123,7 +125,7 @@ def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # ハイパーパラメータ設定
-    gamma = 0.95
+    gamma = 0.97
     lr = 0.00005
 
     # 環境
@@ -150,18 +152,23 @@ class ReinforceComputer:
     def reset(self, file_name, turn, agent_num):
         file_name = Reinforce.get_path(file_name).format("parameters")
         file_name += f"{turn}_"
-        self.rng = np.random.default_rng()
+        self.rng = xp.random.default_rng()
 
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
-        assert isinstance(agent_num, int) and 1 <= agent_num and agent_num <= 8
+        assert isinstance(agent_num, int)
+        assert 1 <= agent_num <= 8
 
         # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
         each_pi = self.each_pi
         each_pi.clear()
+
         for i in self.rng.choice(8, agent_num, replace = False):
             pi = PolicyNet(self.action_size)
-            pi.load_weights(file_name + f"{i}.npz")
             each_pi.append(pi)
+
+            pi.load_weights(file_name + f"{i}.npz")
+            if cuda.gpu_enable:
+                self.pi.to_gpu()
 
     def __call__(self, board):
         placable = board.list_placable()
@@ -178,10 +185,10 @@ class ReinforceComputer:
                     policy = pi(state)
 
             # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
-            probs = dzf.softmax(policy[:, placable])
+            probs = dzf.softmax(policy[:, np.array(placable)])
             probs = probs.data[0]
 
-        return placable[self.rng.choice(len(placable), p = probs)]
+        return placable[int(self.rng.choice(len(placable), p = probs))]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):
@@ -211,4 +218,5 @@ if __name__ == "__main__":
     fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
+    eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
+    eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
