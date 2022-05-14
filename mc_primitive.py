@@ -4,7 +4,7 @@ from board import Board
 
 
 class PrimitiveMonteCarlo:
-    def __init__(self, max_try = 200):
+    def __init__(self, max_try = 400):
         self.max_try = max_try
         self.rng = np.random.default_rng()
     
@@ -25,7 +25,9 @@ class PrimitiveMonteCarlo:
             board.set_state(state)
 
             board.game()
-            if (board.black_num != board.white_num) and ((board.black_num > board.white_num) == my_turn):
+            if board.black_num == board.white_num:
+                score += 0.5
+            elif ((board.black_num > board.white_num) == my_turn):
                 score += 1
         
         return score
@@ -81,9 +83,10 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
+  
+    pMC = PrimitiveMonteCarlo()
     board = Board()
-    pMC = PrimitiveMonteCarlo(200)
-    board.play(pMC.random_action, pMC)
+    board.debug_game(pMC.random_action, pMC)
 
     print("game set")
     print("black:", board.black_num)
