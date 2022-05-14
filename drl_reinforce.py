@@ -38,6 +38,7 @@ class ReinforceAgent:
 
         self.pi = pi
         self.optimizer = optimizers.Adam(self.lr).setup(pi)
+        self.rng = np.random.default_rng()
 
     def save(self, file_name, is_yet = None):
         self.pi.save_weights(file_name + ".npz")
@@ -65,7 +66,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = int(xp.random.choice(len(placable), 1, p = probs.data[0])[0])
+            action_index = self.rng.choice(len(placable), p = cuda.as_numpy(probs.data[0]))
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -157,6 +158,7 @@ class ReinforceComputer:
     def reset(self, file_name, turn, agent_num):
         file_name = Reinforce.get_path(file_name).format("parameters")
         file_name += f"{turn}_"
+        self.rng = np.random.default_rng()
 
         # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
         assert isinstance(agent_num, int)
@@ -166,7 +168,7 @@ class ReinforceComputer:
         each_pi = self.each_pi
         each_pi.clear()
 
-        for i in np.random.choice(8, agent_num, replace = False):
+        for i in self.rng.choice(8, agent_num, replace = False):
             pi = PolicyNet(self.action_size)
             each_pi.append(pi)
 
@@ -192,11 +194,7 @@ class ReinforceComputer:
             probs = dzf.softmax(policy[:, np.array(placable)])
             probs = probs.data[0]
 
-        if cuda.gpu_enable:
-            action_index = xp.random.choice(len(placable), 1, p = probs)[0]
-        else:
-            action_index = np.random.choice
-        return placable[action_index]
+        return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
 
 
 def eval_reinforce_computer(agent_num, enemy_plan, version = None):
@@ -223,7 +221,7 @@ def eval_reinforce_computer(agent_num, enemy_plan, version = None):
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
+    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 982, version = None)
 
     # 評価用コード
     # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)

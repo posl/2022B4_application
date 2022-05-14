@@ -85,7 +85,7 @@ class SelfMatch:
         else:
             del turn, agent
 
-        print("\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
+        print("\n\033[92m=== Final Winning Percentage (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
         win_rates = np.zeros(2, dtype = np.int32)
         start_time = time()
