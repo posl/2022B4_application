@@ -235,9 +235,10 @@ class SumTree:
 
     @__setitem__.register(int)
     def __(self, index, value):
+        tree = self.tree
+
         # 木構造を保持する ndarray の後半半分が実際の優先度データを格納する部分
         index += self.capacity
-        tree = self.tree
         tree[index] = value
 
         # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
@@ -250,8 +251,9 @@ class SumTree:
     @__setitem__.register(list)
     def __(self, indices, values):
         capacity = self.capacity
-        indices += capacity
         tree = self.tree
+
+        indices = [index + capacity for index in indices]
         tree[indices] = values
 
         seen_set = set(indices)
@@ -281,9 +283,9 @@ class SumTree:
         return indices if len(indices) > 1 else indices[0]
 
     def __sample(self, z):
-        current_index = 1
         capacity = self.capacity
         tree = self.tree
+        current_index = 1
 
         # 実際の優先度データが格納されているインデックスに行き着くまでループを続ける
         while current_index < capacity:
