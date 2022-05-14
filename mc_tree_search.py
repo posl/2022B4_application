@@ -24,10 +24,10 @@ class MonteCarloTreeSearch:
     def __init__(self, max_tries = 4096):
         self.max_tries = max_tries
         self.rng = np.random.default_rng()
-    
+
     def __call__(self, board : Board):
         return self.monte_carlo_tree_search(board)
-    
+
     # ランダムで手を打つplan
     def random_action(self, board : Board):
         return int(self.rng.choice(board.list_placable()))
@@ -41,13 +41,13 @@ class MonteCarloTreeSearch:
     # 未試行の手をランダムに選ぶ
     def expand_child(self, board : Board, node : Node):
         move = node.untried_move.pop(self.rng.integers(len(node.untried_move)))
-        
+
         board.put_stone(move)
         continuable_flag = board.can_continue()
-            
+
         child = Node(board, move, node)
         node.children.append(child)
-        
+
         return child, continuable_flag
 
     # 各ノードに勝敗と訪問を記録
@@ -59,11 +59,11 @@ class MonteCarloTreeSearch:
             judge = 1
         else:
             judge = -1
-        
+
         while node:
             node.visits += 1
             node.wins += judge * (-1 if node.turn else 1) / 2 + 0.5
-            
+
             node = node.parent
 
     # モンテカルロ木探索
@@ -86,7 +86,7 @@ class MonteCarloTreeSearch:
             # 行われていないシミュレーションが存在するノードに移動する
             while not node.untried_move and node.children:
                 node = self.select_child(node)
-            
+
             # 盤面をセット
             board.set_state(node.state)
             board.turn = node.turn
