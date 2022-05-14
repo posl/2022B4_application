@@ -356,7 +356,7 @@ class Board:
             flag = self.can_continue()
 
             if render_flag:
-                self.render(flag)
+                self.render(flag, n)
 
     # エピソード中の画面表示メソッド
     def render(self, flag, n=999):
@@ -365,7 +365,7 @@ class Board:
 
     def play(self):
         #ウインドウ
-        self.main_window = display.MainWindow()
+        self.main_window = display.MainWindow(self)
 
         # サウンド
         #self.sounds = sound.Sounds()
@@ -375,7 +375,7 @@ class Board:
         # tkapp の初期化
         while True:
             self.main_window.change_page(0)
-            self.main_window.main_loop()
+            self.main_window.mainloop()
             if self.click_attr:
                 self.__play()
             else:
@@ -384,7 +384,7 @@ class Board:
             self.main_window.mainloop()
 
     def __play(self):
-        self.main_loop()
+        self.main_window.mainloop()
         #player1_plan, player2_plan = self.click_attr
         player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
         self.set_plan(player1_plan, player2_plan)
