@@ -2,42 +2,48 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import math
 
+import pygame
+
 
 
 class Page(tk.Frame):
     def __init__(self):
         # ページに共通する属性やメソッドなどを記述
+
         self.win_width = 640
         self.win_height = 480
+        self.font_name = "MS_Pゴシック"
         self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
         
 
 
 
 class StartPage(Page):
-    def __init__(self, board):
-        tk.Frame.__init__(self, board)
+    def __init__(self, par, board):
+        tk.Frame.__init__(self, par)
+        self.par = par
         self.board = board
         self.configure(bg="#881111")
 
-        self.label = tk.Label(self, text="Othello", font = (board.font_name, 50), fg="#119911", bg="#881111")
+        self.label = tk.Label(self, text="Othello", font = (self.font_name, 50), fg="#119911", bg="#881111")
         self.label.pack(anchor="center", expand=True)
         #self.label.place(x=200, y=50)
-        self.button1 = tk.Button(self, text="Play", font = (board.font_name, 50), command=lambda:self.goto_option_page())
+        self.button1 = tk.Button(self, text="Play", font = (self.font_name, 50), command=lambda:self.goto_option_page())
         self.button1.pack(anchor="center", expand=True)
         #self.button1.place(x=200, y=200)
-        self.button2 = tk.Button(self, text="Quit", font = (board.font_name, 50), command=lambda:board.quit())
+        self.button2 = tk.Button(self, text="Quit", font = (self.font_name, 50), command=lambda:board.quit())
         self.button2.pack(anchor="center", expand=True)
         #self.button2.place(x=200, y=270)
 
     def goto_option_page(self):
-        self.board.option_page.tkraise()
-        self.board.quit()
+        self.par.change_page(1)
+        self.par.quit()
 
 
 class OptionPage(Page):
-    def __init__(self, board):
-        tk.Frame.__init__(self, board)
+    def __init__(self, par, board):
+        tk.Frame.__init__(self, par)
+        self.par = par
         self.board = board
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
@@ -106,14 +112,14 @@ class OptionPage(Page):
         self.board.set_plan(player1_plan, player2_plan)
         self.board.game_page.canvas_update()
         self.board.game_page.tkraise()
-        self.board.after(1000, self.board.game_page.button1_click)
+        self.board.after(1000, self.board.game_page.machine_put)
 
 
 
 
 class GamePage(Page):
-    def __init__(self, board):
-        tk.Frame.__init__(self, board)
+    def __init__(self, par, board):
+        tk.Frame.__init__(self, par)
         self.board = board
         self.configure(bg="#992299")
         self.grid(row=0, column=0, sticky="nsew")
@@ -147,7 +153,7 @@ class GamePage(Page):
         self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (board.font_name, 25))
         self.label1.place(x=1000, y=300)
 
-        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 25), command=lambda:self.button1_click())
+        self.button1 = tk.Button(self, text="Next", font = (board.font_name, 25), command=lambda:self.machine_put())
         self.button1.place(x=750, y=380)
 
         self.button2 = tk.Button(self, text=">", font = (board.font_name, 50), command=lambda:self.goto_start_page())
@@ -227,7 +233,7 @@ class GamePage(Page):
     def render_reverse(self, n, flg = True):
         y, x = self.board.n2t(n)
         self.stone_yellow_draw(x, y)
-        r_list = self.board.__reverse(n)
+        r_list = self.board.__reverse_python(n)
         if flg:
             for i in r_list:
                 i_y, i_x = self.board.n2t(i)
@@ -304,24 +310,16 @@ class GamePage(Page):
             self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
         return
         
-    def button1_click(self):
+    def machine_put(self):
         if self.board.turn==1 and self.player1==0:
             print("COMは石を置けなかった(先攻)")
             return
-        if self.board.turn==1 and self.player1==1:
-            print()
-        if self.board.turn==1 and self.player1==2:
-            print()
-        if self.board.turn==1 and self.player1==3:
+        if self.board.turn==1 and self.player1>0:
             print()
         if self.board.turn==0 and self.player2==0:
             print("COMは石を置けなかった(後攻)")
             return
-        if self.board.turn==0 and self.player2==1:
-            print()
-        if self.board.turn==0 and self.player2==2:
-            print()
-        if self.board.turn==0 and self.player2==3:
+        if self.board.turn==0 and self.player2>0:
             print()
         self.game_still_cont = self.board.can_continue(True)
         self.game_still_cont = self.board.can_continue(True)
@@ -332,7 +330,7 @@ class GamePage(Page):
             self.game_still_cont = self.board.can_continue()
         print("COMが石を置いた")
         if self.board.game_playing:
-            self.board.after(1800, self.button1_click)
+            self.board.after(1800, self.machine_put)
     
     def human_put_stone(self, x, y):
         if x<0 or y<0 or x>=8 or y>=8:
@@ -355,7 +353,7 @@ class GamePage(Page):
             self.board.put_stone(n)
             self.game_still_cont = self.board.can_continue()
         if self.board.game_playing:
-            self.board.after(1800, self.button1_click)
+            self.board.after(1800, self.machine_put)
         return
 
     def game_exit_check(self):
@@ -422,6 +420,29 @@ class GamePage(Page):
 
 
 
+
+class MainWindow(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+        pygame.init()
+        self.width = 640
+        self.height = 480
+        self.geometry( str(self.width) + "x" + str(self.height) )
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        self.start_page = StartPage(self, None)
+        self.option_page = OptionPage(self, None)
+        self.game_page = GamePage(self, None)
+
+    def change_page(self, page_id):
+        if page_id==0:
+            self.start_page.tkraise()
+        elif page_id==1:
+            self.option_page.tkraise()
+        elif page_id==2:
+            self.game_page.tkraise()
+    
 
 
 
