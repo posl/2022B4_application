@@ -213,7 +213,7 @@ class SumTree:
     # 使用する前に呼ぶ必要がある
     def reset(self):
         self.tree = xp.zeros(2 * self.capacity)
-        self.rng = np.random.default_rng()
+        self.rng = xp.random.default_rng()
 
     def save(self, file_name):
         tree = cuda.as_numpy(self.tree)
@@ -276,7 +276,7 @@ class SumTree:
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
     def sample(self, batch_size = 1):
-        zs = self.rng.uniform(0, self.sum, batch_size)
+        zs = self.rng.random(batch_size) * self.sum
         indices = [self.__sample(zs[i]) for i in range(batch_size)]
         return indices if len(indices) > 1 else indices[0]
 

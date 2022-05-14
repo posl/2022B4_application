@@ -70,7 +70,7 @@ class Layer:
 
         params_dict = {}
         self.flatten_params(params_dict)
-        array_dict = {key : param.data for key, param in params_dict.items()}
+        array_dict = {key : param.data for key, param in params_dict.items() if param.data is not None}
 
         try:
             np.savez_compressed(file_path, **array_dict)
@@ -84,12 +84,15 @@ class Layer:
 
     def load_weights(self, file_path):
         if os.path.exists(file_path):
-            npz = np.load(file_path, allow_pickle = True)
+            npz = np.load(file_path)
 
             params_dict = {}
             self.flatten_params(params_dict)
             for key, param in params_dict.items():
-                param.data = npz[key]
+                try:
+                    param.data = npz[key]
+                except KeyError:
+                    param.data = None
         else:
             message = f"\"{file_path}\" is not found."
             raise FileNotFoundError(message)
