@@ -280,14 +280,7 @@ class Board:
 
     # ひっくり返された場所を返す（表示のために必要）
     def reverse_place_t(self):
-        ret = []
-        if self.rev_pl is None:
-            return ret
-        for i in range(8):
-            for j in range(8):
-                if (self.rev_pl >>(8*i+j)) & 1:
-                    ret.append(8*i+j)
-        return ret
+        return self.__get_stand_bits(self.rev_pl)
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
