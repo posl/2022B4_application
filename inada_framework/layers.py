@@ -104,7 +104,10 @@ class Layer:
         params_dict = {}
         self.flatten_params(params_dict)
         for key, param in params_dict.items():
-            param.data = passed_params_dict[key].data
+            if param.data is None:
+                param.data = passed_params_dict[key].data.copy()
+            else:
+                param.data[...] = passed_params_dict[key].data
 
 
 class Model(Layer):
