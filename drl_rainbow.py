@@ -116,10 +116,9 @@ class RainbowNet(Model):
     def forward(self, x):
         batch_size = len(x)
         action_size, quantiles_num = self.sizes
-        x, stream = self.move_to_gpu(x)
 
         # 学習の円滑化のためにアドバンテージ分布はスケーリングする
-        advantages = self.a2(self.a1(x, stream))
+        advantages = self.a2(self.a1(x))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
 
