@@ -9,7 +9,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
 from inada_framework.utilitys import reshape_for_broadcast
-from drl_selfmatch import SelfMatch, simple_plan
+from drl_selfmatch import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
@@ -35,7 +35,7 @@ class NoisyAffine(Layer):
         in_size = x.shape[1]
         out_size = self.out_size
         if self.W_mu.data is None:
-            self.init_params(x, in_size, out_size)
+            self.init_params(in_size, out_size)
 
         # GPU メモリへの転送が必要な場合は、cuda の DMA を用いて非同期で行う
         if isinstance(x, np.ndarray) and cuda.gpu_enable:
@@ -68,8 +68,8 @@ class NoisyAffine(Layer):
         return x
 
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
-    def init_params(self, x, in_size, out_size):
-        xp = cuda.get_array_module(x)
+    def init_params(self, in_size, out_size):
+        xp = cuda.cp if cuda.gpu_enable else np
 
         stdv = 1. / sqrt(in_size)
         self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)

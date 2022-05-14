@@ -6,8 +6,6 @@ import inada_framework.functions as dzf
 from drl_selfmatch import SelfMatch, simple_plan, corners_plan
 from board import Board
 
-xp = cuda.cp if cuda.gpu_enable else np
-
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
 class PolicyNet(Model):
@@ -56,11 +54,12 @@ class ReinforceAgent:
         return action
 
     def get_action(self, board):
-        placable = board.list_placable()
+        xp = cuda.cp if cuda.gpu_enable else np
         state = board.get_state_ndarray(xp)
         policy = self.pi(state[None, :])
 
         # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
+        placable = board.list_placable()
         probs = dzf.softmax(policy[:, np.array(placable)])
 
         if len(placable) == 1:
@@ -182,6 +181,7 @@ class ReinforceComputer:
             return placable[0]
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        xp = cuda.cp if cuda.gpu_enable else np
         state = board.get_state_ndarray(xp)[None, :]
         with no_grad():
             for pi in self.each_pi:
@@ -221,8 +221,8 @@ def eval_reinforce_computer(agent_num, enemy_plan, version = None):
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 982, version = None)
+    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    # eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
-    # eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
+    eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
+    eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
