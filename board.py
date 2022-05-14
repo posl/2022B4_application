@@ -398,6 +398,20 @@ class Board:
         print(self.list_placable())
         print()
 
+    def debug_game(self, player1, player2):
+        self.reset()
+        self.set_plan(player1, player2)
+
+        flag = 1
+        while flag:
+            self.print_state()
+
+            n = self.get_action()
+            self.put_stone(n)
+            flag = self.can_continue()
+
+
+
 
 
 

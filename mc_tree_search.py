@@ -21,7 +21,7 @@ class Node:
 
 
 class MonteCarloTreeSearch:
-    def __init__(self, max_tries = 2048):
+    def __init__(self, max_tries = 4096):
         self.max_tries = max_tries
         self.rng = np.random.default_rng()
     
@@ -131,12 +131,11 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
+
+    mcts = MonteCarloTreeSearch()
     board = Board()
-    mcts = MonteCarloTreeSearch(2048)
-    
-    board.play(mcts.random_action, mcts)
-    #board.play(player, mcts.monte_carlo_tree_search)    
-    
+    board.debug_game(mcts.random_action, mcts)
+
     print("game set")
     print("black:", board.black_num)
     print("white:", board.white_num)
