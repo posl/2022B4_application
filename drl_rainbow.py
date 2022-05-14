@@ -1,6 +1,5 @@
 from math import sqrt
 from functools import cache
-from functools import singledispatchmethod
 from collections import deque
 import pickle
 import zlib
@@ -227,27 +226,18 @@ class SumTree:
             self.tree = tree
 
 
-    @singledispatchmethod
-    def __setitem__(self, index, value):
-        message = f"\"{index.__class__}\" index is not supported."
-        raise TypeError(message)
-
-    @__setitem__.register(int)
-    def __(self, index, value):
-        index += self.capacity
-        self.tree[index] = value
-
-        self.__update_tree(index)
-
-    # 高速化のためにまとめて更新できるようにした
-    @__setitem__.register(np.ndarray)
-    def __(self, indices, values):
+    # 引数のインデックスは int か np.ndarray
+    def __setitem__(self, indices, values):
         indices += self.capacity
         self.tree[indices] = values
 
-        # 素直に１つずつ更新するのが一番速かった
-        for index in indices:
-            self.__update_tree(index)
+        if isinstance(indices, int):
+            self.__update_tree(indices)
+        else:
+            # 素直に１つずつ更新するのが一番速かった
+            update = self.__update_tree
+            for index in indices:
+                update(index)
 
     def __update_tree(self, parent):
         tree = self.tree
