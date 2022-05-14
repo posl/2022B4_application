@@ -631,7 +631,7 @@ class Rainbow(SelfMatch):
 def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
-    # ハイパーパラメータ設定  (compress -> buffer : True -> 0.1 Gbyte, False -> 0.5 Gbyte)
+    # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
     compress = False
