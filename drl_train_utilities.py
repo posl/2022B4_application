@@ -114,7 +114,6 @@ class SelfMatch:
             is_yet = False
         finally:
             self.plot(eval_historys, file_name, is_yet)
-            print()
 
     def fit_one_run(self, run, restart, episodes, eval_historys, win_rates):
         with tqdm(range(restart, episodes), desc = f"run {run}", leave = False) as pbar:

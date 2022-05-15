@@ -211,18 +211,18 @@ def eval_reinforce_computer(agent_num, enemy_plan, version = None):
     self_match = Reinforce(board, first_agent, second_agent)
 
     # 評価
-    print("enemy:", enemy_plan.__name__)
+    print("\nenemy:", enemy_plan.__name__)
     print(f"agent_num: {agent_num}")
     print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
-    print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
+    print("second: {} %".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
 
 
 
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
+    # fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    eval_reinforce_computer(agent_num = 8, enemy_plan = simple_plan, version = None)
-    eval_reinforce_computer(agent_num = 8, enemy_plan = corners_plan, version = None)
+    eval_reinforce_computer(agent_num = 2, enemy_plan = simple_plan, version = None)
+    eval_reinforce_computer(agent_num = 2, enemy_plan = corners_plan, version = None)

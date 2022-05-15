@@ -361,12 +361,6 @@ class Board:
         #ウインドウ
         self.main_window = display.MainWindow(self)
 
-        # サウンド
-        #self.sounds = sound.Sounds()
-
-        #self.render(1)  #初期状態の表示
-
-        # tkapp の初期化
         while True:
             self.main_window.change_page(0)
             self.main_window.mainloop()
@@ -421,8 +415,6 @@ class Board:
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
-
-
 
 
 
