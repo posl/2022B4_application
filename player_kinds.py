@@ -30,7 +30,6 @@ class PlayerKinds:
         self.kinds_func.append(self.human.player)
         self.kinds_difficulty.append(1)
 
-        self.human = Human(par)
         self.kinds_name.append("ランダム")
         self.kinds_func.append(self.human.com_random)
         self.kinds_difficulty.append(1)
