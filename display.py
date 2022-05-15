@@ -143,6 +143,10 @@ class OptionPage(Page):
         self.board.game_config(player1_id, player2_id, player1_diff, player2_diff)
 
         self.par.game_page.time_len_coef = self.combobox5.current() + 1
+
+        name1 = self.board.player_kinds.get_name(player1_id)
+        name2 = self.board.player_kinds.get_name(player2_id)
+        self.par.title(name1 + "(黒) vs " + name2 + "(白)")
         return
 
     def start_game(self):
