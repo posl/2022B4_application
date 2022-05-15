@@ -285,11 +285,11 @@ class Board:
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
-    def list_placable(self, save_flag = False):
+    def list_placable(self, save_flag = False, use_saved = True):
         p_list = self.p_list
 
         # can_continue で計算したものが存在する場合は、それを利用する
-        if p_list is not None:
+        if p_list is not None and use_saved:
             self.p_list = None
             return p_list
 
@@ -332,7 +332,7 @@ class Board:
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
     def can_continue(self, pass_flag = False):
         self.turn ^= 1
-        if self.list_placable(True):
+        if self.list_placable(True, not pass_flag):
             return 1 + pass_flag
 
         if pass_flag:
