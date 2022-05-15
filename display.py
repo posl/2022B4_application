@@ -1,6 +1,7 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import math
+import random
 
 import pygame
 
@@ -82,59 +83,9 @@ class OptionPage(Page):
     def start_game(self):
         self.game_config_validate()
         self.par.change_page(2)
-        #self.par.after()
         self.board.click_attr = True
-        #self.par.game_page.canvas_update()
-        #self.par.after(100, self.par.quit)
-        #self.par.mainloop()
         self.par.quit()
-        return
-        # 下のコードは後で消す
-        self.board.reset()
-        self.board.game_playing = 1
-        if False: #デバッグで終局を早めたい時にTrue
-            self.board.stone_black = 0
-            for i in range(7):
-                for j in range(7):
-                    self.board.stone_exist = self.board.stone_exist | (1<<(8*i+j))
-                    if (i+j)%2==0:
-                        self.board.stone_black = self.board.stone_black + (1<<(8*i+j))
-                        pass
-                    else:
-                        pass
-        player1_id = self.combobox1.current()
-        player2_id = self.combobox2.current()
-        self.board.game_page.player1 = self.combobox1.current()
-        self.board.game_page.player2 = self.combobox2.current()
-        player1_plan = 0
-        if self.combobox1.current() == 0:
-            print("先攻：",0)
-            player1_plan = self.board.com_random
-        elif self.combobox1.current() == 1:
-            print("先攻：",1)
-            player1_plan = self.board.com_random
-        elif self.combobox1.current() == 2:
-            print("先攻：",2)
-            player1_plan = self.board.com_monte
-        elif self.combobox1.current() == 3:
-            print("先攻：",3)
-            player1_plan = self.board.com_alpha0
-        if self.combobox2.current() == 0:
-            print("後攻",0)
-            player2_plan = self.board.com_random
-        elif self.combobox2.current() == 1:
-            print("後攻",1)
-            player2_plan = self.board.com_random
-        elif self.combobox2.current() == 2:
-            print("後攻",2)
-            player2_plan = self.board.com_monte
-        elif self.combobox2.current() == 3:
-            print("後攻",3)
-            player2_plan = self.board.com_alpha1
-        self.board.set_plan(player1_plan, player2_plan)
-        self.board.game_page.canvas_update()
-        self.board.game_page.tkraise()
-        self.board.after(1000, self.board.game_page.machine_put)
+
 
 
 
@@ -152,10 +103,6 @@ class GamePage(Page):
 
         self.player1 = 0
         self.player2 = 0
-
-        self.game_still_cont = 0
-        #self.game_still_cont_check = 0
-
 
         self.game_canvas = tk.Canvas(self, width=self.canvas_width, height=self.canvas_height)
         self.game_canvas.place(x=100, y=50)
@@ -185,32 +132,33 @@ class GamePage(Page):
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
         self.stone_counter_update()
+        time_len_coef = 4
         if self.game_canvas_state==0:
             self.render_current_board()
             self.game_canvas_state = 1
-            self.par.after(50, self.canvas_update)
+            self.par.after(50//time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==1:
             self.render_placeable()
             self.game_canvas_state = 2
-            self.par.after(200, self.par.quit)
+            self.par.after(200//time_len_coef, self.par.quit)
         elif self.game_canvas_state==2:
             self.render_reverse(n, 0)
             self.game_canvas_state = 3
-            self.par.after(400, self.canvas_update)
+            self.par.after(400//time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==3:
             self.render_reverse(n, 1)
             self.game_canvas_state = 4
-            self.par.after(400, self.canvas_update)
+            self.par.after(400//time_len_coef, self.canvas_update)
         elif self.game_canvas_state==4:
             self.render_reverse(n, 2)
             self.game_canvas_state = 5
-            self.par.after(400, self.canvas_update)
+            self.par.after(400//time_len_coef, self.canvas_update)
         elif self.game_canvas_state==5:
             self.render_current_board()
             self.game_canvas_state = 1
-            self.par.after(500, self.canvas_update)
+            self.par.after(400//time_len_coef, self.canvas_update)
 
     
     def game_canvas_state_update(self, v):
@@ -242,7 +190,7 @@ class GamePage(Page):
         lp = self.board.list_placable()
         for w in lp:
             j, i = self.board.n2t(w)
-            self.stone_blue_draw(i,j)
+            self.stone_red_draw(i,j)
         return
 
     # flg...True : ひっくり返るところをgray
@@ -305,6 +253,14 @@ class GamePage(Page):
             k_ = 17 - k
             s = format(0xff-3*k, "02X")
             s = "#" + "11" + s + s
+            self.game_canvas.create_rectangle(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
+
+    def stone_red_draw(self, x, y):
+        self.game_canvas.create_rectangle(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#FF3333")
+        for k in range(17):
+            k_ = 17 - k
+            s = format(0xff-3*k, "02X")
+            s = "#" + s + "33" + "33"
             self.game_canvas.create_rectangle(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_yellow_draw(self, x, y):
@@ -377,12 +333,11 @@ class GamePage(Page):
 
     def result_view(self):
         self.win_check()
-        self.board.result_page.win_check()
         self.button2.place(x=520)
         self.label1.place(x=520)
 
     def goto_start_page(self):
-        self.par.page_change(0)
+        self.par.change_page(0)
         self.button2.place(x=1000)
         self.label1.place(x=1000)
         self.label1.configure(text="")
@@ -416,6 +371,7 @@ class MainWindow(tk.Tk):
         self.start_page = StartPage(self, self.board)
         self.option_page = OptionPage(self, self.board)
         self.game_page = GamePage(self, self.board)
+        self.change_page(0)
 
         self.sounds = sound.Sounds()
         self.human = Human(self)
@@ -443,6 +399,9 @@ class Human:
             if n in placable:
                 break
         return n
+    
+    def com_random(self, board):
+        return random.choice(board.list_placable())
     
 
 

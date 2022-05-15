@@ -114,7 +114,7 @@ class Board:
         self.click_attr = None
 
         # どこがひっくり返されたかを保持しておく(表示のために必要)
-        self.rev_pl = []
+        self.rev_pl = 0
 
 
     @property
@@ -280,14 +280,7 @@ class Board:
 
     # ひっくり返された場所を返す（表示のために必要）
     def reverse_place_t(self):
-        ret = []
-        if self.rev_pl is None:
-            return ret
-        for i in range(8):
-            for j in range(8):
-                if (self.rev_pl >>(8*i+j)) & 1:
-                    ret.append(8*i+j)
-        return ret
+        return self.__get_stand_bits(self.rev_pl)
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
@@ -356,7 +349,10 @@ class Board:
             flag = self.can_continue()
 
             if render_flag:
-                self.render(flag)
+                self.render(flag, n)
+        if render_flag: # 最後の１石だけ表示されない問題を解消する(1秒待機)
+            self.main_window.after(1000, self.main_window.quit)
+            self.main_window.mainloop()
 
     # エピソード中の画面表示メソッド
     def render(self, flag, n=999):
@@ -365,17 +361,17 @@ class Board:
 
     def play(self):
         #ウインドウ
-        self.main_window = display.MainWindow()
+        self.main_window = display.MainWindow(self)
 
         # サウンド
         #self.sounds = sound.Sounds()
 
-        self.render(1)  #初期状態の表示
+        #self.render(1)  #初期状態の表示
 
         # tkapp の初期化
         while True:
             self.main_window.change_page(0)
-            self.main_window.main_loop()
+            self.main_window.mainloop()
             if self.click_attr:
                 self.__play()
             else:
@@ -384,7 +380,7 @@ class Board:
             self.main_window.mainloop()
 
     def __play(self):
-        self.main_loop()
+        #self.main_window.mainloop()
         #player1_plan, player2_plan = self.click_attr
         player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
         self.set_plan(player1_plan, player2_plan)
@@ -392,6 +388,9 @@ class Board:
         # 最初の盤面表示
         self.reset()
         self.print_state()
+        self.render(None)
+        self.main_window.after(100, self.main_window.quit)
+        self.main_window.mainloop()
 
         self.game(self.print_state)
 
