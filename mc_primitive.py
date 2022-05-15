@@ -77,7 +77,7 @@ if __name__ == "__main__":
         while 1:
             try:
                 n = int(input("enter n : "))
-                if board.is_placable(n):
+                if n in board.list_placable():
                     return n
             except:
                 print("error")

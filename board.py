@@ -4,7 +4,7 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import get_reverse_board, get_legal_board
+from board_speedup import get_reverse_board, get_legal_board, get_stand_bits
 import display
 import player_kinds
 
@@ -220,7 +220,7 @@ class Board:
 
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
     def __get_stand_bits(self, x):
-        return [n for n in range(self.action_size) if (x >> n) & 1]
+        return get_stand_bits(self.action_size, x)
 
 
     @property

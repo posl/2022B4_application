@@ -1,4 +1,12 @@
+# distutils: language=c++
+# distutils: extra_compile_args = ["-O3"]
+# cython: language_level=3, boundscheck=False, wraparound=False
+# cython: cdivision=True
+
+from libcpp.vector cimport vector
+
 ctypedef unsigned long long uint
+
 
 # 合法手の箇所だけ１が立った、ボードを表す 64 bit 符号無し整数を返す (ブラックボックス化するため、反復処理は展開している)
 # 引数は手番または、相手プレイヤーの石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
@@ -110,3 +118,17 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
     tmp |= mask & (tmp << n)
     tmp |= mask & (tmp << n)
     return tmp
+
+
+#１が立っているビット位置のリストを取得する
+def get_stand_bits(int num, uint x):
+    cdef:
+        int n
+        vector[int] l = []
+
+    for n in range(num):
+        if x & 1:
+            l.push_back(n)
+        x >>= 1
+
+    return l
