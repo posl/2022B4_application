@@ -154,6 +154,7 @@ class OptionPage(Page):
         self.par.change_page(2)
         self.board.click_attr = True
         self.par.game_page.game_canvas_state = 0
+        self.par.sounds.bgm_play(1)
         self.par.quit()
 
 
@@ -420,6 +421,7 @@ class GamePage(Page):
         self.button2.place(x=1000)
         self.label1.place(x=1000)
         self.label1.configure(text="")
+        self.par.sounds.bgm_play(0)
         self.par.quit()
     
 
