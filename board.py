@@ -4,8 +4,9 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import get_reverse_board, get_legal_board
+from board_speedup import get_reverse_board, get_legal_board, get_stand_bits
 import display
+#import player_kinds
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -90,9 +91,11 @@ class Board:
         if self.height == self.width == 8:
             self.__list_placable = self.__list_placable_cython
             self.__reverse = self.__reverse_cython
+            self.__get_stand_bits = self.__get_stand_bits_cython
         else:
             self.__list_placable = self.__list_placable_python
             self.__reverse = self.__reverse_python
+            self.__get_stand_bits = self.__get_stand_bits_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -108,7 +111,7 @@ class Board:
         self.player2_plan = None
 
         # can_continue で計算した、合法手のリストを再利用するための属性
-        self.p_list = None
+        self.p_list = []
 
         # 画面表示用のクリックイベントを保持するための属性
         self.click_attr = None
@@ -207,19 +210,25 @@ class Board:
 
     @property
     def black_positions(self):
-        return self.__get_stand_bits(self.stone_black)
+        return self.__get_stand_bits(self.action_size, self.stone_black)
 
     @property
     def white_positions(self):
-        return self.__get_stand_bits(self.stone_white)
+        return self.__get_stand_bits(self.action_size, self.stone_white)
 
     @property
     def reverse_positions(self):
-        return self.__get_stand_bits(self.reversed)
+        return self.__get_stand_bits(self.action_size, self.reversed)
+
 
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
-    def __get_stand_bits(self, x):
-        return [n for n in range(self.action_size) if (x >> n) & 1]
+    @staticmethod
+    def __get_stand_bits_python(num, x):
+        return [n for n in range(num) if (x >> n) & 1]
+
+    @staticmethod
+    def __get_stand_bits_cython(num, x):
+        return get_stand_bits(num, x)
 
 
     @property
@@ -288,8 +297,8 @@ class Board:
         p_list = self.p_list
 
         # can_continue で計算したものが存在する場合は、それを利用する
-        if p_list is not None:
-            self.p_list = None
+        if p_list:
+            self.p_list = []
             return p_list
 
         p_list = self.__list_placable(self.players_board)
@@ -325,7 +334,7 @@ class Board:
         return False
 
     def __list_placable_cython(self, players_board):
-        return self.__get_stand_bits(get_legal_board(*players_board))
+        return self.__get_stand_bits(self.action_size, get_legal_board(*players_board))
 
 
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
@@ -361,6 +370,9 @@ class Board:
         #ウインドウ
         self.main_window = display.MainWindow(self)
 
+        #プレイヤーの種類
+        self.player_kinds = player_kinds.PlayerKinds(self.main_window)
+
         while True:
             self.main_window.change_page(0)
             self.main_window.mainloop()
@@ -374,8 +386,8 @@ class Board:
     def __play(self):
         #self.main_window.mainloop()
         #player1_plan, player2_plan = self.click_attr
-        player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
-        self.set_plan(player1_plan, player2_plan)
+        #player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
+        #self.set_plan(player1_plan, player2_plan)
 
         # 最初の盤面表示
         self.reset()
@@ -390,6 +402,12 @@ class Board:
         self.main_window.after(1000, self.main_window.quit)
         self.main_window.mainloop()
 
+    # id...種類のID  diff...難易度
+    # gameの設定
+    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
+        player1_plan = self.player_kinds.get_func(player1id)
+        player2_plan = self.player_kinds.get_func(player2id)
+        self.set_plan(player1_plan, player2_plan)
 
     # 一時的な盤面表示
     def print_board(self, x):

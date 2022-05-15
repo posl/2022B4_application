@@ -18,7 +18,7 @@ class Page(tk.Frame):
 
         self.win_width = 640
         self.win_height = 480
-        self.font_name = "MS_Pゴシック"
+        self.font_name = "凸版文久見出しゴシック"
         self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
         
 
@@ -41,6 +41,9 @@ class StartPage(Page):
         #self.button2.place(x=200, y=270)
 
     def goto_option_page(self):
+        self.par.option_page.set_player_kinds()
+        self.par.option_page.combobox1_changed()
+        self.par.option_page.combobox2_changed()
         self.par.change_page(1)
         
 
@@ -52,7 +55,8 @@ class OptionPage(Page):
         self.board = board
         self.configure(bg="#992299")
 
-        self.combo_menus = ("手動", "COM-A(ランダム)", "COM-B(モンテカルロ)", "COM-C(alpha)")
+        self.combo_menus = ["---"]
+        self.combo_menus2 = ("x1", "x2", "x3", "x4")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999")
         self.label1.place(x=10, y=30)
@@ -60,30 +64,97 @@ class OptionPage(Page):
         self.label2 = tk.Label(self, text="Player2", fg="#999999")
         self.label2.place(x=10, y=90)
 
+        self.label3 = tk.Label(self, text="表示速度", fg="#999999")
+        self.label3.place(x=10, y=150)
+
+        self.combobox3 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox3.place(x=330, y=30 )
+        self.combobox3.current(0)
+
+        self.combobox4 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox4.place(x=330, y=90 )
+        self.combobox4.current(0)
+
         self.combobox1 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
-        self.combobox1.place(x=200, y=30 )
+        self.combobox1.place(x=100, y=30 )
         self.combobox1.current(0)
+        self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
+        
 
         self.combobox2 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
-        self.combobox2.place(x=200, y=90 )
-        self.combobox2.current(1)
+        self.combobox2.place(x=100, y=90 )
+        self.combobox2.current(0)
+        self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
+
+        self.combobox5 = ttk.Combobox(self, height=4, values = self.combo_menus2, state="readonly")
+        self.combobox5.place(x=100, y=150 )
+        self.combobox5.current(0)
 
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 50), command=lambda:self.start_game())
         self.button1.place(x=450, y=380)
+
+    def combobox1_changed(self):
+        n = self.combobox1.current()
+        n = self.board.player_kinds.get_difficulty(n)
+        if n<2:
+            self.combobox3.place(x = 1000)
+            self.combobox3["values"] = ["1"]
+            self.combobox3.current(0)
+        else:
+            self.combobox3.place(x=330)
+            self.combo_menus.clear()
+            for i in range(n):
+                self.combo_menus.append("難易度"+str(i+1))
+            self.combobox3["values"] = self.combo_menus
+            self.combobox3.current(0)
+
+    def combobox2_changed(self):
+        n = self.combobox2.current()
+        n = self.board.player_kinds.get_difficulty(n)
+        if n<2:
+            self.combobox4.place(x = 1000)
+            self.combobox4["values"] = ["1"]
+            self.combobox4.current(0)
+        else:
+            self.combobox4.place(x=330)
+            self.combo_menus.clear()
+            for i in range(n):
+                self.combo_menus.append("難易度"+str(i+1))
+            self.combobox4["values"] = self.combo_menus
+            self.combobox4.current(0)
+
+    def set_player_kinds(self):
+        n = self.board.player_kinds.get_num()
+        self.combo_menus.clear()
+        for i in range(n):
+            self.combo_menus.append(self.board.player_kinds.get_name(i))
+        self.combobox1["values"] = self.combo_menus
+        self.combobox2["values"] = self.combo_menus
+        self.combobox1.current(0)
+        self.combobox2.current(0)
 
     # ゲームの設定を有効化
     def game_config_validate(self):
         player1_id = self.combobox1.current()
         player2_id = self.combobox2.current()
-        player1_diff = 0  #難易度
-        player2_diff = 0  #難易度
+        player1_diff = self.combobox3.current()  #難易度
+        player2_diff = self.combobox4.current()  #難易度
         # ボード側に上の値を渡して設定させる処理をここに書く
+        self.board.game_config(player1_id, player2_id, player1_diff, player2_diff)
+
+        self.par.game_page.time_len_coef = self.combobox5.current() + 1
+
+        name1 = self.board.player_kinds.get_name(player1_id)
+        name2 = self.board.player_kinds.get_name(player2_id)
+        self.par.title(name1 + "(黒) vs " + name2 + "(白)")
         return
 
     def start_game(self):
         self.game_config_validate()
         self.par.change_page(2)
         self.board.click_attr = True
+        self.par.game_page.game_canvas_state = 0
+        self.par.sounds.bgm_play(1)
         self.par.quit()
 
 
@@ -108,6 +179,8 @@ class GamePage(Page):
         self.game_canvas.place(x=100, y=50)
         self.game_canvas.bind("<Button-1>", self.cell_click)
         self.game_canvas_state = 0
+        self.game_canvas_lock = False
+        self.time_len_coef = 1
 
         self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
         self.counter_bar.place(x=100, y=5)
@@ -132,33 +205,38 @@ class GamePage(Page):
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
         self.stone_counter_update()
-        time_len_coef = 4
         if self.game_canvas_state==0:
             self.render_current_board()
             self.game_canvas_state = 1
-            self.par.after(50//time_len_coef, self.canvas_update)
+            self.game_canvas_lock = True
+            self.par.after(50//self.time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==1:
             self.render_placeable()
             self.game_canvas_state = 2
-            self.par.after(200//time_len_coef, self.par.quit)
+            self.par.after(200//self.time_len_coef, self.canvas_quit)
         elif self.game_canvas_state==2:
             self.render_reverse(n, 0)
             self.game_canvas_state = 3
-            self.par.after(400//time_len_coef, self.canvas_update)
+            self.game_canvas_lock = True
+            self.par.after(400//self.time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==3:
             self.render_reverse(n, 1)
             self.game_canvas_state = 4
-            self.par.after(400//time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.canvas_update)
         elif self.game_canvas_state==4:
             self.render_reverse(n, 2)
             self.game_canvas_state = 5
-            self.par.after(400//time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.canvas_update)
         elif self.game_canvas_state==5:
             self.render_current_board()
             self.game_canvas_state = 1
-            self.par.after(400//time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.canvas_update)
+
+    def canvas_quit(self):
+        self.game_canvas_lock = False
+        self.par.quit()
 
     
     def game_canvas_state_update(self, v):
@@ -320,6 +398,8 @@ class GamePage(Page):
             print("あなたの番ではありません：")
             return
         """
+        if self.game_canvas_lock == True:
+            return
         print("cell_click:",self.game_canvas_state)
         x = event.x
         y = event.y
@@ -341,6 +421,7 @@ class GamePage(Page):
         self.button2.place(x=1000)
         self.label1.place(x=1000)
         self.label1.configure(text="")
+        self.par.sounds.bgm_play(0)
         self.par.quit()
     
 
@@ -374,7 +455,6 @@ class MainWindow(tk.Tk):
         self.change_page(0)
 
         self.sounds = sound.Sounds()
-        self.human = Human(self)
 
     def change_page(self, page_id):
         if page_id==0:
@@ -384,24 +464,6 @@ class MainWindow(tk.Tk):
         elif page_id==2:
             self.game_page.tkraise()
 
-
-#本来はここに書くべきではなかろう
-class Human:
-    def __init__(self, par):
-        self.par = par  # par : MainWindow , main_loopを呼び出すために必要
-
-    def player(self, board):
-        placable = set(board.list_placable())
-        while True:
-            self.par.mainloop()
-            n = board.click_attr
-            board.click_attr = None
-            if n in placable:
-                break
-        return n
-    
-    def com_random(self, board):
-        return random.choice(board.list_placable())
     
 
 
