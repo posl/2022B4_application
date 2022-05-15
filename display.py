@@ -42,6 +42,8 @@ class StartPage(Page):
 
     def goto_option_page(self):
         self.par.option_page.set_player_kinds()
+        self.par.option_page.combobox1_changed()
+        self.par.option_page.combobox2_changed()
         self.par.change_page(1)
         
 
@@ -75,17 +77,16 @@ class OptionPage(Page):
 
         self.combobox1 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
         self.combobox1.place(x=100, y=30 )
-        self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
         self.combobox1.current(0)
-        self.combobox1_changed()
+        self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
+        
 
         self.combobox2 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
         self.combobox2.place(x=100, y=90 )
-        self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
         self.combobox2.current(0)
-        self.combobox2_changed()
+        self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
 
-        self.combobox5 = ttk.Combobox(self, height=3, values = self.combo_menus2, state="readonly")
+        self.combobox5 = ttk.Combobox(self, height=4, values = self.combo_menus2, state="readonly")
         self.combobox5.place(x=100, y=150 )
         self.combobox5.current(0)
 
@@ -94,28 +95,32 @@ class OptionPage(Page):
 
     def combobox1_changed(self):
         n = self.combobox1.current()
+        n = self.board.player_kinds.get_difficulty(n)
         if n<2:
             self.combobox3.place(x = 1000)
             self.combobox3["values"] = ["1"]
             self.combobox3.current(0)
         else:
             self.combobox3.place(x=330)
-            self.combobox3["values"] = []
+            self.combo_menus.clear()
             for i in range(n):
-                self.combobox3["values"].append("難易度"+str(i+1))
+                self.combo_menus.append("難易度"+str(i+1))
+            self.combobox3["values"] = self.combo_menus
             self.combobox3.current(0)
 
     def combobox2_changed(self):
         n = self.combobox2.current()
+        n = self.board.player_kinds.get_difficulty(n)
         if n<2:
             self.combobox4.place(x = 1000)
             self.combobox4["values"] = ["1"]
             self.combobox4.current(0)
         else:
             self.combobox4.place(x=330)
-            self.combobox4["values"] = []
+            self.combo_menus.clear()
             for i in range(n):
-                self.combobox4["values"].append("難易度"+str(i+1))
+                self.combo_menus.append("難易度"+str(i+1))
+            self.combobox4["values"] = self.combo_menus
             self.combobox4.current(0)
 
     def set_player_kinds(self):

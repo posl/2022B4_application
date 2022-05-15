@@ -14,8 +14,45 @@ class Human:
                 break
         return n
     
+    def cheat_player(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        n = 0
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            break
+        if t==1:
+            if ((board.stone_white>>n) & 1):
+                board.stone_white = board.stone_white ^ (1<<n)
+            board.stone_black = board.stone_black ^ (1<<n)
+        else:
+            if ((board.stone_black>>n) & 1):
+                board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
+            board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        return self.player(board)
+    
     #本来はここに書くべきではなかろうが暫定的に
     def com_random(self, board):
+        return random.choice(board.list_placable())
+
+    def com_cheater1(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        if t==1:
+            p = random.choice(wplace)
+            board.stone_white = board.stone_white ^ (1<<p)
+            board.stone_black = board.stone_black ^ (1<<p)
+        else:
+            p = random.choice(bplace)
+            board.stone_black = board.stone_black ^ (1<<p)
+            board.stone_white = board.stone_white ^ (1<<p)
         return random.choice(board.list_placable())
 
 
@@ -30,8 +67,17 @@ class PlayerKinds:
         self.kinds_func.append(self.human.player)
         self.kinds_difficulty.append(1)
 
+        self.human = Human(par)
+        self.kinds_name.append("人間-チート")
+        self.kinds_func.append(self.human.cheat_player)
+        self.kinds_difficulty.append(1)
+
         self.kinds_name.append("ランダム")
         self.kinds_func.append(self.human.com_random)
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("チート")
+        self.kinds_func.append(self.human.com_cheater1)
         self.kinds_difficulty.append(1)
 
     def get_num(self):
@@ -50,7 +96,7 @@ class PlayerKinds:
         return self.kinds_func[id]
 
     def get_difficulty(self, id):
-        if id<0 or id>=len(self.kinds_name):
+        if id<0 or id>=len(self.kinds_difficulty):
             print("範囲外のIDが指定されました")
             exit()
         return self.kinds_difficulty[id]
