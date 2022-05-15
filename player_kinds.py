@@ -18,6 +18,20 @@ class Human:
     def com_random(self, board):
         return random.choice(board.list_placable())
 
+    def com_cheater1(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        if t==1:
+            p = random.choice(wplace)
+            board.stone_white = board.stone_white ^ (1<<p)
+            board.stone_black = board.stone_black ^ (1<<p)
+        else:
+            p = random.choice(bplace)
+            board.stone_black = board.stone_black ^ (1<<p)
+            board.stone_white = board.stone_white ^ (1<<p)
+        return random.choice(board.list_placable())
+
 
 class PlayerKinds:
     def __init__(self, par):
@@ -32,6 +46,10 @@ class PlayerKinds:
 
         self.kinds_name.append("ランダム")
         self.kinds_func.append(self.human.com_random)
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("チート")
+        self.kinds_func.append(self.human.com_cheater1)
         self.kinds_difficulty.append(1)
 
     def get_num(self):
@@ -50,7 +68,7 @@ class PlayerKinds:
         return self.kinds_func[id]
 
     def get_difficulty(self, id):
-        if id<0 or id>=len(self.kinds_name):
+        if id<0 or id>=len(self.kinds_difficulty):
             print("範囲外のIDが指定されました")
             exit()
         return self.kinds_difficulty[id]
