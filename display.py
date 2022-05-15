@@ -41,6 +41,7 @@ class StartPage(Page):
         #self.button2.place(x=200, y=270)
 
     def goto_option_page(self):
+        self.par.option_page.set_player_kinds()
         self.par.change_page(1)
         
 
@@ -52,7 +53,7 @@ class OptionPage(Page):
         self.board = board
         self.configure(bg="#992299")
 
-        self.combo_menus = ("手動", "COM-A(ランダム)", "COM-B(モンテカルロ)", "COM-C(alpha)")
+        self.combo_menus = ["---"]
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999")
         self.label1.place(x=10, y=30)
@@ -66,10 +67,20 @@ class OptionPage(Page):
 
         self.combobox2 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
         self.combobox2.place(x=200, y=90 )
-        self.combobox2.current(1)
+        self.combobox2.current(0)
 
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 50), command=lambda:self.start_game())
         self.button1.place(x=450, y=380)
+
+    def set_player_kinds(self):
+        n = self.board.player_kinds.get_num()
+        self.combo_menus.clear()
+        for i in range(n):
+            self.combo_menus.append(self.board.player_kinds.get_name(i))
+        self.combobox1["values"] = self.combo_menus
+        self.combobox2["values"] = self.combo_menus
+        self.combobox1.current(0)
+        self.combobox2.current(0)
 
     # ゲームの設定を有効化
     def game_config_validate(self):
@@ -78,6 +89,7 @@ class OptionPage(Page):
         player1_diff = 0  #難易度
         player2_diff = 0  #難易度
         # ボード側に上の値を渡して設定させる処理をここに書く
+        self.board.game_config(player1_id, player2_id, player1_diff, player2_diff)
         return
 
     def start_game(self):
@@ -374,7 +386,6 @@ class MainWindow(tk.Tk):
         self.change_page(0)
 
         self.sounds = sound.Sounds()
-        self.human = Human(self)
 
     def change_page(self, page_id):
         if page_id==0:
@@ -384,24 +395,6 @@ class MainWindow(tk.Tk):
         elif page_id==2:
             self.game_page.tkraise()
 
-
-#本来はここに書くべきではなかろう
-class Human:
-    def __init__(self, par):
-        self.par = par  # par : MainWindow , main_loopを呼び出すために必要
-
-    def player(self, board):
-        placable = set(board.list_placable())
-        while True:
-            self.par.mainloop()
-            n = board.click_attr
-            board.click_attr = None
-            if n in placable:
-                break
-        return n
-    
-    def com_random(self, board):
-        return random.choice(board.list_placable())
     
 
 

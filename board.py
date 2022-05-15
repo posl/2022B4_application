@@ -6,6 +6,7 @@ import numpy as np
 
 from board_speedup import get_reverse_board, get_legal_board
 import display
+import player_kinds
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -361,6 +362,9 @@ class Board:
         #ウインドウ
         self.main_window = display.MainWindow(self)
 
+        #プレイヤーの種類
+        self.player_kinds = player_kinds.PlayerKinds(self.main_window)
+
         while True:
             self.main_window.change_page(0)
             self.main_window.mainloop()
@@ -374,8 +378,8 @@ class Board:
     def __play(self):
         #self.main_window.mainloop()
         #player1_plan, player2_plan = self.click_attr
-        player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
-        self.set_plan(player1_plan, player2_plan)
+        #player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
+        #self.set_plan(player1_plan, player2_plan)
 
         # 最初の盤面表示
         self.reset()
@@ -390,6 +394,12 @@ class Board:
         self.main_window.after(1000, self.main_window.quit)
         self.main_window.mainloop()
 
+    # id...種類のID  diff...難易度
+    # gameの設定
+    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
+        player1_plan = self.player_kinds.get_func(player1id)
+        player2_plan = self.player_kinds.get_func(player2id)
+        self.set_plan(player1_plan, player2_plan)
 
     # 一時的な盤面表示
     def print_board(self, x):
