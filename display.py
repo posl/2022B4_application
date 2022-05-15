@@ -96,6 +96,7 @@ class OptionPage(Page):
         self.game_config_validate()
         self.par.change_page(2)
         self.board.click_attr = True
+        self.par.game_page.game_canvas_state = 0
         self.par.quit()
 
 
