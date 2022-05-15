@@ -1,35 +1,48 @@
-from inada_framework.utilitys import pair
+import weakref
+from copy import deepcopy
 import os
-from inada_framework import Parameter, cuda
+
 import numpy as np
+
+from inada_framework import Parameter, cuda
+from inada_framework.utilities import make_data_dir, pair
 import inada_framework.functions as dzf
 
 
+
 # =============================================================================
-# レイヤ・モデルの基底クラス
+# レイヤの基底クラス
 # =============================================================================
 
+# 学習するパラメータを持つクラスがレイヤであるとする
 class Layer:
     def __init__(self):
         # パラメータは集合で保持する (同じオブジェクト ID の要素は含まれない)
-        self._params = set()
+        self.__params = set()
 
     # インスタンス変数 (属性) を設定する際に呼び出せれる特殊メソッド
     def __setattr__(self, name, value):
         # パラメータの管理を自動化するために、パラメータの名前・入れ子になっているレイヤの名前を取っておく
         if isinstance(value, (Parameter, Layer)):
-            self._params.add(name)
+            self.__params.add(name)
         super().__setattr__(name, value)
+
+    def __call__(self, *inputs):
+        outputs = self.forward(*inputs)
+        if not isinstance(outputs, tuple):
+            outputs = (outputs, )
+
+        # 弱参照
+        self.inputs = [weakref.ref(x) for x in inputs]
+        self.outputs = [weakref.ref(y) for y in outputs]
+        return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, inputs):
         raise NotImplementedError()
 
-    def __call__(self, *inputs):
-        return self.forward(*inputs)
-
     # yield 文は関数の進行具合を保存した状態で値を返す (イテレータとして利用できる)
     def params(self):
-        for name in self._params:
+        for name in self.__params:
             # __dict__ から辞書形式で内部の属性情報に直接アクセスできる
             object = self.__dict__[name]
 
@@ -52,42 +65,48 @@ class Layer:
             param.to_gpu()
 
     # パラメータを保持するインスタンスの辞書を平板化して取得する
-    def flatten_params(self, params_dict, parent_key = ""):
-        for name in self._params:
+    def __flatten_params(self, params_dict, parent_key = ""):
+        for name in self.__params:
             object = self.__dict__[name]
             key = parent_key + name
 
             if isinstance(object, Layer):
                 # Layer が入れ子構造になっている場合は、再帰的にこの関数を呼び出す
-                object.flatten_params(params_dict, key + "/")
+                object.__flatten_params(params_dict, key + "/")
             elif isinstance(object, Parameter):
                 params_dict[key] = object
 
     def save_weights(self, file_path):
-        # パラメータを保存するときは必ずデータが主記憶上にあるようにする
-        if cuda.gpu_enable:
-            self.to_cpu()
+        # GPU を使っていても素直に再開できるように深いコピーを取る
+        try:
+            save_layer = deepcopy(self)
+        except TypeError:
+            print("\nWarning: this layer's deepcopy is failed because of having unpicklable object.\n")
+            save_layer = self
+
+        # パラメータの保存時には、主記憶上にデータがあるようにする
+        save_layer.to_cpu()
 
         params_dict = {}
-        self.flatten_params(params_dict)
+        save_layer.__flatten_params(params_dict)
         array_dict = {key : param.data for key, param in params_dict.items() if param.data is not None}
 
         try:
+            make_data_dir(file_path)
             np.savez_compressed(file_path, **array_dict)
+
         except (Exception, KeyboardInterrupt):
             if os.path.exists(file_path):
                 os.remove(file_path)
             raise
-        else:
-            if cuda.gpu_enable:
-                self.to_gpu()
 
     def load_weights(self, file_path):
+        # 指定されたファイルが無ければ、何もせずに戻る
         if os.path.exists(file_path):
             npz = np.load(file_path)
 
             params_dict = {}
-            self.flatten_params(params_dict)
+            self.__flatten_params(params_dict)
             for key, param in params_dict.items():
                 try:
                     param.data = npz[key]
@@ -102,10 +121,10 @@ class Layer:
         assert isinstance(layer, self.__class__)
 
         passed_params_dict = {}
-        layer.flatten_params(passed_params_dict)
+        layer.__flatten_params(passed_params_dict)
 
         params_dict = {}
-        self.flatten_params(params_dict)
+        self.__flatten_params(params_dict)
         for key, param in params_dict.items():
             if param.data is None:
                 param.data = passed_params_dict[key].data.copy()
@@ -115,7 +134,6 @@ class Layer:
 
 class Model(Layer):
     pass
-
 
 
 
@@ -140,10 +158,10 @@ class Affine(Layer):
 
     def forward(self, x):
         if self.W.data is None:
-            self.W.data = self.init_W(x)
+            self.W.data = self.__init_W(x)
         return dzf.affine(x, self.W, self.b)
 
-    def init_W(self, x):
+    def __init_W(self, x):
         I = x.shape[1]
         xp = cuda.get_array_module(x)
         return xp.random.randn(I, self.out_size).astype(np.float32) * np.sqrt(self.W_mode / I)
@@ -160,17 +178,16 @@ class BatchNorm(Layer):
 
     def forward(self, x):
         if self.gamma.data is None:
-            self.init_params(x)
+            self.__init_params(x)
         return dzf.batch_nrom(x, self.gamma, self.beta, self.avg_mean.data, self.avg_var.data)
 
-    def init_params(self, x):
+    def __init_params(self, x):
         xp = cuda.get_array_module(x)
         D = x.shape[1]
         self.gamma.data = xp.ones(D, dtype = x.dtype)
         self.beta.data = xp.zeros(D, dtype = x.dtype)
         self.avg_mean.data = xp.zeros(D, dtype = x.dtype)
         self.avg_var.data = xp.ones(D, dtype = x.dtype)
-
 
 
 
@@ -221,7 +238,7 @@ class Conv2d1x1(Layer):
 
     def forward(self, x):
         if self.W.data is None:
-            self.W.data = self.init_W(x)
+            self.W.data = self.__init_W(x)
 
         # ImageNet で学習済みのパラメータの次元数が 4 であるために必要な処理
         elif self.W.data.ndim == 4:
@@ -230,11 +247,10 @@ class Conv2d1x1(Layer):
 
         return dzf.conv2d_1x1filter(x, self.W)
 
-    def init_W(self, x):
+    def __init_W(self, x):
         C, OC = x.shape[1], self.out_channels
         xp = cuda.get_array_module(x)
         return xp.random.randn(OC, C).astype(np.float32) * np.sqrt(self.W_mode / C)
-
 
 
 
@@ -288,12 +304,12 @@ class LSTM(Layer):
 
             # この条件式が真になるのは学習を開始した直後の順伝播時だけ
             if self.Wx.data is None:
-                self.Wx.data = self.init_Wx(x.shape[1], xp)
+                self.Wx.data = self.__init_Wx(x.shape[1], xp)
 
         x, self.h, self.c = dzf.lstm(x, self.h, self.c, self.Wx, self.Wh, self.b, self.dropout_ratio)
         return x
 
-    def init_Wx(self, in_size, xp):
+    def __init_Wx(self, in_size, xp):
         return xp.random.randn(in_size, self.hidden_size * 4).astype(np.float32) * np.sqrt(1 / in_size)
 
 
@@ -330,15 +346,13 @@ class GRU(Layer):
 
             # この条件式が真になるのは学習を開始した直後の順伝播時だけ
             if self.Wx.data is None:
-                self.Wx.data = self.init_Wx(x.shape[1], xp)
+                self.Wx.data = self.__init_Wx(x.shape[1], xp)
 
         x, self.h = dzf.gru(x, self.h, self.Wx, self.Wh, self.b, self.dropout_ratio)
         return x
 
-    def init_Wx(self, in_size, xp):
+    def __init_Wx(self, in_size, xp):
         return xp.random.randn(in_size, self.hidden_size * 3).astype(np.float32) * np.sqrt(1 / in_size)
-
-
 
 
 class TimeRNN(Layer):
@@ -380,8 +394,7 @@ class TimeRNN(Layer):
 
         # split, concatenate は次元をそのままに保つので、次元を落としてから次元０方向に T 分割する
         T, N, D = x.shape
-        R = T * N
-        x_list = dzf.split(dzf.reshape(x, (R, D)), np.arange(N, R, N))
+        x_list = dzf.split(dzf.reshape(x, (T * N, D)), np.arange(N, T * N, N))
 
         for name in self._forward:
             layer = getattr(self, name)

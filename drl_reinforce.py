@@ -1,10 +1,11 @@
 import numpy as np
 
-from inada_framework import Model, optimizers, cuda, no_grad
+from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
+
 
 
 # 確率形式に変換する前の最適方策を出力するニューラルネットワーク
@@ -21,30 +22,31 @@ class PolicyNet(Model):
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.99, lr = 0.0001):
+    def __init__(self, action_size, gamma = 0.99, lr = 0.0001, to_gpu = False):
         self.memory = []
 
         self.action_size = action_size
         self.gamma = gamma
         self.lr = lr
+        self.use_gpu = to_gpu and cuda.gpu_enable
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
         pi = PolicyNet(self.action_size)
-        if cuda.gpu_enable:
+        if self.use_gpu:
             pi.to_gpu()
 
         self.pi = pi
         self.optimizer = optimizers.Adam(self.lr).setup(pi)
         self.rng = np.random.default_rng()
 
-    def save(self, file_name, is_yet = None):
-        self.pi.save_weights(file_name + ".npz")
+    def save(self, file_path, is_yet = None):
+        self.pi.save_weights(file_path + ".npz")
 
-    def load_to_restart(self, file_name):
+    def load_to_restart(self, file_path):
         pi = self.pi
-        pi.load_weights(file_name + ".npz")
-        if cuda.gpu_enable:
+        pi.load_weights(file_path + ".npz")
+        if self.use_gpu:
             pi.to_gpu()
 
 
@@ -54,7 +56,7 @@ class ReinforceAgent:
         return action
 
     def get_action(self, board):
-        xp = cuda.cp if cuda.gpu_enable else np
+        xp = cuda.cp if self.use_gpu else np
         state = board.get_state_ndarray(xp)
         policy = self.pi(state[None, :])
 
@@ -121,12 +123,12 @@ class Reinforce(SelfMatch):
         agent.add((-reward, None))
         agent.update()
 
-    def save(self, turn, file_name, index):
+    def save(self, turn, file_path, index):
         agent = self.agents[turn]
-        agent.save(f"{file_name}{turn}_{index}")
+        agent.save(f"{file_path}{turn}_{index}")
 
 
-def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
+def fit_reinforce_agent(to_gpu, episodes, trained_num = 0, restart = 0, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # ハイパーパラメータ設定
@@ -137,7 +139,7 @@ def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
     board = Board()
 
     # エージェント
-    agent_args = board.action_size, gamma, lr
+    agent_args = board.action_size, gamma, lr, to_gpu
     first_agent = ReinforceAgent(*agent_args)
     second_agent = ReinforceAgent(*agent_args)
 
@@ -150,9 +152,10 @@ def fit_reinforce_agent(episodes, trained_num = 0, restart = 0, version = None):
 
 # 実際にコンピュータとして使われるクラス
 class ReinforceComputer:
-    def __init__(self, action_size):
+    def __init__(self, action_size, to_gpu = False):
         self.each_pi = []
         self.action_size = action_size
+        self.use_gpu = to_gpu and cuda.gpu_enable
 
     def reset(self, file_name, turn, agent_num):
         file_name = Reinforce.get_path(file_name).format("parameters")
@@ -166,13 +169,14 @@ class ReinforceComputer:
         # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
         each_pi = self.each_pi
         each_pi.clear()
+        use_gpu = self.use_gpu
 
         for i in self.rng.choice(8, agent_num, replace = False):
             pi = PolicyNet(self.action_size)
             each_pi.append(pi)
 
             pi.load_weights(file_name + f"{i}.npz")
-            if cuda.gpu_enable:
+            if use_gpu:
                 pi.to_gpu()
 
     def __call__(self, board):
@@ -180,9 +184,10 @@ class ReinforceComputer:
         if len(placable) == 1:
             return placable[0]
 
-        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
-        xp = cuda.cp if cuda.gpu_enable else np
+        xp = cuda.cp if self.use_gpu else np
         state = board.get_state_ndarray(xp)[None, :]
+
+        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
         with no_grad():
             for pi in self.each_pi:
                 try:
@@ -197,13 +202,16 @@ class ReinforceComputer:
         return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
 
 
-def eval_reinforce_computer(agent_num, enemy_plan, version = None):
+def eval_reinforce_computer(to_gpu, agent_num, enemy_plan, version = None):
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # 環境とエージェント
     board = Board()
-    first_agent = ReinforceComputer(board.action_size)
-    second_agent = ReinforceComputer(board.action_size)
+
+    # コンピュータ
+    computer_args = board.action_size, to_gpu
+    first_agent = ReinforceComputer(*computer_args)
+    second_agent = ReinforceComputer(*computer_args)
 
     # エージェントの初期化
     first_agent.reset(file_name, 1, agent_num)
@@ -220,9 +228,11 @@ def eval_reinforce_computer(agent_num, enemy_plan, version = None):
 
 
 if __name__ == "__main__":
+    to_gpu = False
+
     # 学習用コード
-    # fit_reinforce_agent(episodes = 100000, trained_num = 0, restart = 0, version = None)
+    # fit_reinforce_agent(to_gpu, episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    eval_reinforce_computer(agent_num = 2, enemy_plan = simple_plan, version = None)
-    eval_reinforce_computer(agent_num = 2, enemy_plan = corners_plan, version = None)
+    eval_reinforce_computer(to_gpu, agent_num = 2, enemy_plan = simple_plan, version = None)
+    eval_reinforce_computer(to_gpu, agent_num = 2, enemy_plan = corners_plan, version = None)

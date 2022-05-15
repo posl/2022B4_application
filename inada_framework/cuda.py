@@ -1,4 +1,3 @@
-from inada_framework import Variable
 import numpy as np
 try:
     import cupy as cp
@@ -7,6 +6,8 @@ except ImportError:
 else:
     gpu_enable = True
 
+from inada_framework import Variable
+
 
 def get_array_module(x):
     if isinstance(x, Variable):
@@ -14,6 +15,8 @@ def get_array_module(x):
 
     if not gpu_enable:
         return np
+
+    # 引数の型に応じて、numpy か cupy を返す
     return cp.get_array_module(x)
 
 
@@ -23,7 +26,7 @@ def as_numpy(x):
 
     if np.isscalar(x):
         return np.array(x)
-    elif isinstance(x, np.ndarray):
+    if isinstance(x, np.ndarray):
         return x
     return cp.asnumpy(x)
 

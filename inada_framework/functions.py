@@ -1,10 +1,12 @@
-from inada_framework import Function, cuda, as_array, as_variable, Variable, Config
 import numpy as np
-from inada_framework.utilitys import xp_sum_to, reshape_for_broadcast
 try:
     import cupyx
 except ImportError:
     pass
+
+from inada_framework import Function, cuda, as_array, as_variable, Variable, Config
+from inada_framework.utilities import xp_sum_to, reshape_for_broadcast
+
 
 
 # =============================================================================
@@ -123,7 +125,6 @@ def rpow(x0, x1):
 
 
 
-
 # =============================================================================
 # 数学関数
 # =============================================================================
@@ -194,7 +195,6 @@ def log(x):
 
 
 
-
 # =============================================================================
 # テンソル操作
 # =============================================================================
@@ -220,10 +220,10 @@ class GetItemGrad(Function):
         xp = cuda.get_array_module(gy)
         gx = xp.zeros(self.in_shape, dtype = gy.dtype)
 
-        if xp is np:
-            np.add.at(gx, self.slices, gy)
-        else:
+        if xp != np:
             cupyx.scatter_add(gx, self.slices, gy)
+        else:
+            np.add.at(gx, self.slices, gy)
         return gx
 
     def backward(self, ggx):
@@ -337,13 +337,12 @@ def split(x, indices_or_sections, axis = 0):
         assert not r
         indices_or_sections = np.arange(q, N, q, dtype = np.int64)
 
-    # Function インスタンスの出力の仕様によって、順伝播後に長さ１のリストは返せないので必要と分岐
+    # Function インスタンスの出力の仕様によって、順伝播後に長さ１のリストは返せないので必要な分岐
     if not len(indices_or_sections):
         return [as_variable(x)]
     if axis < 0:
         axis += x.ndim
     return Split(indices_or_sections, axis)(x)
-
 
 
 
@@ -505,7 +504,6 @@ def affine(x, W, b = None):
 
 
 
-
 # =============================================================================
 # 活性化関数 (出力層のものも含む)
 # =============================================================================
@@ -616,7 +614,6 @@ def log_softmax(x, axis = 1):
 
 
 
-
 # =============================================================================
 # 損失関数
 # =============================================================================
@@ -684,7 +681,6 @@ def binary_cross_entropy(p, t):
 
 def sigmoid_cross_entropy(x, t):
     return binary_cross_entropy(sigmoid(x), t)
-
 
 
 
@@ -790,13 +786,11 @@ def batch_nrom(x, gamma, beta, mean, var, decay = 0.9, eps = 2e-5):
 
 
 
-
 # =============================================================================
 # その他
 # =============================================================================
 
-# inada
-#_framework.functions から cnn, rnn 用の関数もインポートできるようにする
+# inada_framework.functions から cnn, rnn 用の関数もインポートできるようにする
 from inada_framework.functions_cnn import conv2d
 from inada_framework.functions_cnn import deconv2d
 from inada_framework.functions_cnn import conv2d_1x1filter

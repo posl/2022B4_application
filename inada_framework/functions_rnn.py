@@ -2,6 +2,7 @@ from inada_framework import Function, cuda
 import inada_framework.functions as dzf
 
 
+
 # =============================================================================
 # RNN 層 (LSTM, GRU)
 # =============================================================================

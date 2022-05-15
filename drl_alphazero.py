@@ -11,6 +11,7 @@ from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
+
 # PV-MCTS での過去の探索状況を近似するニューラルネットワーク
 class PolicyValueNet(Model):
     def __init__(self, action_size):
@@ -25,19 +26,25 @@ class PolicyValueNet(Model):
 
 
 class AlphaZeroAgent:
-    def __init__(self, action_size, c_puct = 1.0):
+    def __init__(self, action_size, simulations_num, c_puct = 1.0, alpha = 0.35, epsilon = 0.25):
         self.network = PolicyValueNet(action_size)
+
+        # ハイパーパラメータ
+        self.simulations_num = simulations_num
         self.c_puct = c_puct
+        self.alpha = alpha
+        self.epsilon = epsilon
 
     # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
     def reset(self, arg):
         self.load(arg)
 
-        # それぞれ、過去の探索割合を近似したある種の方策、平均の評価値、探索回数 (計算の都合上、探索回数は常に１多い)
+        # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率を元にした行動価値、各状態・行動の探索回数
         self.P = {}
-        self.V = {}
+        self.Q = {}
         self.N = {}
 
+        self.seen_state = set()
         self.rng = np.random.default_rng()
 
     # クラスメソッドのオーバーロードによって、コンピュータとしての使用時と、学習時で処理を分ける
@@ -56,15 +63,18 @@ class AlphaZeroAgent:
 
 
     def __call__(self, board):
-        pass
+        action, __, __ = self.get_action(board)
+        return action
 
     def get_action(self, board):
-        placable = self.board.list_placable()
-        state = board.state
-        N = self.N[state]
+        state = board.get_state_ndarray()
+        mcts_policy = self.__search(board, state)
+        action = self.rng.choice(np.where(mcts_policy == mcts_policy.max())[0])
+        return action, state, mcts_policy
 
         # 右辺の第１項が過去の探索割合を勘案しながら探索回数の少ない手を選ぶための項で、第２項が勝率を見て活用を行うための項
-        pucts = (self.c_puct * sqrt(N.sum() - len(placable)) * self.P[state]) / N + self.V[state]
+        N = self.N[state]
+        pucts = (self.c_puct * sqrt(N.sum()) * self.P[state]) / (N + 1) + self.Q[state]
 
         # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
         action_indexs = np.where(pucts == pucts.max())[0]
@@ -76,14 +86,36 @@ class AlphaZeroAgent:
         return placable[action_index]
 
 
-    def search(self):
-        pass
+    def __search(self, board, state):
+        placable = board.list_placable()
 
-    def __expand(self):
-        pass
+        seen_state = self.seen_state
+        if state not in seen_state:
+            seen_state.add(state)
+            self.__expand(state, placable)
 
-    def __evaluate(self):
-        pass
+        # 探索の初期状態ではランダムな手が選ばれやすくなるように、ノイズをかける
+        if self.alpha is not None:
+            P = self.P[state]
+            P *= (1. - self.epsilon)
+            P += self.epsilon * self.rng.dirichlet(np.full(len(P), self.alpha))
+
+        for __ in range(self.simulations_num):
+            with board.log_runtime():
+                pass
+
+    def __expand(self, state, placable):
+        policy, value = self.network(state[None, :])
+        self.P[state] = policy[0, np.array(placable)]
+        self.Q_N[state] = np.zeros((2, len(placable)), dtype = np.float32)
+        return value[0, 0]
+
+    def __evaluate(self, board, state, placable):
+        flag = board.can_continue()
+        if flag:
+            pass
+        else:
+            
 
 
 
@@ -118,13 +150,11 @@ class ReplayBuffer:
         buffer = self.buffer
         selected = [buffer[i] for i in indices]
 
-        xp = cuda.cp if cuda.gpu_enable else np
-        states = xp.stack([state2ndarray_func(x[0], xp) for x in selected])
+        states = np.stack([x[0] for x in selected])
+        mcts_policys = np.stack([x[1] for x in selected])
+        rewards = np.array([x[2] for x in selected], dtype = np.float32)
 
-        mcts_policy = xp.stack([x[1] for x in selected], dtype = np.float32)
-        rewards = xp.array([x[2] for x in selected], dtype = np.float32)
-
-        return states, mcts_policy, rewards
+        return states, mcts_policys, rewards
 
 
 

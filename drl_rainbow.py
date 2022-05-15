@@ -8,17 +8,18 @@ import numpy as np
 
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
-from inada_framework.utilitys import reshape_for_broadcast
+from inada_framework.utilities import reshape_for_broadcast
 from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
+
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
 class NoisyAffine(Layer):
-    def __init__(self, out_size, first_sigma = 0.5, activation = None):
+    def __init__(self, out_size, transfer = False, activation = None, use_gpu = False):
         super().__init__()
         self.out_size = out_size
-        self.first_sigma = first_sigma
+        self.transfer = transfer
         self.activation = activation
 
         # 重みは学習が開始したときに動的に生成する
@@ -27,7 +28,8 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        xp = cuda.cp if cuda.gpu_enable else np
+        self.use_gpu = use_gpu
+        xp = cuda.cp if use_gpu else np
         self.rng = xp.random.default_rng()
 
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
@@ -38,12 +40,10 @@ class NoisyAffine(Layer):
             self.init_params(in_size, out_size)
 
         # GPU メモリへの転送が必要な場合は、cuda の DMA を用いて非同期で行う
-        if isinstance(x, np.ndarray) and cuda.gpu_enable:
+        transfer = self.transfer
+        if transfer:
             x, source, stream = self.preprocess_to_gpu(x)
             x.set(source, stream = stream)
-            sync_flag = True
-        else:
-            sync_flag = False
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
         epsilon_in = self.noise_f(self.rng.standard_normal(size = (in_size, 1), dtype = np.float32))
@@ -56,7 +56,7 @@ class NoisyAffine(Layer):
         b = self.b_mu + self.b_sigma * b_epsilon
 
         # ストリームを使い、非同期でメモリ転送を行なっていた場合は、その処理と同期させる
-        if sync_flag:
+        if transfer:
             stream.synchronize()
         x = dzf.affine(x, W, b)
 
@@ -69,13 +69,13 @@ class NoisyAffine(Layer):
 
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
     def init_params(self, in_size, out_size):
-        xp = cuda.cp if cuda.gpu_enable else np
+        xp = cuda.cp if self.use_gpu else np
 
         stdv = 1. / sqrt(in_size)
         self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
         self.b_mu.data = xp.random.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
 
-        initial_sigma = self.first_sigma * stdv
+        initial_sigma = 0.5 * stdv
         self.W_sigma.data = xp.full((in_size, out_size), initial_sigma, dtype = np.float32)
         self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
 
@@ -102,16 +102,20 @@ class NoisyAffine(Layer):
 
 # 分位点数を指定して、行動価値分布に対応する累積分布関数の逆関数を近似する (QR-DQN (分位点回帰による分布強化学習))
 class RainbowNet(Model):
-    def __init__(self, action_size, quantiles_num):
+    def __init__(self, action_size, quantiles_num, use_gpu = False):
         super().__init__()
         self.sizes = action_size, quantiles_num
 
-        # 行動価値関数をアドバンテージ分布と状態価値分布に分けて学習する (Dueling DQN)
-        self.a1 = NoisyAffine(512, activation = dzf.relu)
-        self.a2 = NoisyAffine(action_size * quantiles_num)
+        first_noisy_args = 512, use_gpu, dzf.relu, use_gpu
+        a_out = action_size * quantiles_num
+        v_out = quantiles_num
 
-        self.v1 = NoisyAffine(512, activation = dzf.relu)
-        self.v2 = NoisyAffine(quantiles_num)
+        # 行動価値関数をアドバンテージ分布と状態価値分布に分けて学習する (Dueling DQN)
+        self.a1 = NoisyAffine(*first_noisy_args)
+        self.a2 = NoisyAffine(a_out, use_gpu = use_gpu)
+
+        self.v1 = NoisyAffine(*first_noisy_args)
+        self.v2 = NoisyAffine(v_out, use_gpu = use_gpu)
 
     def forward(self, x):
         batch_size = len(x)
@@ -139,8 +143,8 @@ class RainbowNet(Model):
             return placables[int(qs[0, np.array(placables)].argmax())]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        actions =  [placable[ int( q[placable].argmax() ) ] if placable.size > 0 else 0
-                    for q, placable in zip(qs, placables)]
+        actions = [placable[ int( q[placable].argmax() ) ] if placable.size > 0 else 0
+                   for q, placable in zip(qs, placables)]
 
         # インデックスとして使うので、高速化のために np.ndarray に変換する
         return np.array(actions)
@@ -173,8 +177,9 @@ class RainbowNet(Model):
 
 # 重み付きの分位点 Huber 誤差
 class QuantileHuberLoss(Function):
-    def __init__(self, t, quantiles_num):
+    def __init__(self, t, quantiles_num, use_gpu = False):
         self.t = t
+        self.quantiles = quantiles(quantiles_num, use_gpu)
         self.N = quantiles_num
 
     def forward(self, x):
@@ -188,7 +193,7 @@ class QuantileHuberLoss(Function):
         loss = xp.where(abs_error < 1., 0.5 * td_error * td_error, abs_error - 0.5)
 
         # Huber 誤差に分位点重みを掛ける
-        loss *= abs(quantiles(self.N) - (td_error < 0))
+        loss *= abs(self.quantiles - (td_error < 0))
 
         # 次元２方向に平均を取り、次元１方向に和を取る操作を簡略化している
         return loss.sum(axis = (1, 2)) / self.N
@@ -208,7 +213,7 @@ class QuantileHuberLoss(Function):
         gy = dzf.broadcast_to(gy, td_error_shape)
 
         # Huber 誤差の逆伝播
-        gy *= abs(quantiles(self.N) - td_indicator)
+        gy *= abs(self.quantiles - td_indicator)
         mask = (~abs_indicator).astype(gy.dtype)
         mask[td_indicator] = -1.
         mask[abs_indicator] = td_error[abs_indicator]
@@ -219,8 +224,8 @@ class QuantileHuberLoss(Function):
 
 # 一度計算したら、引数が変わらない限り、キャッシュにあるデータを即座に返すようになる
 @cache
-def quantiles(quantiles_num):
-    xp = cuda.cp if cuda.gpu_enable else np
+def quantiles(quantiles_num, use_gpu = False):
+    xp = cuda.cp if use_gpu else np
     step = 1 / quantiles_num
     start = step / 2.
     return xp.array([start + i * step for i in range(quantiles_num)], dtype = np.float32)
@@ -251,11 +256,11 @@ class SumTree:
         self.tree = np.zeros(2 * self.capacity)
         self.rng = np.random.default_rng()
 
-    def save(self, file_name):
-        np.save(file_name + "_tree.npy", self.tree)
+    def save(self, file_path):
+        np.save(file_path + "_tree.npy", self.tree)
 
-    def load(self, file_name):
-        self.tree = np.load(file_name + "_tree.npy")
+    def load(self, file_path):
+        self.tree = np.load(file_path + "_tree.npy")
 
 
     # セグメントツリーの更新は１つずつのみとする (技巧的な方法と比べてもこれが一番速かった)
@@ -344,23 +349,23 @@ class ReplayBuffer:
             self.rng = np.random.default_rng()
 
     # エージェントの情報である合計ステップ数も一緒に保存する
-    def save(self, file_name, total_steps):
+    def save(self, file_path, total_steps):
         save_data = [self.buffer, self.count, total_steps]
 
         if self.prioritized:
-            self.priorities.save(file_name)
+            self.priorities.save(file_path)
             save_data.append(self.max_priority)
 
-        with open(file_name + "_buffer.pkl", "wb") as f:
+        with open(file_path + "_buffer.pkl", "wb") as f:
             pickle.dump(save_data, f)
 
     # 学習の途中からの再開によってあり得ない遷移が学習されないように、tmp_buffer は前回のものを引き継がない
-    def load(self, file_name):
-        with open(file_name + "_buffer.pkl", "rb") as f:
+    def load(self, file_path):
+        with open(file_path + "_buffer.pkl", "rb") as f:
             load_data = pickle.load(f)
 
         if self.prioritized:
-            self.priorities.load(file_name)
+            self.priorities.load(file_path)
             self.max_priority = load_data.pop()
 
         self.buffer, self.count, total_steps = load_data
@@ -444,7 +449,7 @@ class ReplayBuffer:
         else:
             selected = [buffer[i] for i in indices]
 
-        # 状態データはニューラルネットワークに入力したから、必要に応じて GPU 対応を行うので、np.ndarray でよい
+        # 状態データはニューラルネットワークに入力してから、必要に応じて GPU 対応を行うので、np.ndarray でよい
         states = np.stack([x[0] for x in selected])
         next_states = np.stack([x[4] for x in selected])
 
@@ -475,17 +480,19 @@ class ReplayBuffer:
 
 # TD 法の Q 学習でパラメータを修正する価値ベースのエージェント
 class RainbowAgent:
-    def __init__(self, replay_buffer: ReplayBuffer, batch_size, action_size, quantiles_num, lr):
+    def __init__(self, replay_buffer, batch_size, action_size, quantiles_num, lr, to_gpu = False):
+        assert isinstance(replay_buffer, ReplayBuffer)
         self.replay_buffer = replay_buffer
         self.batch_size = batch_size
 
         self.action_size = action_size
         self.quantiles_num = quantiles_num
         self.lr = lr / 4. if replay_buffer.prioritized else lr
+        self.use_gpu = to_gpu and cuda.gpu_enable
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
-        qnet_args = self.action_size, self.quantiles_num
+        qnet_args = self.action_size, self.quantiles_num, self.use_gpu
         self.qnet = RainbowNet(*qnet_args)
         self.optimizer = optimizers.Adam(self.lr).setup(self.qnet)
 
@@ -496,21 +503,21 @@ class RainbowAgent:
         self.total_steps = 0
 
     # キーボード例外で学習を中断した場合は、再開に必要な情報も保存する
-    def save(self, file_name, is_yet = False):
+    def save(self, file_path, is_yet = False):
         if is_yet:
-            self.qnet.save_weights(file_name + "_online.npz")
-            self.qnet_target.save_weights(file_name + "_target.npz")
-            self.replay_buffer.save(file_name, self.total_steps)
+            self.qnet.save_weights(file_path + "_online.npz")
+            self.qnet_target.save_weights(file_path + "_target.npz")
+            self.replay_buffer.save(file_path, self.total_steps)
         else:
-            self.qnet.save_weights(file_name + ".npz")
+            self.qnet.save_weights(file_path + ".npz")
 
     # 同じ条件での途中再開に必要な情報を読み込む
-    def load_to_restart(self, file_name):
-        self.qnet.load_weights(file_name + "_online.npz")
-        self.qnet_target.load_weights(file_name + "_target.npz")
-        self.total_steps = self.replay_buffer.load(file_name)
+    def load_to_restart(self, file_path):
+        self.qnet.load_weights(file_path + "_online.npz")
+        self.qnet_target.load_weights(file_path + "_target.npz")
+        self.total_steps = self.replay_buffer.load(file_path)
 
-        if cuda.gpu_enable:
+        if self.use_gpu:
             self.qnet.to_gpu()
             self.qnet_target.to_gpu()
 
@@ -553,10 +560,9 @@ class RainbowAgent:
         states, actions, rewards, gammas, next_states, next_placables = experiences
 
         # GPU を使用する場合は、非同期メモリ転送を開始する
-        if cuda.gpu_enable:
+        use_gpu = self.use_gpu
+        if use_gpu:
             preprocess = NoisyAffine.preprocess_to_gpu
-            sync_flag = True
-
             rewards, source, rewards_stream = preprocess(rewards)
             rewards.set(source, stream = rewards_stream)
 
@@ -565,8 +571,6 @@ class RainbowAgent:
 
             weights, source, weights_stream = preprocess(weights)
             weights.set(source, stream = weights_stream)
-        else:
-            sync_flag = False
 
         # 誤差を含む出力に max 演算子を使うことで過大評価を起こさないように、行動はオンライン分布から取る (Double DQN)
         with no_grad():
@@ -576,7 +580,7 @@ class RainbowAgent:
             next_quantile_values = self.qnet_target(next_states)
             next_quantile_values = next_quantile_values.data[sequence, next_actions]
 
-            if sync_flag:
+            if use_gpu:
                 rewards_stream.synchronize()
                 gammas_stream.synchronize()
 
@@ -593,14 +597,14 @@ class RainbowAgent:
         quantile_values = quantile_values.reshape((batch_size, self.quantiles_num, 1))
 
         # 出力の TD 誤差の形状は、(batch_size, )
-        td_loss = QuantileHuberLoss(target_quantile_values, self.quantiles_num)(quantile_values)
+        td_loss = QuantileHuberLoss(target_quantile_values, self.quantiles_num, use_gpu)(quantile_values)
 
         # TD 誤差を使って、経験データの優先度を更新する
         replay_buffer.update_priorities(td_loss.data, indices)
 
         # 優先度付き経験再生を使っている場合は、重点サンプリングの重みを掛ける
         if weights is not None:
-            if sync_flag:
+            if use_gpu:
                 weights_stream.synchronize()
             td_loss *= weights
 
@@ -637,8 +641,8 @@ class Rainbow(SelfMatch):
 
             # 遷移情報２つセットで１回の update メソッドが呼べる
             if len(buffer) == 2:
-                state, action = buffer.popleft()[1:]
-                next_placable, next_state = buffer[0][:2]
+                __, state, action = buffer.popleft()
+                next_placable, next_state, __ = buffer[0]
 
                 # 報酬はゲーム終了まで出ない
                 agent.update((state, action, 0, next_state, next_placable), progress)
@@ -665,7 +669,7 @@ class Rainbow(SelfMatch):
         agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
 
 
-def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
+def fit_rainbow_agent(quantiles_num, to_gpu, episodes, restart = 0, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
     # ハイパーパラメータ設定
@@ -686,7 +690,7 @@ def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
     replay_buffer1 = ReplayBuffer(*replay_buffer_args)
 
     # エージェント
-    agent_args = batch_size, board.action_size, quantiles_num, lr
+    agent_args = batch_size, board.action_size, quantiles_num, lr, to_gpu
     first_agent = RainbowAgent(replay_buffer0, *agent_args)
     second_agent = RainbowAgent(replay_buffer1, *agent_args)
 
@@ -699,27 +703,31 @@ def fit_rainbow_agent(quantiles_num, episodes, restart = 0, version = None):
 
 # 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
 class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size):
+    def __init__(self, action_size, to_gpu = False):
         self.action_size = action_size
+        self.use_gpu = to_gpu and cuda.gpu_enable
 
     # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
     def reset(self, file_name, turn, quantiles_num):
         qnet = RainbowNet(self.action_size, quantiles_num)
         self.qnet = qnet
 
-        file_name = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
-        qnet.load_weights(file_name)
-        if cuda.gpu_enable:
+        file_path = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
+        qnet.load_weights(file_path)
+        if self.use_gpu:
             qnet.to_gpu()
 
 
-def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
+def eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan, version = None):
     file_name = "rainbow" if version is None else ("rainbow" + version)
 
-    # 環境とエージェント
+    # 環境
     board = Board()
-    first_computer = RainbowComputer(board.action_size)
-    second_computer = RainbowComputer(board.action_size)
+
+    # コンピュータ
+    computer_args = board.action_size, to_gpu
+    first_computer = RainbowComputer(*computer_args)
+    second_computer = RainbowComputer(*computer_args)
 
     # エージェントの初期化
     first_computer.reset(file_name, 1, quantiles_num)
@@ -737,10 +745,11 @@ def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
 
 if __name__ == "__main__":
     quantiles_num = 200
+    to_gpu = True
 
     # 学習用コード (13 hours -> 48307 episodes)
-    fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
+    # fit_rainbow_agent(quantiles_num, to_gpu, episodes = 3000000, restart = 0, version = None)
 
     # 評価用コード
-    # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
-    # eval_rainbow_computer(quantiles_num, enemy_plan = corners_plan, version = None)
+    eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan = simple_plan, version = None)
+    eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan = corners_plan, version = None)

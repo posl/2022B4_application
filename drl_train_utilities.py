@@ -8,6 +8,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
+
 # エージェントの評価に使う単純な方策
 def simple_plan(board, placable = None):
     if placable is None:
@@ -115,6 +116,7 @@ class SelfMatch:
         finally:
             self.plot(eval_historys, file_name, is_yet)
 
+
     def fit_one_run(self, run, restart, episodes, eval_historys, win_rates):
         with tqdm(range(restart, episodes), desc = f"run {run}", leave = False) as pbar:
             eval_interval = episodes // 100
@@ -131,6 +133,7 @@ class SelfMatch:
                     # 学習の中断によって描画用配列の整合性を損なうことがなるべくないように、この反映はまとめて行う
                     eval_historys[:, index] += (win_rates - eval_historys[:, index]) / run
                     index += 1
+
 
     # このメソッドを継承した子クラスが実装する
     def fit_one_episode(self, progress):
@@ -162,9 +165,11 @@ class SelfMatch:
 
         return win_count
 
+
     # このメソッドを継承した子クラスが実装する
-    def save(self, turn, file_name, index):
+    def save(self, turn, file_path, index):
         raise NotImplementedError()
+
 
     # キーボード割り込みによって途中終了した場合は、パラメータの保存も同時に行う
     def plot(self, eval_historys, file_name, is_yet = False):

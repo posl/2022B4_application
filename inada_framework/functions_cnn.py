@@ -1,7 +1,9 @@
-from inada_framework import Function, cuda
-from inada_framework.utilitys import get_deconv_outsize, pair, get_conv_outsize
-from inada_framework.functions import broadcast_to
 import numpy as np
+
+from inada_framework import Function, cuda
+from inada_framework.utilities import get_deconv_outsize, pair, get_conv_outsize
+from inada_framework.functions import broadcast_to
+
 
 
 # =============================================================================
@@ -159,7 +161,6 @@ def conv2d_1x1filter(x, W):
 
 
 
-
 # =============================================================================
 # プーリング層 (max_pooling, average_pooling, global_average_pooling)
 # =============================================================================
@@ -221,7 +222,6 @@ def global_average_pooling(x):
 
 
 
-
 # =============================================================================
 # im2col, col2im  (Function インスタンス)
 # =============================================================================
@@ -266,7 +266,6 @@ def col2im(x, input_shape, filter_size, stride = 1, padding = 0, to_matrix = Fal
 
 
 
-
 # =============================================================================
 # im2col, col2im  (ndarray インスタンス)
 # =============================================================================
@@ -278,13 +277,14 @@ def im2col_ndarray(img, filter_size, stride, padding, to_matrix = False):
     PH, PW = pair(padding)
     OH, OW = get_conv_outsize(H, FH, SH, PH), get_conv_outsize(W, FW, SW, PW)
 
-    if cuda.gpu_enable:
-        col = cuda.cp.empty((N, C, FH, FW, OH, OW), dtype = img.dtype)
+    xp = cuda.get_array_module(img)
+    if xp != np:
+        col = xp.empty((N, C, FH, FW, OH, OW), dtype = img.dtype)
         dy, dx = 1, 1
 
         # 参考元 : Chainer (https://github.com/chainer/chainer/blob/v6.4.0/chainer/utils/conv.py)
         # ElementwiseKernel : 並列計算を行う C/C++ 言語プログラムを渡して、GPU のカーネルに実行してもらう
-        cuda.cp.ElementwiseKernel(
+        xp.ElementwiseKernel(
             "raw T img, int32 h, int32 w, int32 out_h, int32 out_w,"
             "int32 kh, int32 kw, int32 sy, int32 sx, int32 ph, int32 pw,"
             "int32 dy, int32 dx",
@@ -332,12 +332,13 @@ def col2im_ndarray(col, img_shape, filter_size, stride, padding, to_matrix = Fal
     if to_matrix:
         col = col.reshape(N, OH, OW, C, FH, FW).transpose(0, 3, 4, 5, 1, 2)
 
-    if cuda.gpu_enable:
-        img = cuda.cp.empty((N, C, H, W), dtype = col.dtype)
+    xp = cuda.get_array_module(col)
+    if xp != np:
+        img = xp.empty((N, C, H, W), dtype = col.dtype)
         dx, dy = 1, 1
 
         # 参考元 : Chainer (https://github.com/chainer/chainer/blob/v6.4.0/chainer/utils/conv.py)
-        cuda.cp.ElementwiseKernel(
+        xp.ElementwiseKernel(
             "raw T col, int32 h, int32 w, int32 out_h, int32 out_w,"
             "int32 kh, int32 kw, int32 sy, int32 sx, int32 ph, int32 pw,"
             "int32 dx, int32 dy",

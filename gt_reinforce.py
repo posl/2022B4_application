@@ -3,7 +3,7 @@ from gt_alpha_beta import GTValue
 from board import Board
 import numpy as np
 from random import random
-from drl_selfmatch import corners_plan as simple_plan
+from drl_train_utilities import corners_plan as simple_plan
 
 
 

@@ -1,8 +1,12 @@
-import contextlib
-import numpy as np
-import inada_framework
-import heapq
+from contextlib import contextmanager
+from heapq import heappush, heappop
 import weakref
+from os.path import join, dirname
+
+import numpy as np
+
+import inada_framework
+
 
 
 # =============================================================================
@@ -12,9 +16,10 @@ import weakref
 class Config:
     enable_backprop = True
     train_flag = True
+    data_path = None
 
 
-@contextlib.contextmanager
+@contextmanager
 def using_config(name, value):
     # Config のクラス属性に関する処理 (attribute : 属性)
     old_value = getattr(Config, name)
@@ -30,7 +35,7 @@ def no_grad():
 
 
 # テストモードの時は計算グラフを作る必要もないので、新たな関数として test_mode を定義する
-@contextlib.contextmanager
+@contextmanager
 def test_mode():
     setattr(Config, "enable_backprop", False)
     setattr(Config, "train_flag", False)
@@ -39,7 +44,6 @@ def test_mode():
     finally:
         setattr(Config, "enable_backprop", True)
         setattr(Config, "train_flag", True)
-
 
 
 
@@ -61,7 +65,8 @@ class Variable:
     def __init__(self, data, name = None):
         # 扱うデータ型を None と ndarray に限定する
         if not (data is None or isinstance(data, array_types)):
-            raise TypeError("{} is not supported".format(type(data)))
+            message = "{} is not supported".format(type(data))
+            raise TypeError(message)
 
         self.data = data
         self.grad = None
@@ -130,7 +135,7 @@ class Variable:
 
         def add_func(f):
             if f not in seen_set:
-                heapq.heappush(funcs, f)
+                heappush(funcs, f)
                 seen_set.add(f)
 
         add_func(self.creator)
@@ -139,7 +144,7 @@ class Variable:
         with using_config("enable_backprop", create_graph):
             while funcs:
                 # 世代が最も新しい関数をリストから取り出し、逆伝播を実行する
-                f = heapq.heappop(funcs)
+                f = heappop(funcs)
                 gys = [output().grad for output in f.outputs]
                 gxs = f.backward(*gys)
 
@@ -179,7 +184,6 @@ class Parameter(Variable):
 
 
 
-
 # =============================================================================
 # 関数の基底クラス
 # =============================================================================
@@ -192,7 +196,7 @@ class Function:
         xs = [x.data for x in inputs]
         ys = self.forward(*xs)
 
-        # 順伝播メソッドの出力がタプルでない場合、次の処理のためにタプルに変換する
+        # 順伝播メソッドの出力がタプルまたはリストでない場合、次の処理のためにタプルに変換する
         if not isinstance(ys, (tuple, list)):
             ys = (ys, )
         outputs = [Variable(as_array(y)) for y in ys]
@@ -238,15 +242,15 @@ def as_array(x, array_module = np):
 
 
 
-
 # =============================================================================
 # 二項演算子のオーバーロード・特殊メソッド・クラスメソッド
 # =============================================================================
 
-# 循環インポートを避けるために、import mydezero.functions as dzf のようには利用しない
-def setup_variable():
+def setup():
+    # 循環インポートを避けるために、import ~ as dzf のようには利用しない
     dzf = inada_framework.functions
 
+    # 演算子のオーバーロード・特殊メソッド・クラスメソッドの定義
     Variable.__add__ = dzf.add
     Variable.__radd__ = dzf.add
     Variable.__iadd__ = dzf.add
@@ -276,3 +280,10 @@ def setup_variable():
     Variable.min = dzf.min
     Variable.matmul = dzf.matmul
     Variable.dot = dzf.matmul
+
+    # Colab では __file__ が使えないので、そこを利用して、ファイルのパス設定を分ける
+    try:
+        data_path = join(dirname(__file__), "..", "data", "{}", "{}")
+    except NameError:
+        data_path = "/content/drive/MyDrive/data/{}/{}"
+    setattr(Config, "data_path", data_path)

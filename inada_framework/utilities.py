@@ -1,3 +1,20 @@
+import os
+
+
+
+# =============================================================================
+# データディレクトリのためのファイル操作
+# =============================================================================
+
+# 指定したファイルが属するデータディレクトリが存在しない場合に、新しく作成する関数
+def make_data_dir(file_path):
+    file_dir = os.path.dirname(file_path)
+    if not os.path.exists(file_dir):
+        data_dir = os.path.dirname(file_dir)
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+        os.mkdir(file_dir)
+
 
 
 # =============================================================================
@@ -38,7 +55,6 @@ def reshape_for_broadcast(gy, in_shape, axis, keepdims):
 
 
 
-
 # =============================================================================
 # CNN に使う機能のための関数
 # =============================================================================
@@ -62,4 +78,5 @@ def pair(x):
         assert len(x) == 2
         return x
     else:
-        raise TypeError("{} cannot be interpreted as pair".format(type(x)))
+        message = "{} cannot be interpreted as pair".format(type(x))
+        raise TypeError(message)
