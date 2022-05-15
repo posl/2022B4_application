@@ -7,7 +7,7 @@ import numpy as np
 from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_selfmatch import SelfMatch
+from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
@@ -29,13 +29,16 @@ class AlphaZeroAgent:
         self.network = PolicyValueNet(action_size)
         self.c_puct = c_puct
 
-    # 引数はパラメータが保存されたファイルのパスか、同じモデルのインスタンス
+    # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
     def reset(self, arg):
         self.load(arg)
 
-        # それぞれ、過去の探索割合を近似したある種の方策、累計評価値、探索回数 (計算の都合上、常に１回多い値となっている)
+        # それぞれ、過去の探索割合を近似したある種の方策、平均の評価値、探索回数 (計算の都合上、探索回数は常に１多い)
         self.P = {}
-        self.W_N = {}
+        self.V = {}
+        self.N = {}
+
+        self.rng = np.random.default_rng()
 
     # クラスメソッドのオーバーロードによって、コンピュータとしての使用時と、学習時で処理を分ける
     @singledispatchmethod
@@ -53,19 +56,34 @@ class AlphaZeroAgent:
 
 
     def __call__(self, board):
-        return self.get_action(board)
+        pass
 
     def get_action(self, board):
-        state = board.state
-        P = self.P[state]
-        W, N = self.W_N[state]
-
         placable = self.board.list_placable()
-        pucts = (self.c_puct * P * sqrt(N.sum() - len(placable)) + W) / N
+        state = board.state
+        N = self.N[state]
+
+        # 右辺の第１項が過去の探索割合を勘案しながら探索回数の少ない手を選ぶための項で、第２項が勝率を見て活用を行うための項
+        pucts = (self.c_puct * sqrt(N.sum() - len(placable)) * self.P[state]) / N + self.V[state]
+
+        # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
+        action_indexs = np.where(pucts == pucts.max())[0]
+
+        if len(action_indexs) == 1:
+            action_index = action_indexs[0]
+        else:
+            action_index = self.rng.choice(action_indexs)
+        return placable[action_index]
 
 
-    # モンテカルロ木探索を行うクラス (ランダム対局で盤面を評価するわけではないため、正確にはモンテカルロ法ではない)
-    
+    def search(self):
+        pass
+
+    def __expand(self):
+        pass
+
+    def __evaluate(self):
+        pass
 
 
 
@@ -101,7 +119,6 @@ class ReplayBuffer:
         selected = [buffer[i] for i in indices]
 
         xp = cuda.cp if cuda.gpu_enable else np
-        state2ndarray_func = Board.state2ndarray
         states = xp.stack([state2ndarray_func(x[0], xp) for x in selected])
 
         mcts_policy = xp.stack([x[1] for x in selected], dtype = np.float32)
@@ -112,12 +129,16 @@ class ReplayBuffer:
 
 
 
-# 自己対戦によって、パラメータを学習するための場
+# 自己対戦によって、パラメータを学習するための闘技場
 class AlphaZeroArena:
     def __init__(self, action_size):
         self.network = PolicyValueNet(action_size)
 
+    def save(self, file_name):
+        self.network.save_weights(SelfMatch.get_path(file_name).format("parameters"))
+
     def fit(self):
+        # self_plays -> update
         pass
 
     def self_plays(self):
@@ -128,6 +149,3 @@ class AlphaZeroArena:
 
     def update(self):
         pass
-
-    def save(self, file_name):
-        self.network.save_weights(SelfMatch.get_path(file_name).format("parameters"))

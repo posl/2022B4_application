@@ -3,7 +3,7 @@ import numpy as np
 from inada_framework import Model, optimizers, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_selfmatch import SelfMatch, simple_plan, corners_plan
+from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 

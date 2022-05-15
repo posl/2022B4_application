@@ -9,7 +9,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
 from inada_framework.utilitys import reshape_for_broadcast
-from drl_selfmatch import SelfMatch, simple_plan, corners_plan
+from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
 
 
@@ -727,19 +727,20 @@ def eval_rainbow_computer(quantiles_num, enemy_plan, version = None):
     self_match = Rainbow(board, first_computer, second_computer)
 
     # 評価
-    print("enemy:", enemy_plan.__name__)
+    print("\nenemy:", enemy_plan.__name__)
     print(f"quantiles_num: {quantiles_num}")
     print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
-    print("second: {} %\n".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
+    print("second: {} %".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
 
 
 
 
 if __name__ == "__main__":
-    quantiles_num = 50
+    quantiles_num = 200
 
     # 学習用コード (13 hours -> 48307 episodes)
     fit_rainbow_agent(quantiles_num, episodes = 3000000, restart = 0, version = None)
 
     # 評価用コード
     # eval_rainbow_computer(quantiles_num, enemy_plan = simple_plan, version = None)
+    # eval_rainbow_computer(quantiles_num, enemy_plan = corners_plan, version = None)
