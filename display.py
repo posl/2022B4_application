@@ -18,7 +18,7 @@ class Page(tk.Frame):
 
         self.win_width = 640
         self.win_height = 480
-        self.font_name = "MS_Pゴシック"
+        self.font_name = "凸版文久見出しゴシック"
         self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
         
 
@@ -121,6 +121,7 @@ class GamePage(Page):
         self.game_canvas.place(x=100, y=50)
         self.game_canvas.bind("<Button-1>", self.cell_click)
         self.game_canvas_state = 0
+        self.game_canvas_lock = False
 
         self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
         self.counter_bar.place(x=100, y=5)
@@ -145,19 +146,21 @@ class GamePage(Page):
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
         self.stone_counter_update()
-        time_len_coef = 4
+        time_len_coef = 1
         if self.game_canvas_state==0:
             self.render_current_board()
             self.game_canvas_state = 1
+            self.game_canvas_lock = True
             self.par.after(50//time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==1:
             self.render_placeable()
             self.game_canvas_state = 2
-            self.par.after(200//time_len_coef, self.par.quit)
+            self.par.after(200//time_len_coef, self.canvas_quit)
         elif self.game_canvas_state==2:
             self.render_reverse(n, 0)
             self.game_canvas_state = 3
+            self.game_canvas_lock = True
             self.par.after(400//time_len_coef, self.canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==3:
@@ -172,6 +175,10 @@ class GamePage(Page):
             self.render_current_board()
             self.game_canvas_state = 1
             self.par.after(400//time_len_coef, self.canvas_update)
+
+    def canvas_quit(self):
+        self.game_canvas_lock = False
+        self.par.quit()
 
     
     def game_canvas_state_update(self, v):
@@ -333,6 +340,8 @@ class GamePage(Page):
             print("あなたの番ではありません：")
             return
         """
+        if self.game_canvas_lock == True:
+            return
         print("cell_click:",self.game_canvas_state)
         x = event.x
         y = event.y
