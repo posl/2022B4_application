@@ -1,5 +1,8 @@
 import random
 
+import mc_tree_search
+import mc_primitive
+
 class Human:
     def __init__(self, par):
         self.par = par  # par : MainWindow , main_loopを呼び出すために必要
@@ -56,6 +59,7 @@ class Human:
         return random.choice(board.list_placable())
 
 
+
 class PlayerKinds:
     def __init__(self, par):
         self.kinds_name = [] # 名前（人間、ランダムなど）
@@ -68,7 +72,7 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
 
         self.human = Human(par)
-        self.kinds_name.append("人間-チート")
+        self.kinds_name.append("人間-チート1")
         self.kinds_func.append(self.human.cheat_player)
         self.kinds_difficulty.append(1)
 
@@ -76,9 +80,18 @@ class PlayerKinds:
         self.kinds_func.append(self.human.com_random)
         self.kinds_difficulty.append(1)
 
-        self.kinds_name.append("チート")
+        self.kinds_name.append("ランダム-チート1")
         self.kinds_func.append(self.human.com_cheater1)
         self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("MC木探索")
+        self.kinds_func.append(mc_tree_search.MonteCarloTreeSearch())
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("原始MC探索")
+        self.kinds_func.append(mc_primitive.PrimitiveMonteCarlo())
+        self.kinds_difficulty.append(1)
+
 
     def get_num(self):
         return len(self.kinds_name)
