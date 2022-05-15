@@ -110,11 +110,11 @@ class Board:
         # can_continue で計算した、合法手のリストを再利用するための属性
         self.p_list = None
 
-        # 画面表示用の属性
+        # 画面表示用のクリックイベントを保持するための属性
         self.click_attr = None
 
-        # どこがひっくり返されたかを保持しておく(表示のために必要)
-        self.rev_pl = 0
+        # 画面表示用にどこがひっくり返されたかを保持するための属性
+        self.reversed = 0
 
 
     @property
@@ -213,6 +213,11 @@ class Board:
     def white_positions(self):
         return self.__get_stand_bits(self.stone_white)
 
+    # ひっくり返された場所を返す（表示のために必要）
+    @property
+    def reverse_positions(self):
+        return self.__get_stand_bits(self.reversed)
+
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
     def __get_stand_bits(self, x):
         return [n for n in range(self.action_size) if (x >> n) & 1]
@@ -255,7 +260,9 @@ class Board:
         move_player, opposition_player = self.players_board
         mask = self.__reverse(n, move_player, opposition_player)
         self.set_players_board(mask | (1 << n), mask)
-        self.rev_pl = mask #表示のために裏返ったところを保持
+
+        # 画面表示のために裏返ったところを保持しておく
+        self.reversed = mask
 
     # n に置いた時に返るマスを返す
     @staticmethod
@@ -277,10 +284,6 @@ class Board:
     @staticmethod
     def __reverse_cython(startpoint, move_player, opposition_player):
         return get_reverse_board(1 << startpoint, move_player, opposition_player)
-
-    # ひっくり返された場所を返す（表示のために必要）
-    def reverse_place_t(self):
-        return self.__get_stand_bits(self.rev_pl)
 
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
@@ -350,12 +353,9 @@ class Board:
 
             if render_flag:
                 self.render(flag, n)
-        if render_flag: # 最後の１石だけ表示されない問題を解消する(1秒待機)
-            self.main_window.after(1000, self.main_window.quit)
-            self.main_window.mainloop()
 
     # エピソード中の画面表示メソッド
-    def render(self, flag, n=999):
+    def render(self, flag, n = 999):
         self.main_window.game_page.canvas_update(flag, n)
 
 
@@ -393,6 +393,10 @@ class Board:
         self.main_window.mainloop()
 
         self.game(self.print_state)
+
+        # 最後の１石だけ表示されない問題を解消する (１秒待機)
+        self.main_window.after(1000, self.main_window.quit)
+        self.main_window.mainloop()
 
 
     # 一時的な盤面表示

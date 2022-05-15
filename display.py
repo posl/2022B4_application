@@ -197,7 +197,7 @@ class GamePage(Page):
     # flg...False : ひっくり返ったところを黒/白に
     def render_reverse(self, n, flg = 0):
         y, x = self.board.n2t(n)
-        r_list =  self.board.reverse_place_t()
+        r_list =  self.board.reverse_positions
         bplace = self.board.black_positions
         wplace = self.board.white_positions
         if flg==0:
