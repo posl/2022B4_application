@@ -6,7 +6,7 @@ import numpy as np
 
 from board_speedup import get_reverse_board, get_legal_board, get_stand_bits
 import display
-import player_kinds
+#import player_kinds
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -91,9 +91,11 @@ class Board:
         if self.height == self.width == 8:
             self.__list_placable = self.__list_placable_cython
             self.__reverse = self.__reverse_cython
+            self.__get_stand_bits = self.__get_stand_bits_cython
         else:
             self.__list_placable = self.__list_placable_python
             self.__reverse = self.__reverse_python
+            self.__get_stand_bits = self.__get_stand_bits_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -208,19 +210,25 @@ class Board:
 
     @property
     def black_positions(self):
-        return self.__get_stand_bits(self.stone_black)
+        return self.__get_stand_bits(self.action_size, self.stone_black)
 
     @property
     def white_positions(self):
-        return self.__get_stand_bits(self.stone_white)
+        return self.__get_stand_bits(self.action_size, self.stone_white)
 
     @property
     def reverse_positions(self):
-        return self.__get_stand_bits(self.reversed)
+        return self.__get_stand_bits(self.action_size, self.reversed)
+
 
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
-    def __get_stand_bits(self, x):
-        return get_stand_bits(self.action_size, x)
+    @staticmethod
+    def __get_stand_bits_python(num, x):
+        return [n for n in range(num) if (x >> n) & 1]
+
+    @staticmethod
+    def __get_stand_bits_cython(num, x):
+        return get_stand_bits(num, x)
 
 
     @property
@@ -326,7 +334,7 @@ class Board:
         return False
 
     def __list_placable_cython(self, players_board):
-        return self.__get_stand_bits(get_legal_board(*players_board))
+        return self.__get_stand_bits(self.action_size, get_legal_board(*players_board))
 
 
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
