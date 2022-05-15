@@ -213,7 +213,6 @@ class Board:
     def white_positions(self):
         return self.__get_stand_bits(self.stone_white)
 
-    # ひっくり返された場所を返す（表示のために必要）
     @property
     def reverse_positions(self):
         return self.__get_stand_bits(self.reversed)
@@ -260,9 +259,7 @@ class Board:
         move_player, opposition_player = self.players_board
         mask = self.__reverse(n, move_player, opposition_player)
         self.set_players_board(mask | (1 << n), mask)
-
-        # 画面表示のために裏返ったところを保持しておく
-        self.reversed = mask
+        return mask
 
     # n に置いた時に返るマスを返す
     @staticmethod
@@ -348,10 +345,11 @@ class Board:
         flag = 1
         while flag:
             n = self.get_action()
-            self.put_stone(n)
+            mask = self.put_stone(n)
             flag = self.can_continue()
 
             if render_flag:
+                self.reversed = mask
                 self.render(flag, n)
 
     # エピソード中の画面表示メソッド
