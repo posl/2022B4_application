@@ -14,6 +14,29 @@ class Human:
                 break
         return n
     
+    def cheat_player(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        n = 0
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            break
+        if t==1:
+            if ((board.stone_white>>n) & 1):
+                board.stone_white = board.stone_white ^ (1<<n)
+            board.stone_black = board.stone_black ^ (1<<n)
+        else:
+            if ((board.stone_black>>n) & 1):
+                board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
+            board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        return self.player(board)
+    
     #本来はここに書くべきではなかろうが暫定的に
     def com_random(self, board):
         return random.choice(board.list_placable())
@@ -42,6 +65,11 @@ class PlayerKinds:
         self.human = Human(par)
         self.kinds_name.append("人間")
         self.kinds_func.append(self.human.player)
+        self.kinds_difficulty.append(1)
+
+        self.human = Human(par)
+        self.kinds_name.append("人間-チート")
+        self.kinds_func.append(self.human.cheat_player)
         self.kinds_difficulty.append(1)
 
         self.kinds_name.append("ランダム")
