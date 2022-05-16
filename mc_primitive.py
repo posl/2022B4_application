@@ -1,19 +1,25 @@
-import numpy as np
-
+from random import choice
 from board import Board
+from board_speedup import alpha_beta
+
 
 
 class PrimitiveMonteCarlo:
-    def __init__(self, max_try = 400):
+    def __init__(self, max_try = 800):
         self.max_try = max_try
-        self.rng = np.random.default_rng()
 
     def __call__(self, board : Board):
-        return self.primitive_monte_carlo(board)
+        if 0 and (board.stone_black | board.stone_white).bit_count() > 50:
+            move = alpha_beta(*board.players_board)
+            if move:
+                return move
+        else:
+            return self.primitive_monte_carlo(board)
+
 
     # ランダムで手を打つplan
     def random_action(self, board : Board):
-        return int(self.rng.choice(board.list_placable()))
+        return choice(board.list_placable())
 
     # nに石を置いた時の勝利回数を返す
     def play_out(self, board : Board, my_turn):
@@ -67,7 +73,7 @@ class PrimitiveMonteCarlo:
 
         # スコアが同点ならランダムで打つ
         max_index = [i for i, s in enumerate(scores) if s == max(scores)]
-        move = placable[self.rng.choice(max_index)]
+        move = placable[choice(max_index)]
         print("put : ", move)
         return move
 

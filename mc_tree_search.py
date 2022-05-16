@@ -1,7 +1,6 @@
 from math import sqrt, log
 
-import numpy as np
-
+from random import choice
 from board import Board
 
 
@@ -15,32 +14,33 @@ class Node:
         self.wins = 0   # 記録されているターンプレイヤーの勝ち数でないことに注意
         self.visits = 0
         self.untried_move = board.list_placable()
+        
 
     def uct(self, total_visits):
         return self.wins / self.visits + sqrt(2 * log(total_visits) / self.visits)
 
 
 class MonteCarloTreeSearch:
-    def __init__(self, max_tries = 4096):
+    def __init__(self, max_tries = 8192):
         self.max_tries = max_tries
-        self.rng = np.random.default_rng()
 
     def __call__(self, board : Board):
         return self.monte_carlo_tree_search(board)
 
     # ランダムで手を打つplan
     def random_action(self, board : Board):
-        return int(self.rng.choice(board.list_placable()))
+        return choice(board.list_placable())
 
     # 優先度（utcによる）の高い子孫を選ぶ（複数ある場合ランダム）
     def select_child(self, node : Node):
         ucts = [child.uct(self.root.visits) for child in node.children]
         max_index = [i for i, u in enumerate(ucts) if u == max(ucts)]
-        return node.children[self.rng.choice(max_index)]
+        return node.children[choice(max_index)]
 
     # 未試行の手をランダムに選ぶ
     def expand_child(self, board : Board, node : Node):
-        move = node.untried_move.pop(self.rng.integers(len(node.untried_move)))
+        move = choice(node.untried_move)
+        node.untried_move.remove(move)
 
         board.put_stone(move)
         continuable_flag = board.can_continue()
@@ -62,6 +62,7 @@ class MonteCarloTreeSearch:
 
         while node:
             node.visits += 1
+            # 記録されているターンと勝ちは反転していることに注意
             node.wins += judge * (-1 if node.turn else 1) / 2 + 0.5
 
             node = node.parent
@@ -71,7 +72,6 @@ class MonteCarloTreeSearch:
         # 原状回復用
         original_state = board.state
         original_plans = board.plans
-        original_turn = board.turn
 
         # シミュレーション用の行動をセット
         board.set_plan(self.random_action, self.random_action)
@@ -89,7 +89,6 @@ class MonteCarloTreeSearch:
 
             # 盤面をセット
             board.set_state(node.state)
-            board.turn = node.turn
             
             # シミュレーションする手を決定し、木を拡張
             if node.untried_move:
@@ -106,7 +105,6 @@ class MonteCarloTreeSearch:
         # 原状回復
         board.set_state(original_state)
         board.set_plan(*original_plans)
-        board.turn = original_turn
 
 
         print([i.move for i in self.root.children])
@@ -115,7 +113,7 @@ class MonteCarloTreeSearch:
         visits = [child.visits for child in self.root.children]
         print(visits)
         max_index = [i for i, v in enumerate(visits) if v == max(visits)]
-        move = self.root.children[self.rng.choice(max_index)].move
+        move = self.root.children[choice(max_index)].move
         print("put", move)
         return move
 
