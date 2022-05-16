@@ -186,24 +186,30 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
     first_agent = ReinforceAgent(*agent_args)
     second_agent = ReinforceAgent(*agent_args)
 
-    # 自己対戦場
+    # 自己対戦
     self_match = Reinforce(board, first_agent, second_agent)
 
     for gamma in gammas:
         first_agent.gamma = gamma
         second_agent.gamma = gamma
-        self_match.fit(3, episodes, restart, file_name + "-{}_".format(str(gamma)[2:]))
+        self_match.fit(3, episodes, restart, file_name)
+        print(f"\"gamma = {gamma}\" is done!")
+    print()
 
 
 
 
 if __name__ == "__main__":
     to_gpu = False
-    gammas = 0.95, 0.85, 0.75
+    gammas = 0.95, 0.90, 0.85, 0.80, 0.75, 0.70
     file_name = "reinforce"
 
+    # 学習の進行具合によって変更する必要がある変数
+    trained_num = 0
+    restart = False
+
     # 学習用コード
-    fit_reinforce_agent(to_gpu, gammas, file_name)
+    fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)
 
     # 評価用コード
-    eval_computer(ReinforceComputer, to_gpu, gammas, file_name)
+    # eval_computer(ReinforceComputer, to_gpu, gammas[: trained_num], file_name)

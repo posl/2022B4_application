@@ -686,8 +686,6 @@ class Rainbow(SelfMatch):
 
 
 def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = False):
-    file_name += "-{}_".format(str(gamma)[2:])
-
     # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
@@ -710,21 +708,23 @@ def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = Fa
     first_agent = RainbowAgent(replay_buffer0, *agent_args)
     second_agent = RainbowAgent(replay_buffer1, *agent_args)
 
-    # 自己対戦
+    # 自己対戦場
     self_match = Rainbow(board, first_agent, second_agent)
     self_match.fit(1, episodes, restart, file_name)
-
 
 
 
 if __name__ == "__main__":
     to_gpu = True
     gammas = (0.98, 0.94, 0.90)
-    trained_num = 0
     file_name = "rainbow"
 
+    # 学習の進行具合によって変更する必要がある変数
+    trained_num = 0
+    restart = False
+
     # 学習用コード (CPU : 3.80 s / iter,  GPU : 0.54 s / iter)
-    fit_rainbow_agent(to_gpu, gammas[trained_num], file_name, restart = False)
+    fit_rainbow_agent(to_gpu, gammas[trained_num], file_name, restart = restart)
 
     # 評価用コード
-    eval_computer(RainbowComputer, to_gpu, gammas[: trained_num + 1], file_name)
+    # eval_computer(RainbowComputer, to_gpu, gammas[: trained_num + 1], file_name)

@@ -70,7 +70,7 @@ class SelfMatch:
         if restart:
             # 学習を途中再開する場合は、描画用配列と開始インデックスも引き継ぐ
             load_file = file_name.format("is_yet")
-            historys = np.load(f"{load_file}history.npy")
+            historys = np.load(f"{load_file}_history.npy")
             run_start, start = historys[:, -1].astype(int)
 
             # 前回保存した学習途中のデータを読み込むために、エージェントの初期化も行う
@@ -123,7 +123,7 @@ class SelfMatch:
             historys[:, -1] = run, episode
 
             save_file = file_name.format("is_yet")
-            np.save(f"{save_file}history.npy", historys)
+            np.save(f"{save_file}_history.npy", historys)
             self.save(save_file)
 
             raise KeyboardInterrupt()
@@ -167,18 +167,14 @@ class SelfMatch:
         return win_count
 
 
+    # index が指定されるのは、学習済みのパラメータを保存するときのみとする
     def save(self, file_path: str, index = None):
-        file_path += "{}"
-
-        if index is None:
-            is_yet = True
-        else:
-            is_yet = False
-            file_path += f"{index}"
-
         for turn in {1, 0}:
             agent = self.agents[turn]
-            agent.save(file_path.format(turn), is_yet)
+            if index is None:
+                agent.save(file_path + f"{turn}", is_yet = True)
+            else:
+                agent.save(file_path + "-{}_{}{}".format(str(agent.gamma)[2:], turn, index))
             agent.reset()
 
 
