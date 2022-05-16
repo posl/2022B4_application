@@ -70,7 +70,7 @@ class SelfMatch:
         if restart:
             # 学習を途中再開する場合は、描画用配列と開始インデックスも引き継ぐ
             load_file = file_name.format("is_yet")
-            historys = np.load(f"{load_file}_history.npy")
+            historys = np.load(f"{load_file}history.npy")
             run_start, start = historys[:, -1].astype(int)
 
             # 前回保存した学習途中のデータを読み込むために、エージェントの初期化も行う
@@ -96,10 +96,10 @@ class SelfMatch:
         print("\n\033[92m=== Total Elapsed Time ===\033[0m")
         start_time = time()
 
-        for run in range(run_start, runs + 1):
-            index = ceil(start / eval_interval) - 1
+        try:
+            for run in range(run_start, runs + 1):
+                index = ceil(start / eval_interval) - 1
 
-            try:
                 with tqdm(range(start, episodes + 1), desc = f"run {run}", leave = False) as pbar:
                     for episode in pbar:
                         self.fit_episode(progress = episode / episodes)
@@ -113,37 +113,33 @@ class SelfMatch:
                             historys[:, index] += (win_rates - historys[:, index]) / run
                             index += 1
 
-            # キーボード例外により学習を中断できる
-            except KeyboardInterrupt:
-                save_file = file_name.format("is_yet")
-                is_yet = True
-
-                # 配列に学習を途中再開するために必要な情報も入れる
-                historys[:, -1] = run, episode
-                np.save(f"{save_file}_history.npy", historys)
-
-            else:
-                save_file = file_name.format("parameters")
-                is_yet = False
+                # パラメータの保存と累計経過時間の表示
+                self.save(file_name.format("parameters"), run - 1)
+                print("{:.5g} min".format((time() - start_time) / 60))
                 start = 1
 
-            finally:
-                # パラメータの保存と累計経過時間の表示
-                self.save(save_file, run - 1, is_yet)
-                print("{:.5g} min".format((time() - start_time) / 60))
+        except KeyboardInterrupt:
+            # 配列に学習を途中再開するために必要な情報も入れる
+            historys[:, -1] = run, episode
 
+            save_file = file_name.format("is_yet")
+            np.save(f"{save_file}history.npy", historys)
+            self.save(save_file)
 
-        # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
-        x = np.arange(100)
-        y = historys[:, :-1]
-        plt.plot(x, y[1], label = "first")
-        plt.plot(x, y[0], label = "second")
-        plt.ylim(-5, 105)
+            raise KeyboardInterrupt()
 
-        plt.xlabel("Progress Rate")
-        plt.ylabel("Mean Winning Percentage")
-        plt.legend()
-        plt.savefig(file_name.format("graphs"))
+        finally:
+            # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
+            x = np.arange(100)
+            y = historys[:, :-1]
+            plt.plot(x, y[1], label = "first")
+            plt.plot(x, y[0], label = "second")
+            plt.ylim(-5, 105)
+
+            plt.xlabel("Progress Rate")
+            plt.ylabel("Mean Winning Percentage")
+            plt.legend()
+            plt.savefig(file_name.format("graphs"))
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する
@@ -171,9 +167,13 @@ class SelfMatch:
         return win_count
 
 
-    def save(self, file_path: str, index: int, is_yet = False):
+    def save(self, file_path: str, index = None):
         file_path += "{}"
-        if not is_yet:
+
+        if index is None:
+            is_yet = True
+        else:
+            is_yet = False
             file_path += f"{index}"
 
         for turn in {1, 0}:

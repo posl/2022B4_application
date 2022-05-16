@@ -686,6 +686,8 @@ class Rainbow(SelfMatch):
 
 
 def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = False):
+    file_name += "-{}_".format(str(gamma)[2:])
+
     # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
@@ -710,7 +712,6 @@ def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = Fa
 
     # 自己対戦
     self_match = Rainbow(board, first_agent, second_agent)
-    file_name += "-{}_".format(str(gamma)[2:])
     self_match.fit(1, episodes, restart, file_name)
 
 
