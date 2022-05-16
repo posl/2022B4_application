@@ -456,6 +456,12 @@ class MainWindow(tk.Tk):
 
         self.sounds = sound.Sounds()
 
+        self.protocol("WM_DELETE_WINDOW", self.on_exit)
+
+    def on_exit(self):
+        self.destroy()
+        exit()
+
     def change_page(self, page_id):
         if page_id==0:
             self.start_page.tkraise()

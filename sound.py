@@ -12,7 +12,12 @@ class Sounds:
         se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
         se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
         se4 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou19.wav"))
-        
+        se0.set_volume(0.3)
+        se1.set_volume(0.3)
+        se2.set_volume(0.3)
+        se3.set_volume(0.3)
+        se4.set_volume(0.3)
+
         self.sounds.append(se0)
         self.sounds.append(se1)
         self.sounds.append(se2)
