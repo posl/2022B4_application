@@ -25,11 +25,15 @@ class PolicyValueNet(Model):
         return policy, value
 
 
+
+
+# モンテカルロ木探索の要領で、深層強化学習を駆使し、行動選択をするエージェント (コンピュータとしても使う)
 class AlphaZeroAgent:
-    def __init__(self, action_size, simulations_num, c_puct = 1.0, alpha = 0.35, epsilon = 0.25):
+    def __init__(self, action_size, simulations_num = 800, c_puct = 1.0, alpha = 0.35, epsilon = 0.25):
         self.network = PolicyValueNet(action_size)
 
         # ハイパーパラメータ
+        assert simulations_num > 0
         self.simulations_num = simulations_num
         self.c_puct = c_puct
         self.alpha = alpha
@@ -39,13 +43,15 @@ class AlphaZeroAgent:
     def reset(self, arg):
         self.load(arg)
 
-        # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率を元にした行動価値、各状態・行動の探索回数
+        # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率も参考にした累計行動価値、各状態・行動の探索回数
         self.P = {}
-        self.Q = {}
+        self.T = {}
         self.N = {}
 
         self.seen_state = set()
+        self.placable = {}
         self.rng = np.random.default_rng()
+
 
     # クラスメソッドのオーバーロードによって、コンピュータとしての使用時と、学習時で処理を分ける
     @singledispatchmethod
@@ -63,63 +69,105 @@ class AlphaZeroAgent:
 
 
     def __call__(self, board):
-        action, __, __ = self.get_action(board)
+        return self.get_action(board, False)
+
+    def get_action(self, board, train_flag = True):
+        root_state = board.state
+        state, policy = self.__search(board, root_state)
+
+        indices = np.where(policy == policy.max())[0]
+        placable = self.placable[root_state]
+        action = placable[indices[0] if len(indices) == 1 else self.rng.choice(indices)]
+
+        if train_flag:
+            # 方策の形状はニューラルネットワークのものと合わせる
+            mcts_policy = np.zeros(board.action_size, dtype = np.float32)
+            mcts_policy[np.array(placable)] = policy
+            return action, state, mcts_policy
+
+        # コンピュータとして使う場合の処理を軽くしている
         return action
 
-    def get_action(self, board):
-        state = board.get_state_ndarray()
-        mcts_policy = self.__search(board, state)
-        action = self.rng.choice(np.where(mcts_policy == mcts_policy.max())[0])
-        return action, state, mcts_policy
 
-        # 右辺の第１項が過去の探索割合を勘案しながら探索回数の少ない手を選ぶための項で、第２項が勝率を見て活用を行うための項
-        N = self.N[state]
-        pucts = (self.c_puct * sqrt(N.sum()) * self.P[state]) / (N + 1) + self.Q[state]
-
-        # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
-        action_indexs = np.where(pucts == pucts.max())[0]
-
-        if len(action_indexs) == 1:
-            action_index = action_indexs[0]
+    # シミュレーションを行なって得た方策を返すメソッド
+    def __search(self, board, root_state):
+        if root_state in self.seen_state:
+            state_ndarray = board.get_state_ndarray()
         else:
-            action_index = self.rng.choice(action_indexs)
-        return placable[action_index]
-
-
-    def __search(self, board, state):
-        placable = board.list_placable()
-
-        seen_state = self.seen_state
-        if state not in seen_state:
-            seen_state.add(state)
-            self.__expand(state, placable)
+            state_ndarray = self.__expand(board, root_state, True)
 
         # 探索の初期状態ではランダムな手が選ばれやすくなるように、ノイズをかける
         if self.alpha is not None:
-            P = self.P[state]
-            P *= (1. - self.epsilon)
-            P += self.epsilon * self.rng.dirichlet(np.full(len(P), self.alpha))
+            P = self.P[root_state]
+            P = (1. - self.epsilon) * P + self.epsilon * self.rng.dirichlet(np.full(len(P), self.alpha))
 
+        # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations_num):
-            with board.log_runtime():
-                pass
+            board.set_state(root_state)
+            self.__evaluate(board, root_state)
 
-    def __expand(self, state, placable):
-        policy, value = self.network(state[None, :])
+        # 評価値が高いほど探索回数が多くなるように収束するので、それを方策として使う
+        N = self.N[root_state]
+        mcts_policy = N / N.sum()
+        return state_ndarray, mcts_policy
+
+
+    # 子盤面を展開し、その方策・累計行動価値・探索回数の初期化を行うメソッド
+    def __expand(self, board, state, root_flag = False):
+        self.seen_state.add(state)
+        state_ndarray = board.get_state_ndarray()
+        policy, value = self.network(state_ndarray[None, :])
+
+        placable = board.list_placable()
+        self.placable[state] = placable
+
         self.P[state] = policy[0, np.array(placable)]
-        self.Q_N[state] = np.zeros((2, len(placable)), dtype = np.float32)
+        self.T[state] = np.zeros(len(placable), dtype = np.float32)
+        self.N[state] = np.zeros(len(placable), dtype = np.float32)
+
+        # ルート盤面の展開時は評価地の代わりに、学習時用にニューラルネットワークへの入力としての状態データを返す
+        if root_flag:
+            return state_ndarray
+
+        # それ以外は、ニューラルネットワークの出力である過去の勝率を返す
         return value[0, 0]
 
-    def __evaluate(self, board, state, placable):
-        flag = board.can_continue()
-        if flag:
-            pass
+
+    # 初到達の盤面の展開をしてゲーム木を大きくしながら、ゲームの報酬や過去のデータをもとに評価値を返すメソッド
+    def __evaluate(self, board, state, continue_flag = 1):
+        if not continue_flag:
+            # ゲーム終了時は最後に手を打ったプレイヤーの報酬を返す
+            return board.reward
+
+        if state in self.seen_state:
+            # 右辺の第１項が過去の結果を勘案しつつ探索を促進する項で、第２項が勝率を見て活用を促進する項
+            N = self.N[state]
+            pucts = (self.c_puct * sqrt(N.sum()) * self.P[state]) / (N + 1) + self.T[state] / (N + 1e-15)
+
+            # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
+            indices = np.where(pucts == pucts.max())[0]
+            action_index = indices[0] if len(indices) == 1 else self.rng.choice(indices)
+
+            action = self.placable[state][action_index]
+            board.put_stone(action)
+            value = self.__evaluate(board, board.state, board.can_continue())
+
+            # 結果を反映させる
+            self.T[state][action_index] += value
+            self.N[state][action_index] += 1
         else:
-            
+            # 展開していなかった盤面の場合は、ニューラルネットワークの出力である過去の勝率を評価値として返す
+            value = self.__expand(board, state)
+
+        # １つ前に手を打ったプレイヤーにとっての評価値を返す (手番が変わっていた場合は、視点が逆になる)
+        if continue_flag == 1:
+            return -value
+        return value
 
 
 
 
+# 過去の探索の記録を残し、それらを順に取り出すことのできるイテラブル
 class ReplayBuffer:
     def __init__(self, buffer_size, batch_size = 64):
         self.buffer = deque(maxlen = buffer_size)

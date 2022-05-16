@@ -20,6 +20,8 @@ class PolicyNet(Model):
         return self.l2(x)
 
 
+
+
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
     def __init__(self, action_size, gamma = 0.99, lr = 0.0001, to_gpu = False):
@@ -80,8 +82,7 @@ class ReinforceAgent:
     def update(self):
         G, loss = 0, 0
         for reward, prob in reversed(self.memory):
-            G *= self.gamma
-            G += reward
+            G = self.gamma * G + reward
 
             # 負けの場合は、報酬に１回分余分に gamma が掛かっている
             if prob is not None:
@@ -132,7 +133,7 @@ def fit_reinforce_agent(to_gpu, episodes, trained_num = 0, restart = 0, version 
     file_name = "reinforce" if version is None else ("reinforce" + version)
 
     # ハイパーパラメータ設定
-    gamma = 0.97
+    gamma = 0.9
     lr = 0.00005
 
     # 環境
@@ -231,8 +232,9 @@ if __name__ == "__main__":
     to_gpu = False
 
     # 学習用コード
-    # fit_reinforce_agent(to_gpu, episodes = 100000, trained_num = 0, restart = 0, version = None)
+    fit_reinforce_agent(to_gpu, episodes = 100000, trained_num = 0, restart = 0, version = None)
 
     # 評価用コード
-    eval_reinforce_computer(to_gpu, agent_num = 2, enemy_plan = simple_plan, version = None)
-    eval_reinforce_computer(to_gpu, agent_num = 2, enemy_plan = corners_plan, version = None)
+    for i in range(1, 9):
+        eval_reinforce_computer(to_gpu, agent_num = i, enemy_plan = simple_plan, version = None)
+        eval_reinforce_computer(to_gpu, agent_num = i, enemy_plan = corners_plan, version = None)

@@ -24,12 +24,8 @@ def simple_plan(board, placable = None):
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
 
     # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出した最大手であるインデックスからランダムに選ぶ
-    action_indexs = np.where(flip_nums == flip_nums.max())[0]
-
-    if len(action_indexs) == 1:
-        action_index = action_indexs[0]
-    else:
-        action_index = random.choice(action_indexs)
+    indices = np.where(flip_nums == flip_nums.max())[0]
+    action_index = indices[0] if len(indices) == 1 else random.choice(indices)
     return placable[action_index]
 
 

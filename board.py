@@ -6,7 +6,6 @@ import numpy as np
 
 from board_speedup import get_reverse_board, get_legal_board, get_stand_bits
 import display
-#import player_kinds
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -367,10 +366,10 @@ class Board:
 
 
     def play(self):
-        #ウインドウ
+        # ウインドウ
         self.main_window = display.MainWindow(self)
 
-        #プレイヤーの種類
+        # プレイヤーの種類
         self.player_kinds = player_kinds.PlayerKinds(self.main_window)
 
         while True:

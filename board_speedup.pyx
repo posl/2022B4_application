@@ -1,15 +1,20 @@
-# distutils: language=c++
+# distutils: language = c++
 # distutils: extra_compile_args = ["-O3"]
-# cython: language_level=3, boundscheck=False, wraparound=False
-# cython: cdivision=True
+# cython: language_level = 3, boundscheck = False, wraparound = False
+# cython: cdivision = True
 
 from libcpp.vector cimport vector
 
 ctypedef unsigned long long uint
 
 
-# 合法手の箇所だけ１が立った、ボードを表す 64 bit 符号無し整数を返す (ブラックボックス化するため、反復処理は展開している)
+
 # 引数は手番または、相手プレイヤーの石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
+def get_legal_board(uint move_player, uint opposition_player):
+    return __get_legal_board(move_player, opposition_player)
+
+
+# 合法手の箇所だけ１が立った、ボードを表す 64 bit 符号無し整数を返す (ブラックボックス化するため、反復処理は展開している)
 cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
     # ちゃんと型宣言をした方が速い
     cdef uint mask, legal
@@ -37,12 +42,15 @@ cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
     # 空白箇所だけに絞って、出力を得る
     return legal & (~(move_player | opposition_player))
 
-def get_legal_board(uint move_player, uint opposition_player):
-    return __get_legal_board(move_player, opposition_player)
+
+
+
+# 第１引数は手番プレイヤーによって新たに石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
+def get_reverse_board(uint set_position, uint move_player, uint opposition_player):
+    return __get_reverse_board(set_position, move_player, opposition_player)
 
 
 # 反転するマスだけ１が立った、ボードを表す 64 bit 符号無し整数を返す
-# 第１引数は手番プレイヤーによって新たに石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
 cdef inline uint __get_reverse_board(uint set_position, uint move_player, uint opposition_player):
     cdef uint mask, tmp, reverse
     reverse = 0
@@ -85,13 +93,14 @@ cdef inline uint __get_reverse_board(uint set_position, uint move_player, uint o
 
     return reverse
 
-def get_reverse_board(uint set_position, uint move_player, uint opposition_player):
-    return __get_reverse_board(set_position, move_player, opposition_player)
+
+
 
 # 手番プレイヤーの石から見て、指定方向に相手の石が連続していた場合、その終端のもう１つ先が手番にとっての合法手である
 cdef inline uint search_upper_legal(uint tmp, int n, uint mask):
     tmp = search_upper(tmp, n, mask)
     return tmp >> n
+
 
 cdef inline uint search_lower_legal(uint tmp, int n, uint mask):
     tmp = search_lower(tmp, n, mask)
@@ -109,6 +118,7 @@ cdef inline uint search_upper(uint tmp, int n, uint mask):
     tmp |= mask & (tmp >> n)
     return tmp
 
+
 # ボードを表す整数を奥にシフトする方向に探索する
 cdef inline uint search_lower(uint tmp, int n, uint mask):
     tmp = mask & (tmp << n)
@@ -120,7 +130,9 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
     return tmp
 
 
-#１が立っているビット位置のリストを取得する
+
+
+# １が立っているビット位置のリストを取得する
 def get_stand_bits(int num, uint x):
     cdef:
         int n

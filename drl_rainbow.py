@@ -747,7 +747,7 @@ if __name__ == "__main__":
     quantiles_num = 200
     to_gpu = True
 
-    # 学習用コード (13 hours -> 48307 episodes)
+    # 学習用コード (CPU : 3.80 s / iter,  GPU : 0.54 s / iter)
     # fit_rainbow_agent(quantiles_num, to_gpu, episodes = 3000000, restart = 0, version = None)
 
     # 評価用コード
