@@ -1,8 +1,10 @@
+from os import environ
 import tkinter as tk
 import tkinter.ttk as ttk
 import math
-import random
 
+# pygame のウェルカムメッセージを表示させないための設定
+environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
 import sound

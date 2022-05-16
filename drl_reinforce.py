@@ -3,7 +3,7 @@ import numpy as np
 from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_train_utilities import SelfMatch, simple_plan, corners_plan
+from drl_train_utilities import SelfMatch, eval_computer
 from board import Board
 
 
@@ -24,9 +24,8 @@ class PolicyNet(Model):
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.99, lr = 0.0001, to_gpu = False):
+    def __init__(self, action_size, gamma = 0.9, lr = 0.0005, to_gpu = False):
         self.memory = []
-
         self.action_size = action_size
         self.gamma = gamma
         self.lr = lr
@@ -35,11 +34,11 @@ class ReinforceAgent:
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
         pi = PolicyNet(self.action_size)
+        self.optimizer = optimizers.Adam(self.lr).setup(pi)
         if self.use_gpu:
             pi.to_gpu()
 
         self.pi = pi
-        self.optimizer = optimizers.Adam(self.lr).setup(pi)
         self.rng = np.random.default_rng()
 
     def save(self, file_path, is_yet = None):
@@ -98,8 +97,56 @@ class ReinforceAgent:
 
 
 
+# 実際にコンピュータとして使われるクラス
+class ReinforceComputer:
+    def __init__(self, action_size, to_gpu = False):
+        self.each_pi = []
+        self.action_size = action_size
+        self.use_gpu = to_gpu and cuda.gpu_enable
+
+    def reset(self, file_name, gamma, turn):
+        file_path = Reinforce.get_path(file_name).format("parameters")
+        file_path += "-{}_{}".format(str(gamma)[2:], turn)
+        self.rng = np.random.default_rng()
+
+        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
+        each_pi = self.each_pi
+        each_pi.clear()
+        use_gpu = self.use_gpu
+
+        # 同じ条件で学習した３人のエージェントの中から２人選ぶ
+        for i in self.rng.choice(3, 2, replace = False):
+            pi = PolicyNet(self.action_size)
+            each_pi.append(pi)
+
+            pi.load_weights(file_path + f"{i}.npz")
+            if use_gpu:
+                pi.to_gpu()
+
+    def __call__(self, board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
+        xp = cuda.cp if self.use_gpu else np
+        state = board.get_state_ndarray(xp)[None, :]
+
+        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        with no_grad():
+            pi0, pi1 = self.each_pi
+            policy = pi0(state) + pi1(state)
+
+            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
+            probs = dzf.softmax(policy[:, np.array(placable)])
+            probs = probs.data[0]
+
+        return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
+
+
+
+
 class Reinforce(SelfMatch):
-    def fit_one_episode(self, progress = None):
+    def fit_episode(self, progress = None):
         board = self.board
         board.reset()
 
@@ -124,16 +171,11 @@ class Reinforce(SelfMatch):
         agent.add((-reward, None))
         agent.update()
 
-    def save(self, turn, file_path, index):
-        agent = self.agents[turn]
-        agent.save(f"{file_path}{turn}_{index}")
 
-
-def fit_reinforce_agent(to_gpu, episodes, trained_num = 0, restart = 0, version = None):
-    file_name = "reinforce" if version is None else ("reinforce" + version)
-
+# ガンマの値が学習結果に大きく寄与することがわかったため、それを変更しながら学習して、結果を比較する
+def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = False):
     # ハイパーパラメータ設定
-    gamma = 0.9
+    gamma = None
     lr = 0.00005
 
     # 環境
@@ -144,97 +186,24 @@ def fit_reinforce_agent(to_gpu, episodes, trained_num = 0, restart = 0, version 
     first_agent = ReinforceAgent(*agent_args)
     second_agent = ReinforceAgent(*agent_args)
 
-    # 自己対戦
-    self_match = Reinforce(board, first_agent, second_agent)
-    self_match.fit(8, episodes, file_name, trained_num, restart)
-
-
-
-
-# 実際にコンピュータとして使われるクラス
-class ReinforceComputer:
-    def __init__(self, action_size, to_gpu = False):
-        self.each_pi = []
-        self.action_size = action_size
-        self.use_gpu = to_gpu and cuda.gpu_enable
-
-    def reset(self, file_name, turn, agent_num):
-        file_name = Reinforce.get_path(file_name).format("parameters")
-        file_name += f"{turn}_"
-        self.rng = np.random.default_rng()
-
-        # 何人のエージェントを行動選択に使うかによって、難易度を変えることができる (上限は８人)
-        assert isinstance(agent_num, int)
-        assert 1 <= agent_num <= 8
-
-        # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
-        each_pi = self.each_pi
-        each_pi.clear()
-        use_gpu = self.use_gpu
-
-        for i in self.rng.choice(8, agent_num, replace = False):
-            pi = PolicyNet(self.action_size)
-            each_pi.append(pi)
-
-            pi.load_weights(file_name + f"{i}.npz")
-            if use_gpu:
-                pi.to_gpu()
-
-    def __call__(self, board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
-
-        xp = cuda.cp if self.use_gpu else np
-        state = board.get_state_ndarray(xp)[None, :]
-
-        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
-        with no_grad():
-            for pi in self.each_pi:
-                try:
-                    policy += pi(state)
-                except NameError:
-                    policy = pi(state)
-
-            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
-            probs = dzf.softmax(policy[:, np.array(placable)])
-            probs = probs.data[0]
-
-        return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
-
-
-def eval_reinforce_computer(to_gpu, agent_num, enemy_plan, version = None):
-    file_name = "reinforce" if version is None else ("reinforce" + version)
-
-    # 環境とエージェント
-    board = Board()
-
-    # コンピュータ
-    computer_args = board.action_size, to_gpu
-    first_agent = ReinforceComputer(*computer_args)
-    second_agent = ReinforceComputer(*computer_args)
-
-    # エージェントの初期化
-    first_agent.reset(file_name, 1, agent_num)
-    second_agent.reset(file_name, 0, agent_num)
+    # 自己対戦場
     self_match = Reinforce(board, first_agent, second_agent)
 
-    # 評価
-    print("\nenemy:", enemy_plan.__name__)
-    print(f"agent_num: {agent_num}")
-    print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
-    print("second: {} %".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
+    for gamma in gammas:
+        first_agent.gamma = gamma
+        second_agent.gamma = gamma
+        self_match.fit(3, episodes, restart, file_name + "-{}_".format(str(gamma)[2:]))
 
 
 
 
 if __name__ == "__main__":
     to_gpu = False
+    gammas = 0.95, 0.85, 0.75
+    file_name = "reinforce"
 
     # 学習用コード
-    fit_reinforce_agent(to_gpu, episodes = 100000, trained_num = 0, restart = 0, version = None)
+    fit_reinforce_agent(to_gpu, gammas, file_name)
 
     # 評価用コード
-    for i in range(1, 9):
-        eval_reinforce_computer(to_gpu, agent_num = i, enemy_plan = simple_plan, version = None)
-        eval_reinforce_computer(to_gpu, agent_num = i, enemy_plan = corners_plan, version = None)
+    eval_computer(ReinforceComputer, to_gpu, gammas, file_name)

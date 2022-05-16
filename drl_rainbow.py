@@ -9,7 +9,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
 from inada_framework.utilities import reshape_for_broadcast
-from drl_train_utilities import SelfMatch, simple_plan, corners_plan
+from drl_train_utilities import SelfMatch, eval_computer
 from board import Board
 
 
@@ -617,9 +617,29 @@ class RainbowAgent:
 
 
 
+# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
+class RainbowComputer(RainbowAgent):
+    def __init__(self, action_size, to_gpu = False):
+        self.action_size = action_size
+        self.use_gpu = to_gpu and cuda.gpu_enable
+
+    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
+    def reset(self, file_name, gamma, turn, quantiles_num = 200):
+        qnet = RainbowNet(self.action_size, quantiles_num)
+        self.qnet = qnet
+
+        file_path = Rainbow.get_path(file_name).format("parameters")
+        file_path += "-{}_{}0.npz".format(str(gamma)[2:], turn)
+        qnet.load_weights(file_path)
+        if self.use_gpu:
+            qnet.to_gpu()
+
+
+
+
 # Rainbow エージェント同士で対戦を行うためのクラス (自己対戦)
 class Rainbow(SelfMatch):
-    def fit_one_episode(self, progress):
+    def fit_episode(self, progress):
         board = self.board
         board.reset()
         transition_infos = deque(), deque()
@@ -664,21 +684,15 @@ class Rainbow(SelfMatch):
             else:
                 break
 
-    def save(self, turn, file_name, index = None):
-        agent = self.agents[turn]
-        agent.save(f"{file_name}{turn}_{agent.quantiles_num}")
 
-
-def fit_rainbow_agent(quantiles_num, to_gpu, episodes, restart = 0, version = None):
-    file_name = "rainbow" if version is None else ("rainbow" + version)
-
+def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = False):
     # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
     compress = False
     step_num = 3
-    gamma = 0.98
     batch_size = 32
+    quantiles_num = 200
     lr = 0.00025
 
     # 環境
@@ -696,60 +710,20 @@ def fit_rainbow_agent(quantiles_num, to_gpu, episodes, restart = 0, version = No
 
     # 自己対戦
     self_match = Rainbow(board, first_agent, second_agent)
-    self_match.fit(1, episodes, file_name, 0, restart)
-
-
-
-
-# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
-class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size, to_gpu = False):
-        self.action_size = action_size
-        self.use_gpu = to_gpu and cuda.gpu_enable
-
-    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
-    def reset(self, file_name, turn, quantiles_num):
-        qnet = RainbowNet(self.action_size, quantiles_num)
-        self.qnet = qnet
-
-        file_path = Rainbow.get_path(file_name).format("parameters") + f"{turn}_{quantiles_num}.npz"
-        qnet.load_weights(file_path)
-        if self.use_gpu:
-            qnet.to_gpu()
-
-
-def eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan, version = None):
-    file_name = "rainbow" if version is None else ("rainbow" + version)
-
-    # 環境
-    board = Board()
-
-    # コンピュータ
-    computer_args = board.action_size, to_gpu
-    first_computer = RainbowComputer(*computer_args)
-    second_computer = RainbowComputer(*computer_args)
-
-    # エージェントの初期化
-    first_computer.reset(file_name, 1, quantiles_num)
-    second_computer.reset(file_name, 0, quantiles_num)
-    self_match = Rainbow(board, first_computer, second_computer)
-
-    # 評価
-    print("\nenemy:", enemy_plan.__name__)
-    print(f"quantiles_num: {quantiles_num}")
-    print("first: {} %".format(self_match.eval(1, enemy_plan, verbose = True) / 10))
-    print("second: {} %".format(self_match.eval(0, enemy_plan, verbose = True) / 10))
+    file_name += "-{}_".format(str(gamma)[2:])
+    self_match.fit(1, episodes, restart, file_name)
 
 
 
 
 if __name__ == "__main__":
-    quantiles_num = 200
     to_gpu = True
+    gammas = (0.98, 0.94, 0.90)
+    trained_num = 0
+    file_name = "rainbow"
 
     # 学習用コード (CPU : 3.80 s / iter,  GPU : 0.54 s / iter)
-    # fit_rainbow_agent(quantiles_num, to_gpu, episodes = 3000000, restart = 0, version = None)
+    fit_rainbow_agent(to_gpu, gammas[trained_num], file_name, restart = False)
 
     # 評価用コード
-    eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan = simple_plan, version = None)
-    eval_rainbow_computer(quantiles_num, to_gpu, enemy_plan = corners_plan, version = None)
+    eval_computer(RainbowComputer, to_gpu, gammas[: trained_num + 1], file_name)
