@@ -1,16 +1,17 @@
 from functools import singledispatchmethod
 import random
-from math import sqrt
+from math import sqrt, ceil
 from dataclasses import dataclass
 from collections import deque
 
 import numpy as np
 import ray
+from tqdm import tqdm
 
 from inada_framework import Model, Function, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_train_utilities import SelfMatch, simple_plan, corners_plan
+from drl_train_utilities import SelfMatch, corners_plan
 from board import Board
 from inada_framework.optimizers import Momentum, WeightDecay
 
@@ -69,9 +70,9 @@ class AlphaZeroAgent:
         self.c_puct = c_puct
 
     # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def reset(self, arg, simulations_num = 800):
+    def reset(self, arg, simulations = 800):
         self.load(arg)
-        self.simulations_num = simulations_num
+        self.simulations = simulations
 
         # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率も参考にした累計行動価値、各状態・行動の探索回数
         self.P = {}
@@ -135,7 +136,7 @@ class AlphaZeroAgent:
         P = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
-        for __ in range(self.simulations_num):
+        for __ in range(self.simulations):
             self.__evaluate(board, root_state)
             board.set_state(root_state)
 
@@ -198,6 +199,11 @@ class AlphaZeroAgent:
         return value
 
 
+# 実際にコンピュータとして使われるクラス (上のエージェントをそのまま使っても良い)
+class AlphaZeroComputer(AlphaZeroAgent):
+    pass
+
+
 
 
 # 実態はクラスだが、リストやタプルに比べて、メモリ容量は小さく、アクセスも速い
@@ -216,8 +222,9 @@ class ReplayBuffer:
         self.indices = None
         self.rng = np.random.default_rng()
 
-    def __len__(self):
-        return len(self.buffer)
+    @property
+    def max_iter(self):
+        return ceil(len(self.buffer) / self.batch_size)
 
     # １エピソード分のデータがリストとして、まとめて格納される
     def add(self, datas: list):
@@ -249,13 +256,14 @@ class ReplayBuffer:
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_play(weights: dict, simulations_num):
+def alphazero_play(weights: dict, simulations):
     # 環境
     board = Board()
+    board.reset()
 
     # エージェント (先攻・後攻で分けない)
     agent = AlphaZeroAgent(board.action_size)
-    agent.reset(weights, simulations_num)
+    agent.reset(weights, simulations)
 
     # 実際に１ゲームプレイして、対局データを収集する
     memory = []
@@ -276,8 +284,51 @@ def alphazero_play(weights: dict, simulations_num):
     return memory
 
 
+@ray.remote(num_cpus = 1, num_gpus = 0)
+def alphazero_test(weights: dict, simulations, turn):
+    # 環境
+    board = Board()
+    board.reset()
 
-def alphazero_train(updates = 50, interval = 300, epochs = 5, simulations_num = 800):
+    # エージェント (先攻・後攻で分けない)
+    agent = AlphaZeroAgent(board.action_size)
+    agent.reset(weights, simulations)
+
+    # 方策の設定・１ゲーム勝負
+    plans = (agent, corners_plan) if turn else (corners_plan, agent)
+    board.set_plan(*plans)
+    board.game()
+
+    # 勝利か否かを取得
+    result = board.black_num - board.white_num
+    return (result > 0) if turn else (result < 0)
+
+
+
+
+def alphazero_eval(network, simulations, turn):
+    # ray の共有メモリへの重みパラメータのコピーを事前に１度だけ、明示的に行うことで、以降を高速化する
+    current_weights = ray.put(network.get_weights())
+
+    # まだ完遂していないタスクがリストの中に残るようになる
+    remains = [alphazero_test.remote(current_weights, simulations, turn) for __ in range(100)]
+
+    # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
+    win_count = 0
+    while remains:
+        finished, remains = ray.wait(remains, num_returns = 1)
+        win_count += ray.get(finished[0])
+
+    return win_count
+
+
+
+
+def alphazero_train(updates = 50, interval = 300, epochs = 5, simulations = 800, restart = False):
+    file_path = SelfMatch.get_path("alphazero")
+    is_yet_file = file_path.format("is_yet")
+    params_file = file_path.format("parameters")
+
     # ハイパーパラメータの設定
     buffer_size = 90000
     batch_size = 64
@@ -286,38 +337,65 @@ def alphazero_train(updates = 50, interval = 300, epochs = 5, simulations_num = 
 
     # ニューラルネットワーク・経験再生バッファ
     network = PolicyValueNet(Board.action_size)
-    replay_buffer = ReplayBuffer(buffer_size, batch_size)
+    buffer = ReplayBuffer(buffer_size, batch_size)
 
     # 最適化手法は慣性に着想を得た手法である Momentum で、パラメータのノルムが過大にならないように重み減衰を行う
     optimizer = Momentum(lr).setup(network)
     optimizer.add_hook(WeightDecay(weight_decay))
 
-    # 並列実行を行うための初期設定
-    ray.init()
+
+    # 学習を途中再開する場合は、必要な情報を読み込む
+    if restart:
+        network.load_weights(f"{is_yet_file}_weights.npz")
+        restart = buffer.load(f"{is_yet_file}_buffer.pkl")
+        historys = np.load(f"{is_yet_file}_history.npy")
+    else:
+        restart = 1
+        historys = np.zeros((2, updates), dtype = np.float32)
+
+    # 評価結果を一時的に保持するための配列
+    win_rates = np.zeros(2, dtype = np.int32)
 
 
-    for __ in range(updates):
-        # ray の共有メモリへの重みパラメータのコピーを事前に１度だけ、明示的に行うことで、以降の呼び出しを高速化する
-        current_weights = ray.put(network.get_weights())
+    try:
+        # 並列実行を行うための初期設定
+        ray.init()
 
-        # まだ完遂していないタスクがリストの中に残るようになる
-        remains = [alphazero_play.remote(current_weights, simulations_num) for __ in range(interval)]
+        for update in range(restart, updates + 1):
+            current_weights = ray.put(network.get_weights())
+            remains = [alphazero_play.remote(current_weights, simulations) for __ in range(interval)]
 
-        # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
-        while remains:
-            finished, remains = ray.wait(remains, num_returns = 1)
-            replay_buffer.add(ray.get(finished[0]))
+            # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
+            with tqdm(desc = f"update {update}", total = interval, leave = False) as pbar:
+                while remains:
+                    finished, remains = ray.wait(remains, num_returns = 1)
+                    buffer.add(ray.get(finished[0]))
+                    pbar.update(1)
 
-        # interval で指定した期間ごとに、epochs で指定したエポック数だけ、パラメータを学習する
-        for __ in range(epochs):
-            for states, mcts_policys, rewards in replay_buffer:
-                alphazero_loss(*network(states), mcts_policys, rewards)
-                optimizer.update()
+            # interval で指定した期間ごとに、epochs で指定したエポック数だけ、パラメータを学習する
+            with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
+                for epoch in range(epochs):
+                    pbar.set_description(f"epoch {epoch}")
+
+                    win_rates
+                    for states, mcts_policys, rewards in buffer:
+                        alphazero_loss(*network(states), mcts_policys, rewards)
+                        optimizer.update()
+
+                        win_rates = 
+                        pbar.set_postfix(rates = "({}%, {}%)".format(*win_rates[::-1])))
+                        pbar.update(1)
+
+            # パラメータの保存・暫定結果の出力
+            network.save_weights("{}_{:0{}}.npz".format(params_file, update, len(str(updates))))
+
+    except KeyboardInterrupt:
+        network.save_weights(f"{is_yet_file}_weights.npz")
+        buffer.save(f"{is_yet_file}_buffer.pkl", update)
+        np.save(f"{is_yet_file}_history.npy", historys)
 
 
 
 
-# 自己対戦によって、パラメータを学習するための闘技場
-class AlphaZeroArena:
-    def save(self, file_name):
-        self.network.save_weights(SelfMatch.get_path(file_name).format("parameters"))
+if __name__ == "__main__":
+    alphazero_train(restart = False)

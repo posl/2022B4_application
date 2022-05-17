@@ -144,7 +144,7 @@ class SelfMatch:
             # 割引率が重要なパラメータなので、その情報と一緒に保存する
             gamma = self.agents[0].gamma
             plt.title(f"gamma = {gamma}")
-            plt.savefig(file_name.format("graphs") + "-{}".format(str(gamma)[2:]))
+            plt.savefig(file_name.format("graphs") + "-{}".format(str(gamma * 100)[:2]))
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する
@@ -179,7 +179,7 @@ class SelfMatch:
             if index is None:
                 agent.save(file_path + f"{turn}", is_yet = True)
             else:
-                agent.save(file_path + "-{}_{}{}".format(str(agent.gamma)[2:], turn, index))
+                agent.save(file_path + "-{}_{}{}".format(str(agent.gamma * 100)[:2], turn, index))
             agent.reset()
 
 

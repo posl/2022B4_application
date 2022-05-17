@@ -104,15 +104,15 @@ class ReinforceComputer:
 
     def reset(self, file_name, gamma, turn):
         file_path = Reinforce.get_path(file_name).format("parameters")
-        file_path += "-{}_{}".format(str(gamma)[2:], turn)
+        file_path += "-{}_{}".format(str(gamma * 100)[:2], turn)
 
         # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
         each_pi = self.each_pi
         each_pi.clear()
         use_gpu = self.use_gpu
 
-        # 同じ条件で学習した３人のエージェントの中から、ランダムな人数だけ、ランダムに選ぶ (７通り)
-        for i in random.sample(range(3), random.randint(1, 3)):
+        # 同じ条件で学習した３人のエージェントの中から、２人だけ、ランダムに選ぶ
+        for i in random.sample(range(3), 2):
             pi = PolicyNet(self.action_size)
             each_pi.append(pi)
 
@@ -130,11 +130,8 @@ class ReinforceComputer:
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
         with no_grad():
-            for pi in self.each_pi:
-                try:
-                    policy += pi(state).data
-                except NameError:
-                    policy = pi(state).data
+            pi0, pi1 = self.each_pi
+            policy = pi0(state).data + pi1(state).data
 
         # 各エージェントが提案するスコア値の和をとり、それを元にした重み付きランダムサンプリングで行動を選択する
         policy = policy[0, np.array(placable)]
@@ -191,8 +188,8 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
         first_agent.gamma = gamma
         second_agent.gamma = gamma
         self_match.fit(3, episodes, restart, file_name)
-        print(f"\"gamma = {gamma}\" is done!")
-    print()
+        restart = False
+        print(f"\"gamma = {gamma}\" is done!\n")
 
 
 
@@ -203,11 +200,11 @@ if __name__ == "__main__":
     file_name = "reinforce"
 
     # 学習の進行具合によって変更する必要がある変数
-    trained_num = 0
+    trained_num = 1
     restart = False
 
     # 学習用コード
     fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)
 
     # 評価用コード
-    # eval_computer(ReinforceComputer, to_gpu, gammas[: trained_num], file_name)
+    eval_computer(ReinforceComputer, to_gpu, gammas, file_name)

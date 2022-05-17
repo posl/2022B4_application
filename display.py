@@ -9,9 +9,9 @@ import random
 environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-import mc_tree_search
-#import mc_primitive
-import gt_alpha_beta
+# import mc_tree_search
+# import mc_primitive
+# import gt_alpha_beta
 
 
 class Page(tk.Frame):

@@ -629,7 +629,7 @@ class RainbowComputer(RainbowAgent):
         self.qnet = qnet
 
         file_path = Rainbow.get_path(file_name).format("parameters")
-        file_path += "-{}_{}0.npz".format(str(gamma)[2:], turn)
+        file_path += "-{}_{}0.npz".format(str(gamma * 100)[:2], turn)
         qnet.load_weights(file_path)
         if self.use_gpu:
             qnet.to_gpu()
