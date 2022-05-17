@@ -1,14 +1,16 @@
 from os import environ
+import os
 import tkinter as tk
 import tkinter.ttk as ttk
 import math
+import random
 
 # pygame のウェルカムメッセージを表示させないための設定
 environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-import sound
-
+#import mc_tree_search
+#import mc_primitive
 
 
 class Page(tk.Frame):
@@ -439,6 +441,173 @@ class GamePage(Page):
 
 
 
+class Sounds:
+    def __init__(self):
+        self.sounds = []
+        self.musics = []
+        sound_folder_path = os.path.normpath(os.path.join(os.path.abspath(__file__),  "../sound"))
+        se0 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))      
+        se1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou47.wav"))
+        se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
+        se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
+        se4 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou19.wav"))
+        se0.set_volume(0.3)
+        se1.set_volume(0.3)
+        se2.set_volume(0.3)
+        se3.set_volume(0.3)
+        se4.set_volume(0.3)
+
+        self.sounds.append(se0)
+        self.sounds.append(se1)
+        self.sounds.append(se2)
+        self.sounds.append(se3)
+        self.sounds.append(se4)
+
+        bgm1 = os.path.join(sound_folder_path, "maou09.mp3")
+        bgm2 = os.path.join(sound_folder_path, "tamsu08.mp3")
+
+        self.musics.append(bgm1)
+        self.musics.append(bgm2)
+        
+        self.bgm_play(0)
+
+    def bgm_play(self, id, loop=-1):
+        if id<0 or id>=len(self.musics):
+            return
+        pygame.mixer.music.load(self.musics[id])
+        pygame.mixer.music.play(loop)
+
+    def play(self, id, loop=0):
+        if id<0 or id>=len(self.sounds):
+            return
+        self.sounds[id].play(loops=loop)
+    
+    def stop(self, id):
+        if id<0 or id>=len(self.sounds):
+            return
+        self.sounds[id].stop()
+
+
+
+
+
+
+class Human:
+    def __init__(self, par):
+        self.par = par  # par : MainWindow , main_loopを呼び出すために必要
+
+    def player(self, board):
+        placable = set(board.list_placable())
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            if n in placable:
+                break
+        return n
+    
+    def cheat_player(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        n = 0
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            break
+        if t==1:
+            if ((board.stone_white>>n) & 1):
+                board.stone_white = board.stone_white ^ (1<<n)
+            board.stone_black = board.stone_black ^ (1<<n)
+        else:
+            if ((board.stone_black>>n) & 1):
+                board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
+            board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        return self.player(board)
+    
+    #本来はここに書くべきではなかろうが暫定的に
+    def com_random(self, board):
+        return random.choice(board.list_placable())
+
+    def com_cheater1(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        if len(bplace)+len(wplace)>4:
+            if t==1:
+                p = random.choice(wplace)
+                board.stone_white = board.stone_white ^ (1<<p)
+                board.stone_black = board.stone_black ^ (1<<p)
+            else:
+                p = random.choice(bplace)
+                board.stone_black = board.stone_black ^ (1<<p)
+                board.stone_white = board.stone_white ^ (1<<p)
+        return random.choice(board.list_placable())
+
+
+
+class PlayerKinds:
+    def __init__(self, par):
+        self.kinds_name = [] # 名前（人間、ランダムなど）
+        self.kinds_func = [] # どこに打つかを返す関数
+        self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
+
+        self.human = Human(par)
+        self.kinds_name.append("人間")
+        self.kinds_func.append(self.human.player)
+        self.kinds_difficulty.append(1)
+
+        self.human = Human(par)
+        self.kinds_name.append("人間-チート1")
+        self.kinds_func.append(self.human.cheat_player)
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("ランダム")
+        self.kinds_func.append(self.human.com_random)
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("ランダム-チート1")
+        self.kinds_func.append(self.human.com_cheater1)
+        self.kinds_difficulty.append(1)
+
+        #self.kinds_name.append("MC木探索")
+        #self.kinds_func.append(mc_tree_search.MonteCarloTreeSearch())
+        #self.kinds_difficulty.append(1)
+
+        #self.kinds_name.append("原始MC探索")
+        #self.kinds_func.append(mc_primitive.PrimitiveMonteCarlo())
+        #self.kinds_difficulty.append(1)
+
+
+    def get_num(self):
+        return len(self.kinds_name)
+    
+    def get_name(self, id):
+        if id<0 or id>=len(self.kinds_name):
+            print("範囲外のIDが指定されました")
+            exit()
+        return self.kinds_name[id]
+
+    def get_func(self, id):
+        if id<0 or id>=len(self.kinds_func):
+            print("範囲外のIDが指定されました")
+            exit()
+        return self.kinds_func[id]
+
+    def get_difficulty(self, id):
+        if id<0 or id>=len(self.kinds_difficulty):
+            print("範囲外のIDが指定されました")
+            exit()
+        return self.kinds_difficulty[id]
+
+
+
+
+
 
 class MainWindow(tk.Tk):
     def __init__(self, board, *args, **kwargs):
@@ -456,7 +625,7 @@ class MainWindow(tk.Tk):
         self.game_page = GamePage(self, self.board)
         self.change_page(0)
 
-        self.sounds = sound.Sounds()
+        self.sounds = Sounds()
 
         self.protocol("WM_DELETE_WINDOW", self.on_exit)
 
