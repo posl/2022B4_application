@@ -22,8 +22,6 @@ class PolicyNet(Model):
         return self.l2(x)
 
 
-
-
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
     def __init__(self, action_size, gamma = 0.9, lr = 0.0005, to_gpu = False):
@@ -185,23 +183,24 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
     self_match = Reinforce(board, first_agent, second_agent)
 
     for gamma in gammas:
+        print(f"\"gamma = {gamma}\" is started.\n")
         first_agent.gamma = gamma
         second_agent.gamma = gamma
-        self_match.fit(3, episodes, restart, file_name)
+        self_match.fit(3, episodes, restart, file_name + "-{}".format(str(gamma * 100)[:2]))
         restart = False
-        print(f"\"gamma = {gamma}\" is done!\n")
+        print(f"\ndone!\n")
 
 
 
 
 if __name__ == "__main__":
     to_gpu = False
-    gammas = 0.95, 0.90, 0.85, 0.80, 0.75, 0.70
+    gammas = (0.95, 0.90, 0.85, 0.80, 0.75, 0.70)
     file_name = "reinforce"
 
     # 学習の進行具合によって変更する必要がある変数
     trained_num = 1
-    restart = False
+    restart = True
 
     # 学習用コード
     fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)

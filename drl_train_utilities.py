@@ -141,10 +141,9 @@ class SelfMatch:
             plt.xlabel("Progress Rate")
             plt.ylabel("Mean Winning Percentage")
 
-            # 割引率が重要なパラメータなので、その情報と一緒に保存する
-            gamma = self.agents[0].gamma
-            plt.title(f"gamma = {gamma}")
-            plt.savefig(file_name.format("graphs") + "-{}".format(str(gamma * 100)[:2]))
+            # 割引率が重要なパラメータであることがわかったので、その情報と一緒に保存する
+            plt.title("gamma = {}".format(self.agents[1].gamma))
+            plt.savefig(file_name.format("graphs"))
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する
@@ -174,12 +173,16 @@ class SelfMatch:
 
     # index が指定されるのは、学習済みのパラメータを保存するときのみとする
     def save(self, file_path: str, index = None):
+        file_path += "_{}"
+        if index is None:
+            is_yet = True
+        else:
+            file_path += f"{index}"
+            is_yet = False
+
         for turn in {1, 0}:
             agent = self.agents[turn]
-            if index is None:
-                agent.save(file_path + f"{turn}", is_yet = True)
-            else:
-                agent.save(file_path + "-{}_{}{}".format(str(agent.gamma * 100)[:2], turn, index))
+            agent.save(file_path.format(turn), is_yet)
             agent.reset()
 
 

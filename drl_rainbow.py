@@ -714,9 +714,10 @@ def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = Fa
 
 
 
+
 if __name__ == "__main__":
     to_gpu = True
-    gammas = (0.98, 0.94, 0.90)
+    gammas = (0.98)
     file_name = "rainbow"
 
     # 学習の進行具合によって変更する必要がある変数
@@ -727,4 +728,4 @@ if __name__ == "__main__":
     fit_rainbow_agent(to_gpu, gammas[trained_num], file_name, restart = restart)
 
     # 評価用コード
-    # eval_computer(RainbowComputer, to_gpu, gammas[: trained_num + 1], file_name)
+    # eval_computer(RainbowComputer, to_gpu, gammas, file_name)
