@@ -1,10 +1,13 @@
 from functools import singledispatchmethod
+import random
 from math import sqrt
+from dataclasses import dataclass
 from collections import deque
 
 import numpy as np
+import ray
 
-from inada_framework import Model, cuda, optimizers, no_grad
+from inada_framework import Model, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 from drl_train_utilities import SelfMatch, simple_plan, corners_plan
@@ -29,19 +32,17 @@ class PolicyValueNet(Model):
 
 # モンテカルロ木探索の要領で、深層強化学習を駆使し、行動選択をするエージェント (コンピュータとしても使う)
 class AlphaZeroAgent:
-    def __init__(self, action_size, simulations_num = 800, c_puct = 1.0, alpha = 0.35, epsilon = 0.25):
+    def __init__(self, action_size, sampling_limits = 20, c_puct = 1.0):
         self.network = PolicyValueNet(action_size)
 
         # ハイパーパラメータ
-        assert simulations_num > 0
-        self.simulations_num = simulations_num
+        self.sampling_limits = sampling_limits
         self.c_puct = c_puct
-        self.alpha = alpha
-        self.epsilon = epsilon
 
     # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def reset(self, arg):
+    def reset(self, arg, simulations_num):
         self.load(arg)
+        self.simulations_num = simulations_num
 
         # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率も参考にした累計行動価値、各状態・行動の探索回数
         self.P = {}
@@ -63,30 +64,34 @@ class AlphaZeroAgent:
     def __(self, file_name):
         self.network.load_weights(SelfMatch.get_path(file_name).format("parameters"))
 
-    @load.register(PolicyValueNet)
-    def __(self, model):
-        self.network.copy_weights(model)
+    @load.register(dict)
+    def __(self, weights):
+        self.network.set_weights(weights)
 
 
     def __call__(self, board):
-        return self.get_action(board, False)
+        return self.get_action(board)
 
-    def get_action(self, board, train_flag = True):
+    def get_action(self, board, count = None):
         root_state = board.state
         state, policy = self.__search(board, root_state)
-
-        indices = np.where(policy == policy.max())[0]
         placable = self.placable[root_state]
-        action = placable[indices[0] if len(indices) == 1 else self.rng.choice(indices)]
 
-        if train_flag:
-            # 方策の形状はニューラルネットワークのものと合わせる
-            mcts_policy = np.zeros(board.action_size, dtype = np.float32)
-            mcts_policy[np.array(placable)] = policy
-            return action, state, mcts_policy
+        if count is not None and count < self.sampling_limits:
+            action = random.choices(placable, policy)[0]
+        else:
+            indices = np.where(policy == policy.max())[0]
+            action_index = indices[0] if len(indices) == 1 else random.choice(indices)
+            action = placable[action_index]
 
-        # コンピュータとして使う場合の処理を軽くしている
-        return action
+        # コンピュータとして使う場合、以降の処理は不要
+        if count is None:
+            return action
+
+        # 方策の形状をニューラルネットワークのものと合わせる
+        mcts_policy = np.zeros(board.action_size, dtype = np.float32)
+        mcts_policy[np.array(placable)] = policy
+        return action, state, mcts_policy
 
 
     # シミュレーションを行なって得た方策を返すメソッド
@@ -97,14 +102,13 @@ class AlphaZeroAgent:
             state_ndarray = self.__expand(board, root_state, True)
 
         # 探索の初期状態ではランダムな手が選ばれやすくなるように、ノイズをかける
-        if self.alpha is not None:
-            P = self.P[root_state]
-            P = (1. - self.epsilon) * P + self.epsilon * self.rng.dirichlet(np.full(len(P), self.alpha))
+        P = self.P[root_state]
+        P = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations_num):
-            board.set_state(root_state)
             self.__evaluate(board, root_state)
+            board.set_state(root_state)
 
         # 評価値が高いほど探索回数が多くなるように収束するので、それを方策として使う
         N = self.N[root_state]
@@ -146,7 +150,7 @@ class AlphaZeroAgent:
 
             # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
             indices = np.where(pucts == pucts.max())[0]
-            action_index = indices[0] if len(indices) == 1 else self.rng.choice(indices)
+            action_index = indices[0] if len(indices) == 1 else random.choice(indices)
 
             action = self.placable[state][action_index]
             board.put_stone(action)
@@ -165,6 +169,14 @@ class AlphaZeroAgent:
         return value
 
 
+
+
+# 実態はクラスだが、リストやタプルに比べて、メモリ容量は小さく、アクセスも速い
+@dataclass(repr = False, eq = False)
+class ReplayData:
+    state: np.ndarray
+    mcts_policy: np.ndarray
+    reward: int
 
 
 # 過去の探索の記録を残し、それらを順に取り出すことのできるイテラブル
@@ -198,32 +210,75 @@ class ReplayBuffer:
         buffer = self.buffer
         selected = [buffer[i] for i in indices]
 
-        states = np.stack([x[0] for x in selected])
-        mcts_policys = np.stack([x[1] for x in selected])
-        rewards = np.array([x[2] for x in selected], dtype = np.float32)
+        states = np.stack([x.state for x in selected])
+        mcts_policys = np.stack([x.mcts_policy for x in selected])
+        rewards = np.array([x.reward for x in selected], dtype = np.float32)
 
         return states, mcts_policys, rewards
 
 
 
 
+@ray.remote(num_cpus = 1, num_gpus = 0)
+def alphazero_play(simulations_num, weights: dict):
+    # 環境
+    board = Board()
+
+    # エージェント (先攻・後攻で分けない)
+    agent = AlphaZeroAgent(board.action_size)
+    agent.reset(weights, simulations_num)
+
+    # 実際に１ゲームプレイして、対局データを収集する
+    memory = []
+    for count in range(board.action_size):
+        action, state, mcts_policy = agent.get_action(board, count)
+        memory.append(ReplayData[state, mcts_policy, board.turn])
+
+        board.put_stone(action)
+        if not board.can_continue():
+            break
+
+    # 最後に手を打ったプレイヤーとその報酬の情報で、各対局データの報酬を確定する
+    final_player = board.turn
+    reward = board.reward
+    for data in memory:
+        data.reward = reward if data.reward == final_player else -reward
+
+    return memory
+
+
+
+
 # 自己対戦によって、パラメータを学習するための闘技場
 class AlphaZeroArena:
-    def __init__(self, action_size):
+    def __init__(self, action_size, buffer_size, batch_size, simulations_num = 800):
         self.network = PolicyValueNet(action_size)
+        self.optimizer = optimizers.Momentum(lr = 0.0005).setup(self.network)
+        self.optimizer.add_hook(ff)
+        self.replay_buffer = ReplayBuffer(buffer_size, batch_size)
 
     def save(self, file_name):
         self.network.save_weights(SelfMatch.get_path(file_name).format("parameters"))
 
-    def fit(self):
-        # self_plays -> update
-        pass
+    def fit(self, episodes, update_interval, simulations_num = 800):
+        assert not episodes % update_interval
 
-    def self_plays(self):
-        pass
+        # 並列実行を行うための初期設定
+        ray.init()
 
-    def __self_play(self):
-        pass
+        for __ in range(episodes // update_interval):
+            weights = ray.put(self.network.get_weights())
+            remains = [alphazero_play.remote(simulations_num, weights) for __ in range(update_interval)]
+            self.self_match(remains)
 
-    def update(self):
-        pass
+    def self_match(self, remains):
+        while remains:
+            finished, remains = ray.wait(remains, num_returns = 1)
+            self.replay_buffer.add(ray.get(finished[0]))
+
+    def update(self, update_epochs = 5):
+        for __ in range(update_epochs):
+            for states, mcts_policys, rewards in self.replay_buffer:
+                policy, value = self.network(states)
+
+                self.optimizer.update()

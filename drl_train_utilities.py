@@ -17,7 +17,7 @@ def simple_plan(board, placable = None):
         placable = board.list_placable()
 
     # 30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
-    if np.random.rand() < 0.3:
+    if random.random() < 0.3:
         if len(placable) == 1:
             return placable[0]
         return random.choice(placable)
@@ -93,7 +93,7 @@ class SelfMatch:
 
 
         # 累計経過時間の表示
-        print("\n\033[92m=== Total Elapsed Time ===\033[0m")
+        print("\033[92m=== Total Elapsed Time ===\033[0m")
         start_time = time()
 
         try:
@@ -115,7 +115,7 @@ class SelfMatch:
 
                 # パラメータの保存と累計経過時間の表示
                 self.save(file_name.format("parameters"), run - 1)
-                print("{:.5g} min".format((time() - start_time) / 60))
+                print("run {}: {:.5g} min".format(run, (time() - start_time) / 60))
                 start = 1
 
         except KeyboardInterrupt:
@@ -126,7 +126,8 @@ class SelfMatch:
             np.save(f"{save_file}_history.npy", historys)
             self.save(save_file)
 
-            raise KeyboardInterrupt()
+            message = "this is simply the interrupt which you raise now, not a error."
+            raise KeyboardInterrupt(message)
 
         finally:
             # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
@@ -134,12 +135,16 @@ class SelfMatch:
             y = historys[:, :-1]
             plt.plot(x, y[1], label = "first")
             plt.plot(x, y[0], label = "second")
-            plt.ylim(-5, 105)
+            plt.legend()
 
+            plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
             plt.ylabel("Mean Winning Percentage")
-            plt.legend()
-            plt.savefig(file_name.format("graphs"))
+
+            # 割引率が重要なパラメータなので、その情報と一緒に保存する
+            gamma = self.agents[0].gamma
+            plt.title(f"gamma = {gamma}")
+            plt.savefig(file_name.format("graphs") + "-{}".format(str(gamma)[2:]))
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する

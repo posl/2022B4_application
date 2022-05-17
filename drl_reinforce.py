@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_grad
@@ -33,22 +35,18 @@ class ReinforceAgent:
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
-        pi = PolicyNet(self.action_size)
-        self.optimizer = optimizers.Adam(self.lr).setup(pi)
+        self.pi = PolicyNet(self.action_size)
+        self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
         if self.use_gpu:
-            pi.to_gpu()
-
-        self.pi = pi
-        self.rng = np.random.default_rng()
+            self.pi.to_gpu()
 
     def save(self, file_path, is_yet = None):
         self.pi.save_weights(file_path + ".npz")
 
     def load_to_restart(self, file_path):
-        pi = self.pi
-        pi.load_weights(file_path + ".npz")
+        self.pi.load_weights(file_path + ".npz")
         if self.use_gpu:
-            pi.to_gpu()
+            self.pi.to_gpu()
 
 
     # エージェントを関数形式で使うとその方策に従った行動が得られる
@@ -68,7 +66,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = self.rng.choice(len(placable), p = cuda.as_numpy(probs.data[0]))
+            action_index = random.choices(range(len(placable)), probs.data[0])[0]
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -107,15 +105,14 @@ class ReinforceComputer:
     def reset(self, file_name, gamma, turn):
         file_path = Reinforce.get_path(file_name).format("parameters")
         file_path += "-{}_{}".format(str(gamma)[2:], turn)
-        self.rng = np.random.default_rng()
 
         # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
         each_pi = self.each_pi
         each_pi.clear()
         use_gpu = self.use_gpu
 
-        # 同じ条件で学習した３人のエージェントの中から２人選ぶ
-        for i in self.rng.choice(3, 2, replace = False):
+        # 同じ条件で学習した３人のエージェントの中から、ランダムな人数だけ、ランダムに選ぶ (７通り)
+        for i in random.sample(range(3), random.randint(1, 3)):
             pi = PolicyNet(self.action_size)
             each_pi.append(pi)
 
@@ -133,14 +130,15 @@ class ReinforceComputer:
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
         with no_grad():
-            pi0, pi1 = self.each_pi
-            policy = pi0(state) + pi1(state)
+            for pi in self.each_pi:
+                try:
+                    policy += pi(state).data
+                except NameError:
+                    policy = pi(state).data
 
-            # 各エージェントが提案するスコア値の和をとり、それを元に確率付きランダムサンプリングで行動を選択する
-            probs = dzf.softmax(policy[:, np.array(placable)])
-            probs = probs.data[0]
-
-        return placable[self.rng.choice(len(placable), p = cuda.as_numpy(probs))]
+        # 各エージェントが提案するスコア値の和をとり、それを元にした重み付きランダムサンプリングで行動を選択する
+        policy = policy[0, np.array(placable)]
+        return random.choices(placable, xp.exp(policy))[0]
 
 
 
@@ -176,7 +174,7 @@ class Reinforce(SelfMatch):
 def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = False):
     # ハイパーパラメータ設定
     gamma = None
-    lr = 0.00005
+    lr = 0.000025
 
     # 環境
     board = Board()
@@ -201,12 +199,12 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
 
 if __name__ == "__main__":
     to_gpu = False
-    gammas = 0.95, 0.90, 0.85, 0.80, 0.75, 0.70
+    gammas = 0.90, 0.85, 0.80, 0.75, 0.70
     file_name = "reinforce"
 
     # 学習の進行具合によって変更する必要がある変数
     trained_num = 0
-    restart = False
+    restart = True
 
     # 学習用コード
     fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)

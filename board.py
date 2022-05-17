@@ -408,6 +408,7 @@ class Board:
         player2_plan = self.player_kinds.get_func(player2id)
         self.set_plan(player1_plan, player2_plan)
 
+
     # 一時的な盤面表示
     def print_board(self, x):
         for i in range(8):

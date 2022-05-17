@@ -1,5 +1,4 @@
 import weakref
-from copy import deepcopy
 import os
 
 import numpy as np
@@ -40,6 +39,7 @@ class Layer:
     def forward(self, inputs):
         raise NotImplementedError()
 
+
     # yield 文は関数の進行具合を保存した状態で値を返す (イテレータとして利用できる)
     def params(self):
         for name in self.__params:
@@ -76,24 +76,15 @@ class Layer:
             elif isinstance(object, Parameter):
                 params_dict[key] = object
 
+
     def save_weights(self, file_path):
-        # GPU を使っていても素直に再開できるように深いコピーを取る
-        try:
-            save_layer = deepcopy(self)
-        except TypeError:
-            print("\nWarning: this layer's deepcopy is failed because of having unpicklable object.\n")
-            save_layer = self
-
         # パラメータの保存時には、主記憶上にデータがあるようにする
-        save_layer.to_cpu()
-
-        params_dict = {}
-        save_layer.__flatten_params(params_dict)
-        array_dict = {key : param.data for key, param in params_dict.items() if param.data is not None}
+        arrays_dict = self.get_weights()
+        arrays_dict = {key : cuda.as_numpy(param) for key, param in arrays_dict.items()}
 
         try:
             make_data_dir(file_path)
-            np.savez_compressed(file_path, **array_dict)
+            np.savez_compressed(file_path, **arrays_dict)
 
         except (Exception, KeyboardInterrupt):
             if os.path.exists(file_path):
@@ -116,20 +107,27 @@ class Layer:
             message = f"\"{file_path}\" is not found."
             raise FileNotFoundError(message)
 
-    # 同じレイヤクラスのインスタンス同士でパラメータを同期させる
     def copy_weights(self, layer):
         assert isinstance(layer, self.__class__)
+        self.set_weights(layer.get_weights())
 
-        passed_params_dict = {}
-        layer.__flatten_params(passed_params_dict)
 
+    def set_weights(self, passed_params_dict):
         params_dict = {}
         self.__flatten_params(params_dict)
-        for key, param in params_dict.items():
-            if param.data is None:
-                param.data = passed_params_dict[key].data.copy()
-            else:
-                param.data[...] = passed_params_dict[key].data
+        for key, param in params_dict.item():
+            try:
+                if param.data is None:
+                    param.data = passed_params_dict[key].copy()
+                else:
+                    param.data[...] = passed_params_dict[key]
+            except KeyError:
+                param.data = None
+
+    def get_weights(self):
+        params_dict = {}
+        self.__flatten_params(params_dict)
+        return {key : param.data for key, param in params_dict.items() if param.data is not None}
 
 
 class Model(Layer):
