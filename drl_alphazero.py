@@ -7,11 +7,12 @@ from collections import deque
 import numpy as np
 import ray
 
-from inada_framework import Model, optimizers, no_grad
+from inada_framework import Model, Function, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
 from drl_train_utilities import SelfMatch, simple_plan, corners_plan
 from board import Board
+from inada_framework.optimizers import Momentum, WeightDecay
 
 
 
@@ -30,6 +31,34 @@ class PolicyValueNet(Model):
 
 
 
+# ニューラルネットワークの出力が過去の探索結果を近似するように学習するための損失関数
+class AlphaZeroLoss(Function):
+    def __init__(self, mcts_policys, rewards):
+        self.mcts_policys = mcts_policys
+        self.rewards = rewards
+
+    def forward(self, policy, value):
+        xp = cuda.get_array_module(policy)
+
+        # 方策の損失関数はクロスエントロピー誤差
+        loss = -self.mcts_policys * xp.log(policy + 0.0001)
+        loss = loss.sum(axis = 1, keepdims = True)
+
+        # 状態価値関数の損失関数は平均二乗誤差
+        loss += (value - self.rewards) ** 2.
+
+        return xp.average(loss)
+
+    def backward(self, gy):
+        pass
+
+
+def alphazero_loss(policy, value, mcts_policys, rewards):
+    return AlphaZeroLoss(mcts_policys, rewards)(policy, value)
+
+
+
+
 # モンテカルロ木探索の要領で、深層強化学習を駆使し、行動選択をするエージェント (コンピュータとしても使う)
 class AlphaZeroAgent:
     def __init__(self, action_size, sampling_limits = 20, c_puct = 1.0):
@@ -40,7 +69,7 @@ class AlphaZeroAgent:
         self.c_puct = c_puct
 
     # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def reset(self, arg, simulations_num):
+    def reset(self, arg, simulations_num = 800):
         self.load(arg)
         self.simulations_num = simulations_num
 
@@ -62,7 +91,7 @@ class AlphaZeroAgent:
 
     @load.register(str)
     def __(self, file_name):
-        self.network.load_weights(SelfMatch.get_path(file_name).format("parameters"))
+        self.network.load_weights(SelfMatch.get_path(file_name + ".npz").format("parameters"))
 
     @load.register(dict)
     def __(self, weights):
@@ -181,7 +210,7 @@ class ReplayData:
 
 # 過去の探索の記録を残し、それらを順に取り出すことのできるイテラブル
 class ReplayBuffer:
-    def __init__(self, buffer_size, batch_size = 64):
+    def __init__(self, buffer_size, batch_size):
         self.buffer = deque(maxlen = buffer_size)
         self.batch_size = batch_size
         self.indices = None
@@ -220,7 +249,7 @@ class ReplayBuffer:
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_play(simulations_num, weights: dict):
+def alphazero_play(weights: dict, simulations_num):
     # 環境
     board = Board()
 
@@ -248,37 +277,47 @@ def alphazero_play(simulations_num, weights: dict):
 
 
 
+def alphazero_train(updates = 50, interval = 300, epochs = 5, simulations_num = 800):
+    # ハイパーパラメータの設定
+    buffer_size = 90000
+    batch_size = 64
+    lr = 0.0005
+    weight_decay = 0.001
+
+    # ニューラルネットワーク・経験再生バッファ
+    network = PolicyValueNet(Board.action_size)
+    replay_buffer = ReplayBuffer(buffer_size, batch_size)
+
+    # 最適化手法は慣性に着想を得た手法である Momentum で、パラメータのノルムが過大にならないように重み減衰を行う
+    optimizer = Momentum(lr).setup(network)
+    optimizer.add_hook(WeightDecay(weight_decay))
+
+    # 並列実行を行うための初期設定
+    ray.init()
+
+
+    for __ in range(updates):
+        # ray の共有メモリへの重みパラメータのコピーを事前に１度だけ、明示的に行うことで、以降の呼び出しを高速化する
+        current_weights = ray.put(network.get_weights())
+
+        # まだ完遂していないタスクがリストの中に残るようになる
+        remains = [alphazero_play.remote(current_weights, simulations_num) for __ in range(interval)]
+
+        # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
+        while remains:
+            finished, remains = ray.wait(remains, num_returns = 1)
+            replay_buffer.add(ray.get(finished[0]))
+
+        # interval で指定した期間ごとに、epochs で指定したエポック数だけ、パラメータを学習する
+        for __ in range(epochs):
+            for states, mcts_policys, rewards in replay_buffer:
+                alphazero_loss(*network(states), mcts_policys, rewards)
+                optimizer.update()
+
+
+
 
 # 自己対戦によって、パラメータを学習するための闘技場
 class AlphaZeroArena:
-    def __init__(self, action_size, buffer_size, batch_size, simulations_num = 800):
-        self.network = PolicyValueNet(action_size)
-        self.optimizer = optimizers.Momentum(lr = 0.0005).setup(self.network)
-        self.optimizer.add_hook(ff)
-        self.replay_buffer = ReplayBuffer(buffer_size, batch_size)
-
     def save(self, file_name):
         self.network.save_weights(SelfMatch.get_path(file_name).format("parameters"))
-
-    def fit(self, episodes, update_interval, simulations_num = 800):
-        assert not episodes % update_interval
-
-        # 並列実行を行うための初期設定
-        ray.init()
-
-        for __ in range(episodes // update_interval):
-            weights = ray.put(self.network.get_weights())
-            remains = [alphazero_play.remote(simulations_num, weights) for __ in range(update_interval)]
-            self.self_match(remains)
-
-    def self_match(self, remains):
-        while remains:
-            finished, remains = ray.wait(remains, num_returns = 1)
-            self.replay_buffer.add(ray.get(finished[0]))
-
-    def update(self, update_epochs = 5):
-        for __ in range(update_epochs):
-            for states, mcts_policys, rewards in self.replay_buffer:
-                policy, value = self.network(states)
-
-                self.optimizer.update()

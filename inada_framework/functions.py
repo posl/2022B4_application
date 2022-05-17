@@ -643,11 +643,12 @@ class SoftmaxCrossEntropy(Function):
         # Softmax
         y = x - xp.max(x, axis = 1, keepdims = True)
         y = xp.exp(y)
-        self.y = y / xp.sum(y, axis = 1, keepdims = True)
+        y = y / xp.sum(y, axis = 1, keepdims = True)
+        self.y = y
 
         # Cross-Entropy-Error
         N = len(x)
-        y = self.y[np.arange(N), t.ravel()]
+        y = y[np.arange(N), t.ravel()]
         y = xp.clip(y, a_min = 1e-15, a_max = None)
         y = xp.log(y)
         return -xp.sum(y) / N

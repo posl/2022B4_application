@@ -199,12 +199,12 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
 
 if __name__ == "__main__":
     to_gpu = False
-    gammas = 0.90, 0.85, 0.80, 0.75, 0.70
+    gammas = 0.95, 0.90, 0.85, 0.80, 0.75, 0.70
     file_name = "reinforce"
 
     # 学習の進行具合によって変更する必要がある変数
     trained_num = 0
-    restart = True
+    restart = False
 
     # 学習用コード
     fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)

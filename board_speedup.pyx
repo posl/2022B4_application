@@ -20,7 +20,7 @@ cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
     cdef uint mask, legal
 
     # 左右方向の探索に使う、オセロ盤の水平方向の両端以外で相手の石が置かれている箇所に１が立ったマスク
-    mask =  0x7e7e7e7e7e7e7e7e
+    mask = 0x7e7e7e7e7e7e7e7e
     mask &= opposition_player
     legal = search_upper_legal(move_player, 1, mask)
     legal |= search_lower_legal(move_player, 1, mask)
@@ -76,7 +76,7 @@ cdef inline uint __get_reverse_board(uint set_position, uint move_player, uint o
         reverse |= tmp
 
     # 斜め方向
-    mask =  0x007e7e7e7e7e7e00
+    mask = 0x007e7e7e7e7e7e00
     mask &= opposition_player
     tmp = search_upper(set_position, 9, mask)
     if move_player & (tmp >> 9):
