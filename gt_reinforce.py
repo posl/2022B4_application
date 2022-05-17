@@ -92,19 +92,19 @@ if __name__ == "__main__":
 
     gtr1 = GTReinforce()
     gtr1.reset()
-    gtr1.set_depth(5)
+    gtr1.set_depth(6)
     gtr1.agent.data.read_value_list("./data/gt/self_match1")
     gtr1.agent.update(0)
     gtr1_file_path = "./data/gt/self_match1"
     gtr2 = GTReinforce()
     gtr2.reset()
-    gtr2.set_depth(5)
+    gtr2.set_depth(6)
     gtr2.agent.data.read_value_list("./data/gt/self_match2")
     gtr2.agent.update(0)
     gtr2_file_path = "./data/gt/self_match2"
     while 1:
         tmp_gtr2_ab = AlphaBeta(gtr2.agent.data)
-        tmp_gtr2_ab.set_depth(5)
+        tmp_gtr2_ab.set_depth(6)
         gtr1.set_player1(tmp_gtr2_ab)
         print(gtr1.start(1))
         gtr1.agent.data.write_value_list(gtr1_file_path)

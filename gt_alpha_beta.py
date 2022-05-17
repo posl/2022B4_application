@@ -3,21 +3,18 @@ from board import Board
 import numpy as np
 
 class GTValue:
-	def __init__(self, select_value = 1):
+	def __init__(self, select_value = 0):
 		self.corner = select_value
 		self.around_corner = select_value
 		self.edge = select_value
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
+		if select_value == 0:
+			self.reset()
 
 	def reset(self):
-		self.corner = 0
-		self.around_corner = 0
-		self.edge = 0
-		self.around_edge = 0
-		self.others = 0
-		self.place = 0
+		self.read_value_list("./data/gt/default_data")
 
 	#評価に必要とする変数をリストとして返す
 	def get_raw_value_list(self):
@@ -126,7 +123,6 @@ class AlphaBeta:
 			if tmp_value > alpha:
 				alpha = tmp_value
 				place_max = i
-
 
 		return place_max
 
