@@ -9,8 +9,9 @@ import random
 environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-#import mc_tree_search
+import mc_tree_search
 #import mc_primitive
+import gt_alpha_beta
 
 
 class Page(tk.Frame):
@@ -574,13 +575,17 @@ class PlayerKinds:
         self.kinds_func.append(self.human.com_cheater1)
         self.kinds_difficulty.append(1)
 
-        #self.kinds_name.append("MC木探索")
-        #self.kinds_func.append(mc_tree_search.MonteCarloTreeSearch())
-        #self.kinds_difficulty.append(1)
+        self.kinds_name.append("MC木探索")
+        self.kinds_func.append(mc_tree_search.MonteCarloTreeSearch())
+        self.kinds_difficulty.append(1)
 
         #self.kinds_name.append("原始MC探索")
         #self.kinds_func.append(mc_primitive.PrimitiveMonteCarlo())
         #self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("alpha-beta")
+        self.kinds_func.append(gt_alpha_beta.AlphaBeta())
+        self.kinds_difficulty.append(1)
 
 
     def get_num(self):
