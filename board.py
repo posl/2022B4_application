@@ -370,7 +370,7 @@ class Board:
         self.main_window = display.MainWindow(self)
 
         # プレイヤーの種類
-        self.player_kinds = player_kinds.PlayerKinds(self.main_window)
+        self.player_kinds = display.PlayerKinds(self.main_window)
 
         while True:
             self.main_window.change_page(0)

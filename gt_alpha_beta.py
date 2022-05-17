@@ -3,21 +3,18 @@ from board import Board
 import numpy as np
 
 class GTValue:
-	def __init__(self, select_value = 1):
+	def __init__(self, select_value = 0):
 		self.corner = select_value
 		self.around_corner = select_value
 		self.edge = select_value
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
+		if select_value == 0:
+			self.reset()
 
 	def reset(self):
-		self.corner = 0
-		self.around_corner = 0
-		self.edge = 0
-		self.around_edge = 0
-		self.others = 0
-		self.place = 0
+		self.read_value_list("./data/gt/default_data")
 
 	#評価に必要とする変数をリストとして返す
 	def get_raw_value_list(self):
@@ -59,11 +56,12 @@ class GTValue:
 	def evaluate_black(self, board : Board):
 		#石の数の評価
 		value_black = 0
-		for i in range(Board.action_size):
-			value_black += self.get_board_value(i) * \
-				board.getbit_stone_exist(i) * (board.getbit_stone_black(i) - (1 ^ board.getbit_stone_black(i)))
+		for i in board.black_positions:
+			value_black += self.get_board_value(i)
+		for i in board.white_positions:
+			value_black -= self.get_board_value(i)
 	
-		#置ける場所の数の評価	
+		#置ける場所の数の評価
 		tmp_turn = board.turn
 		board.turn = 1
 		value_black += self.place * len(board.list_placable())
@@ -81,14 +79,14 @@ class AlphaBeta:
 			self.value = select_value
 		self.__min_value = -999
 		self.__max_value = 999
-		self.set_depth(2)
+		self.set_depth(6)
 
 	def __call__(self, board : Board):
 		return self.get_next_move(board)
 
 	def reset(self, select_value = 0):
 		self.value = GTValue(select_value)
-		self.set_depth(2)
+		self.set_depth(6)
 
 	def set_depth(self, depth):
 		self.__max_depth = depth
@@ -116,7 +114,9 @@ class AlphaBeta:
 		place_max = place_list[0]
 
 		for i in place_list:
-			with board.log_runtime(i):
+			with board.log_runtime():
+				board.put_stone(i)
+				flag = board.can_continue()
 				tmp_value = self.__node(board, 1, alpha, beta)
 			if tmp_value >= beta:
 				return tmp_value
@@ -132,16 +132,16 @@ class AlphaBeta:
 		if depth == self.__max_depth:
 			return self.__evaluate(board)
 
+		if can_continue_flag == 0:
+			return self.__evaluate(board)
+
 		# 求める評価値が最大か最小か決定する
-		ismax = ~(self.turn ^ board.turn)
+		ismax = not (self.turn ^ board.turn)
 
 		if ismax:
 			value = self.__min_value
 		else:
 			value = self.__max_value
-		
-		if can_continue_flag == 0:
-			return self.__evaluate(board)
 
 		place_list = board.list_placable()
 
@@ -188,5 +188,6 @@ if __name__ == "__main__":
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
 	board.reset()
-	board.set_plan(ab0, ab1)
-	board.game()
+	# board.set_plan(ab0, ab1)
+	# board.game()
+	board.debug_game(ab0, ab1)
