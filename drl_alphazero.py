@@ -1,8 +1,8 @@
 import random
 from math import sqrt, ceil
-from dataclasses import dataclass
 from collections import deque
 import pickle
+from time import time
 
 import ray
 import numpy as np
@@ -229,14 +229,6 @@ class AlphaZeroComputer(AlphaZeroAgent):
 
 
 
-# 実態はクラスだが、リストやタプルに比べて、メモリ容量は小さく、アクセスも速い
-@dataclass(repr = False, eq = False)
-class ReplayData:
-    state: np.ndarray
-    mcts_policy: np.ndarray
-    reward: int
-
-
 # 過去の探索の記録を残し、それらを順に取り出すことのできるイテラブル
 class ReplayBuffer:
     def __init__(self, buffer_size, batch_size):
@@ -272,7 +264,7 @@ class ReplayBuffer:
     # ランダムに並び替えた経験データをバッチサイズ分ずつ順に取り出す
     def __next__(self):
         indices = self.indices
-        if indices:
+        if indices.size:
             indices, self.indices = np.split(indices, [self.batch_size])
         else:
             self.indices = None
@@ -281,9 +273,9 @@ class ReplayBuffer:
         buffer = self.buffer
         selected = [buffer[i] for i in indices]
 
-        states = np.stack([x.state for x in selected])
-        mcts_policys = np.stack([x.mcts_policy for x in selected])
-        rewards = np.array([x.reward for x in selected], dtype = np.float32)
+        states = np.stack([x[0] for x in selected])
+        mcts_policys = np.stack([x[1] for x in selected])
+        rewards = np.array([x[2] for x in selected], dtype = np.float32)
 
         # ゲームの報酬はニューラルネットワークの教師データとして使うので、形状をそれと合わせる
         rewards = rewards[:, None]
@@ -307,7 +299,7 @@ def alphazero_play(weights: dict, simulations):
     memory = []
     for count in range(board.action_size):
         action, state, mcts_policy = agent.get_action(board, count)
-        memory.append(ReplayData(state, mcts_policy, board.turn))
+        memory.append((state, mcts_policy, board.turn))
 
         board.put_stone(action)
         if not board.can_continue():
@@ -345,7 +337,7 @@ def alphazero_test(weights: dict, simulations, turn):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 90000, batch_size = 64, lr = 0.0005, weight_decay = 0.001):
+    def __init__(self, buffer_size = 200000, batch_size = 128, lr = 0.0005, weight_decay = 0.001):
         # ニューラルネットワーク・経験再生バッファ
         self.network = PolicyValueNet(Board.action_size)
         self.buffer = ReplayBuffer(buffer_size, batch_size)
@@ -355,19 +347,19 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(weight_decay))
 
 
-    def fit(self, updates = 50, interval = 300, epochs = 5, simulations = 800, restart = False):
+    def fit(self, updates = 100, interval = 500, epochs = 5, simulations = 800, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
 
-        # ファイルのパスは先に計算しておく
+        # 各ファイルパス
         file_path = SelfMatch.get_path("alphazero")
         is_yet_path = file_path.format("is_yet")
         params_path = file_path.format("parameters")
         graphs_path = file_path.format("graphs")
         del file_path
 
-        # 学習を途中再開する場合は、必要な情報を読み込む
+        # 学習の途中再開用
         if restart:
             network.load_weights(f"{is_yet_path}_weights.npz")
             restart = buffer.load(f"{is_yet_path}_buffer.pkl")
@@ -380,6 +372,9 @@ class AlphaZero:
         print("\033[92m=== Current Winning Percentage ===\033[0m")
         print(" run || first | second")
         print("=======================")
+
+        # 累計経過時間
+        start = time()
 
         try:
             # 並列実行を行うための初期設定
@@ -416,6 +411,8 @@ class AlphaZero:
                 weights = ray.put(network.get_weights())
                 historys[:, run] = self.eval(weights, simulations)
                 print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]))
+
+                # 累計経過時間の表示
 
         except KeyboardInterrupt:
             network.save_weights(f"{is_yet_path}_weights.npz")
