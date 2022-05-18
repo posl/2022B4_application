@@ -11,6 +11,7 @@ import pygame
 
 from mc_tree_search import MonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo
+from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
@@ -590,6 +591,13 @@ class PlayerKinds:
         self.kinds_func.append([PrimitiveMonteCarlo()])
         self.kinds_difficulty.append(1)
         self.kinds_turn_diff.append(False)
+
+        self.alphabeta_d0t0 = AlphaBeta(0)
+        self.alphabeta_d0t1 = AlphaBeta(1)
+        self.kinds_name.append("Alpha Beta")
+        self.kinds_func.append([self.alphabeta_d0t0, self.alphabeta_d0t1])
+        self.kinds_difficulty.append(1)
+        self.kinds_turn_diff.append(True)
 
         if False:
             self.rainbow_computer_d0t0 = RainbowComputer(64)
