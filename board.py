@@ -372,6 +372,7 @@ class Board:
 
 
 
+
     # 一時的な盤面表示
     def print_board(self, x):
         for i in range(8):

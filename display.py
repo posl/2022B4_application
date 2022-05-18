@@ -10,7 +10,8 @@ import pygame
 
 from board import Board
 from mc_tree_search import MonteCarloTreeSearch
-#from mc_primitive import PrimitiveMonteCarlo (board_speedupにalpha_betaがないとエラーが出る)
+from mc_primitive import PrimitiveMonteCarlo
+from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
@@ -586,10 +587,17 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
         self.kinds_turn_diff.append(False)
 
-        #self.kinds_name.append("原始MC探索")
-        #self.kinds_func.append(PrimitiveMonteCarlo())
-        #self.kinds_difficulty.append(1)
-        #self.kinds_turn_diff.append(False)
+        self.kinds_name.append("原始MC探索")
+        self.kinds_func.append([PrimitiveMonteCarlo()])
+        self.kinds_difficulty.append(1)
+        self.kinds_turn_diff.append(False)
+
+        self.alphabeta_d0t0 = AlphaBeta(0)
+        self.alphabeta_d0t1 = AlphaBeta(1)
+        self.kinds_name.append("Alpha Beta")
+        self.kinds_func.append([self.alphabeta_d0t0, self.alphabeta_d0t1])
+        self.kinds_difficulty.append(1)
+        self.kinds_turn_diff.append(True)
 
         if False:
             self.rainbow_computer_d0t0 = RainbowComputer(64)
@@ -641,7 +649,7 @@ class PlayerKinds:
         if self.kinds_turn_diff[id]:
             return self.kinds_func[id][2*diff+turn]
         else:
-            return self.kinds_func[id][diff+turn]
+            return self.kinds_func[id][diff]
 
     def get_difficulty(self, id):
         if id<0 or id>=len(self.kinds_difficulty):
@@ -727,7 +735,7 @@ class DisplayBoard(Board):
         self.render(None)
         self.main_window.after(100, self.main_window.quit)
         self.main_window.mainloop()
-
+        
         self.game(self.print_state)
 
         # 最後の１石だけ表示されない問題を解消する (１秒待機)
@@ -738,7 +746,7 @@ class DisplayBoard(Board):
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
         player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
-        player2_plan = self.player_kinds.get_func(player2id, player2diff, 0)
+        player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
         self.set_plan(player1_plan, player2_plan)
 
 
