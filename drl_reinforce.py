@@ -205,5 +205,5 @@ if __name__ == "__main__":
     fit_reinforce_agent(to_gpu, gammas, file_name, restart = restart)
 
     # 評価用コード
-    gammas = 0.70, 0.75, 0.80, 0.85, 0.88, 0.90, 0.92, 0.95
-    eval_computer(ReinforceComputer, to_gpu, gammas, file_name, graph_index = 3)
+    gammas = 0.88, 0.90, 0.92
+    eval_computer(ReinforceComputer, to_gpu, gammas, file_name, graph_index = 4)

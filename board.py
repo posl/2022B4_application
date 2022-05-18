@@ -180,11 +180,11 @@ class Board:
 
     @property
     def black_num(self):
-        return self.__count_bits(self.stone_white)
+        return self.__count_bits(self.stone_black)
 
     @property
     def white_num(self):
-        return self.__count_bits(self.stone_black)
+        return self.__count_bits(self.stone_white)
 
     @staticmethod
     def __count_bits_python(x):

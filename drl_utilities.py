@@ -193,11 +193,10 @@ def eval_computer(computer_class, to_gpu, gammas, file_name, graph_index):
 
     # コンピュータ
     computer_args = board.action_size, to_gpu
-    first_computer = computer_class(*computer_args)
-    second_computer = computer_class(*computer_args)
+    computer = computer_class(*computer_args)
 
     # その他の設定
-    self_match = SelfMatch(board, first_computer, second_computer)
+    self_match = SelfMatch(board, computer, computer)
     length = len(gammas)
     win_rates = np.empty((2, length))
 
@@ -210,14 +209,12 @@ def eval_computer(computer_class, to_gpu, gammas, file_name, graph_index):
             win_rate = 0
 
             for __ in tqdm(range(20), desc = target, leave = False):
-                first_computer.reset(file_name, gamma, 1)
-                second_computer.reset(file_name, gamma, 0)
+                computer.reset(file_name, gamma, turn)
                 win_rate += self_match.eval(turn)
 
             win_rate /= 20
             win_rates[turn, i] = win_rate
             print(f"{target}: {win_rate:.5g} %")
-        print()
 
     # グラフの目盛り位置を設定するための変数
     width = 1 / 3

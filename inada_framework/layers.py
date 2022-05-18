@@ -57,21 +57,21 @@ class Layer:
             param.to_gpu()
 
     # パラメータを保持するインスタンスの辞書を平板化して取得する
-    def __flatten_params(self, params_dict, parent_key = ""):
+    def flatten_params(self, params_dict, parent_key = ""):
         for name in self.__params:
             object = self.__dict__[name]
             key = parent_key + name
 
             if isinstance(object, Layer):
                 # Layer が入れ子構造になっている場合は、再帰的にこの関数を呼び出す
-                object.__flatten_params(params_dict, key + "/")
+                object.flatten_params(params_dict, key + "/")
             elif isinstance(object, Parameter):
                 params_dict[key] = object
 
 
     def save_weights(self, file_path):
         params_dict = {}
-        self.__flatten_params(params_dict)
+        self.flatten_params(params_dict)
 
         # パラメータの保存時には、主記憶上にデータがあるようにする
         arrays_dict =  {key : cuda.as_numpy(param.data)
@@ -93,7 +93,7 @@ class Layer:
             npz = np.load(file_path)
 
             params_dict = {}
-            self.__flatten_params(params_dict)
+            self.flatten_params(params_dict)
             for key, param in params_dict.items():
                 try:
                     param.data = npz[key]
@@ -110,7 +110,7 @@ class Layer:
 
     def set_weights(self, passed_params_dict):
         params_dict = {}
-        self.__flatten_params(params_dict)
+        self.flatten_params(params_dict)
         for key, param in params_dict.items():
             try:
                 if param.data is None:
@@ -122,7 +122,7 @@ class Layer:
 
     def get_weights(self):
         params_dict = {}
-        self.__flatten_params(params_dict)
+        self.flatten_params(params_dict)
         return {key : param.data for key, param in params_dict.items() if param.data is not None}
 
 

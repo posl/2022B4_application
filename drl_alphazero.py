@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from collections import deque
 import pickle
 
-import numpy as np
 import ray
+import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -23,13 +23,33 @@ from inada_framework.optimizers import Momentum, WeightDecay
 class PolicyValueNet(Model):
     def __init__(self, action_size):
         super().__init__()
-        self.p = dzl.Affine(action_size)
-        self.v = dzl.Affine(1)
+        self.p0 = dzl.Affine(512)
+        self.p1 = dzl.Affine(action_size)
+
+        self.v0 = dzl.Affine(512)
+        self.v1 = dzl.Affine(1)
 
     def forward(self, x):
-        score = self.p(x)
-        value = dzf.tanh(self.v(x))
+        score = self.p1(self.p0(x))
+        value = dzf.tanh(self.v1(self.v0(x)))
         return score, value
+
+    def set_weights(self, passed_params_dict):
+        params_dict = {}
+        self.flatten_params(params_dict)
+        for key, param in params_dict.items():
+            try:
+                if param.data is None:
+                    param.data = passed_params_dict[key].copy()
+                else:
+                    param.data[...] = passed_params_dict[key]
+            except KeyError:
+                param.data = None
+
+    def get_weights(self):
+        params_dict = {}
+        self.flatten_params(params_dict)
+        return {key : param.data for key, param in params_dict.items() if param.data is not None}
 
 
 # ニューラルネットワークの出力を確率形式に変換するための関数
@@ -395,7 +415,7 @@ class AlphaZero:
             ray.init()
 
             # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
-            weights = ray.put(network.get_weights())
+            weights = network.get_weights()
 
             for run in range(restart, updates):
                 with tqdm(desc = f"run {run}", total = interval, leave = False) as pbar:
@@ -422,7 +442,7 @@ class AlphaZero:
                 network.save_weights("{}_{:0{}}.npz".format(params_path, run + 1, len(str(updates))))
 
                 # エージェントの評価
-                weights = ray.put(network.get_weights())
+                weights = network.get_weights()
                 historys[:, run] = self.eval(weights, simulations)
                 print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]))
 
@@ -472,7 +492,7 @@ def eval_alphazero_computer(file_name):
 
     # 並列実行を行うための前処理
     ray.init()
-    weights = ray.put(network.get_weights())
+    weights = network.get_weights()
     del network
 
     # 描画用配列
