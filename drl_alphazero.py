@@ -7,11 +7,12 @@ from collections import deque
 import numpy as np
 import ray
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from inada_framework import Model, Function, cuda, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_train_utilities import SelfMatch, corners_plan
+from drl_utilities import SelfMatch, corners_plan
 from board import Board
 from inada_framework.optimizers import Momentum, WeightDecay
 
@@ -103,9 +104,11 @@ class AlphaZeroAgent:
         return self.get_action(board)
 
     def get_action(self, board, count = None):
-        root_state = board.state
-        state, policy = self.__search(board, root_state)
-        placable = self.placable[root_state]
+        # ここで得た情報は教師データとなるだけなので、動的に計算グラフを構築する必要はない
+        with no_grad():
+            root_state = board.state
+            state, policy = self.__search(board, root_state)
+            placable = self.placable[root_state]
 
         if count is not None and count < self.sampling_limits:
             action = random.choices(placable, policy)[0]
@@ -306,96 +309,173 @@ def alphazero_test(weights: dict, simulations, turn):
 
 
 
-def alphazero_eval(network, simulations, turn):
-    # ray の共有メモリへの重みパラメータのコピーを事前に１度だけ、明示的に行うことで、以降を高速化する
-    current_weights = ray.put(network.get_weights())
+class AlphaZero:
+    def __init__(self, buffer_size = 90000, batch_size = 64, lr = 0.0005, weight_decay = 0.001):
+        # ニューラルネットワーク・経験再生バッファ
+        self.network = PolicyValueNet(Board.action_size)
+        self.buffer = ReplayBuffer(buffer_size, batch_size)
 
-    # まだ完遂していないタスクがリストの中に残るようになる
-    remains = [alphazero_test.remote(current_weights, simulations, turn) for __ in range(100)]
-
-    # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
-    win_count = 0
-    while remains:
-        finished, remains = ray.wait(remains, num_returns = 1)
-        win_count += ray.get(finished[0])
-
-    return win_count
+        # 最適化手法は慣性に着想を得た手法である Momentum で、パラメータのノルムが過大にならないように重み減衰も行う
+        self.optimizer = Momentum(lr).setup(self.network)
+        self.optimizer.add_hook(WeightDecay(weight_decay))
 
 
+    def fit(self, updates = 50, interval = 300, epochs = 5, simulations = 800, restart = False):
+        network = self.network
+        buffer = self.buffer
+        optimizer = self.optimizer
 
+        # ファイルのパスは先に計算しておく
+        file_path = SelfMatch.get_path("alphazero")
+        is_yet_path = file_path.format("is_yet")
+        params_path = file_path.format("parameters")
+        graphs_path = file_path.format("graphs")
+        del file_path
 
-def alphazero_train(updates = 50, interval = 300, epochs = 5, simulations = 800, restart = False):
-    file_path = SelfMatch.get_path("alphazero")
-    is_yet_file = file_path.format("is_yet")
-    params_file = file_path.format("parameters")
+        # 学習を途中再開する場合は、必要な情報を読み込む
+        if restart:
+            network.load_weights(f"{is_yet_path}_weights.npz")
+            restart = buffer.load(f"{is_yet_path}_buffer.pkl")
+            historys = np.load(f"{is_yet_path}_history.npy")
+        else:
+            restart = 0
+            historys = np.zeros((2, updates), dtype = np.int32)
 
-    # ハイパーパラメータの設定
-    buffer_size = 90000
-    batch_size = 64
-    lr = 0.0005
-    weight_decay = 0.001
+        # 画面表示
+        print("\033[92m=== Current Winning Percentage ===\033[0m\n")
+        print(" run || first | second")
+        print("=======================")
 
-    # ニューラルネットワーク・経験再生バッファ
-    network = PolicyValueNet(Board.action_size)
-    buffer = ReplayBuffer(buffer_size, batch_size)
+        try:
+            # 並列実行を行うための初期設定
+            ray.init()
 
-    # 最適化手法は慣性に着想を得た手法である Momentum で、パラメータのノルムが過大にならないように重み減衰を行う
-    optimizer = Momentum(lr).setup(network)
-    optimizer.add_hook(WeightDecay(weight_decay))
+            # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
+            weights = ray.put(network.get_weights())
 
+            for run in range(restart, updates):
+                with tqdm(desc = f"run {run}", total = interval, leave = False) as pbar:
+                    # まだ完遂していないタスクがリストの中に残るようになる
+                    remains = [alphazero_play.remote(weights, simulations) for __ in range(interval)]
 
-    # 学習を途中再開する場合は、必要な情報を読み込む
-    if restart:
-        network.load_weights(f"{is_yet_file}_weights.npz")
-        restart = buffer.load(f"{is_yet_file}_buffer.pkl")
-        historys = np.load(f"{is_yet_file}_history.npy")
-    else:
-        restart = 1
-        historys = np.zeros((2, updates), dtype = np.float32)
-
-    # 評価結果を一時的に保持するための配列
-    win_rates = np.zeros(2, dtype = np.int32)
-
-
-    try:
-        # 並列実行を行うための初期設定
-        ray.init()
-
-        for update in range(restart, updates + 1):
-            current_weights = ray.put(network.get_weights())
-            remains = [alphazero_play.remote(current_weights, simulations) for __ in range(interval)]
-
-            # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
-            with tqdm(desc = f"update {update}", total = interval, leave = False) as pbar:
-                while remains:
-                    finished, remains = ray.wait(remains, num_returns = 1)
-                    buffer.add(ray.get(finished[0]))
-                    pbar.update(1)
-
-            # interval で指定した期間ごとに、epochs で指定したエポック数だけ、パラメータを学習する
-            with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
-                for epoch in range(epochs):
-                    pbar.set_description(f"epoch {epoch}")
-
-                    win_rates
-                    for states, mcts_policys, rewards in buffer:
-                        alphazero_loss(*network(states), mcts_policys, rewards)
-                        optimizer.update()
-
-                        win_rates = 
-                        pbar.set_postfix(rates = "({}%, {}%)".format(*win_rates[::-1])))
+                    # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
+                    while remains:
+                        finished, remains = ray.wait(remains, num_returns = 1)
+                        buffer.add(ray.get(finished[0]))
                         pbar.update(1)
 
-            # パラメータの保存・暫定結果の出力
-            network.save_weights("{}_{:0{}}.npz".format(params_file, update, len(str(updates))))
+                # interval で指定した期間ごとに、epochs で指定したエポック数だけ、パラメータを学習する
+                with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
+                    for epoch in range(epochs):
+                        pbar.set_description(f"epoch {epoch}")
 
-    except KeyboardInterrupt:
-        network.save_weights(f"{is_yet_file}_weights.npz")
-        buffer.save(f"{is_yet_file}_buffer.pkl", update)
-        np.save(f"{is_yet_file}_history.npy", historys)
+                        for states, mcts_policys, rewards in buffer:
+                            alphazero_loss(*network(states), mcts_policys, rewards)
+                            optimizer.update()
+                            pbar.update(1)
 
+                # パラメータの保存
+                network.save_weights("{}_{:0{}}.npz".format(params_path, run + 1, len(str(updates))))
+
+                # エージェントの評価
+                weights = ray.put(network.get_weights())
+                historys[:, run] = self.eval(weights, simulations)
+                print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]))
+
+        except KeyboardInterrupt:
+            network.save_weights(f"{is_yet_path}_weights.npz")
+            buffer.save(f"{is_yet_path}_buffer.pkl", run)
+            np.save(f"{is_yet_path}_history.npy", historys)
+
+            message = "this is simply the interrupt which you raise now, not a error."
+            raise KeyboardInterrupt(message)
+
+        finally:
+            # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
+            x = np.arange(100)
+            plt.plot(x, historys[0], label = "first")
+            plt.plot(x, historys[1], label = "second")
+            plt.legend()
+
+            plt.ylim(-5, 105)
+            plt.xlabel("Progress Rate")
+            plt.ylabel("Mean Winning Percentage")
+            plt.savefig(graphs_path)
+            plt.clf()
+
+
+    @staticmethod
+    def eval(weights, simulations):
+        with tqdm(desc = f"now evaluating", total = 200, leave = False) as pbar:
+            win_rates = []
+
+            for turn in (1, 0):
+                remains = [alphazero_test.remote(weights, simulations, turn) for __ in range(100)]
+
+                # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
+                win_count = 0
+                while remains:
+                    finished, remains = ray.wait(remains, num_returns = 1)
+                    win_count += ray.get(finished[0])
+                    pbar.update(1)
+
+                win_rates.append(win_count)
+        return win_rates
+
+
+
+
+def eval_alphazero_computer(file_name):
+    file_path = SelfMatch.get_path(file_name)
+    network = PolicyValueNet(Board.action_size)
+    network.load_weights(file_path.format("parameters") + ".npz")
+
+    # 並列実行を行うための前処理
+    ray.init()
+    weights = ray.put(network.get_weights())
+    del network
+
+    # 描画用配列
+    simulations = 50 * (2 ** np.arange(5))
+    simulations = simulations.astype(int)
+    win_rates = np.empty((2, 5))
+
+
+    # 画面表示
+    print("\033[92m=== Winning Percentage ===\033[0m\n")
+    print(" num || first | second")
+    print("=======================")
+
+    # 行動選択時のシミュレーション回数を推移させながら、コンピュータを評価する
+    for i, simulation in enumerate(simulations):
+        win_rates[:, i] = AlphaZero.eval(weights, simulation)
+        print("{:>4} || {:>3} % | {:>3} %".format(simulation, *win_rates[:, i]))
+
+
+    # グラフの目盛り位置を設定するための変数
+    width = 1 / 3
+    left = np.arange(5)
+    center = left + width
+
+    # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
+    plt.bar(left, win_rates[0], width = width, align = "edge", label = "first")
+    plt.bar(center, win_rates[1], width = width, align = "edge", label = "second")
+    plt.xticks(ticks = center, labels = simulations)
+    plt.legend()
+
+    plt.ylim(-5, 105)
+    plt.xlabel("The Number of Simulation")
+    plt.ylabel("Winning Percentage")
+    plt.title("AlphaZero")
+    plt.savefig(file_path.format("graphs") + "_bar")
+    plt.clf()
 
 
 
 if __name__ == "__main__":
-    alphazero_train(restart = False)
+    # 学習用コード
+    arena = AlphaZero()
+    arena.fit(restart = False)
+
+    # 評価用コード
+    # eval_alphazero_computer(file_name = "alphazero_50")

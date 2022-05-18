@@ -5,7 +5,7 @@ import numpy as np
 from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_train_utilities import SelfMatch, eval_computer
+from drl_utilities import SelfMatch, eval_computer
 from board import Board
 
 
@@ -183,27 +183,27 @@ def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = 
     self_match = Reinforce(board, first_agent, second_agent)
 
     for gamma in gammas:
-        print(f"\"gamma = {gamma}\" is started.\n")
+        print(f"\n\"gamma = {gamma}\" is started.\n")
         first_agent.gamma = gamma
         second_agent.gamma = gamma
         self_match.fit(3, episodes, restart, file_name + "-{}".format(str(gamma * 100)[:2]))
         restart = False
-        print(f"\ndone!\n")
+        print(f"\ndone!")
 
 
 
 
 if __name__ == "__main__":
     to_gpu = False
-    gammas = (0.95, 0.90, 0.85, 0.80, 0.75, 0.70)
+    gammas = ()
     file_name = "reinforce"
 
     # 学習の進行具合によって変更する必要がある変数
-    trained_num = 1
-    restart = True
+    restart = False
 
     # 学習用コード
-    fit_reinforce_agent(to_gpu, gammas[trained_num :], file_name, restart = restart)
+    fit_reinforce_agent(to_gpu, gammas, file_name, restart = restart)
 
     # 評価用コード
-    eval_computer(ReinforceComputer, to_gpu, gammas, file_name)
+    gammas = 0.70, 0.75, 0.80, 0.85, 0.88, 0.90, 0.92, 0.95
+    eval_computer(ReinforceComputer, to_gpu, gammas, file_name, graph_index = 3)

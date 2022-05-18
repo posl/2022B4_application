@@ -77,7 +77,7 @@ class SelfMatch:
             for turn in {1, 0}:
                 agent = self.agents[turn]
                 agent.reset()
-                agent.load_to_restart(f"{load_file}{turn}")
+                agent.load_to_restart(f"{load_file}_{turn}")
 
             # ここで定義した変数は学習中ずっと残ることになるので、不要なものは削除する
             del restart, load_file, turn, agent
@@ -140,10 +140,8 @@ class SelfMatch:
             plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
             plt.ylabel("Mean Winning Percentage")
-
-            # 割引率が重要なパラメータであることがわかったので、その情報と一緒に保存する
-            plt.title("gamma = {}".format(self.agents[1].gamma))
             plt.savefig(file_name.format("graphs"))
+            plt.clf()
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する
@@ -189,7 +187,7 @@ class SelfMatch:
 
 
 # コンピュータの性能を割引率の値ごとに評価し、グラフ形式で保存する関数
-def eval_computer(computer_class, to_gpu, gammas, file_name):
+def eval_computer(computer_class, to_gpu, gammas, file_name, graph_index):
     # 環境
     board = Board()
 
@@ -201,36 +199,40 @@ def eval_computer(computer_class, to_gpu, gammas, file_name):
     # その他の設定
     self_match = SelfMatch(board, first_computer, second_computer)
     length = len(gammas)
-    rates = np.empty((2, length))
+    win_rates = np.empty((2, length))
 
     # 先攻か後攻か・難易度ごとに、コンピュータの評価を合計 20 回行い、その平均をグラフに描画する勝率とする
-    for turn in (1, 0):
-        for i, gamma in enumerate(gammas):
-            current_target = f"turn {turn}, gamma {gamma}"
+    for i, gamma in enumerate(gammas):
+        print(f"\n\033[92mgamma = {gamma}\033[0m")
 
+        for turn in (1, 0):
+            target = f"turn {turn}"
             win_rate = 0
-            for __ in tqdm(range(20), desc = current_target, leave = False):
+
+            for __ in tqdm(range(20), desc = target, leave = False):
                 first_computer.reset(file_name, gamma, 1)
                 second_computer.reset(file_name, gamma, 0)
                 win_rate += self_match.eval(turn)
 
             win_rate /= 20
-            rates[turn, i] = win_rate
-            print(f"{current_target}: {win_rate:.5g} %")
+            win_rates[turn, i] = win_rate
+            print(f"{target}: {win_rate:.5g} %")
+        print()
 
     # グラフの目盛り位置を設定するための変数
-    width = 2.0 / length
+    width = 1 / 3
     left = np.arange(length)
-    right = left + width
+    center = left + width
 
     # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
-    plt.bar(left, rates[1], width = width, align = "edge", label = "first")
-    plt.bar(right, rates[0], width = width, align = "edge", label = "second")
-    plt.xticks(ticks = right, labels = gammas)
+    plt.bar(left, win_rates[1], width = width, align = "edge", label = "first")
+    plt.bar(center, win_rates[0], width = width, align = "edge", label = "second")
+    plt.xticks(ticks = center, labels = gammas)
     plt.legend()
 
     plt.ylim(-5, 105)
     plt.xlabel("Gamma")
-    plt.ylabel("Winning Percentages")
+    plt.ylabel("Winning Percentage")
     plt.title(f"{computer_class.__name__}")
-    plt.savefig(self_match.get_path(file_name + "_bar").format("graphs"))
+    plt.savefig(self_match.get_path(file_name + f"_bar{graph_index}").format("graphs"))
+    plt.clf()

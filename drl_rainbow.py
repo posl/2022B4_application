@@ -9,7 +9,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
 from inada_framework.utilities import reshape_for_broadcast
-from drl_train_utilities import SelfMatch, eval_computer
+from drl_utilities import SelfMatch, eval_computer
 from board import Board
 
 
@@ -686,6 +686,8 @@ class Rainbow(SelfMatch):
 
 
 def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = False):
+    file_name += "-{}".format(str(gamma * 100)[:2])
+
     # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
