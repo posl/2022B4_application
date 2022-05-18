@@ -4,7 +4,7 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import get_stand_bits, get_reverse_board, get_legal_board
+from board_speedup import count_stand_bits, get_stand_bits, get_reverse_board, get_legal_board
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -87,8 +87,8 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
-            self.__count_bits = self.__count_bits_python
-            self.__get_stand_bits = self.__get_stand_bits_cython
+            self.__count_bits = count_stand_bits
+            self.__get_stand_bits = get_stand_bits
             self.__reverse = self.__reverse_cython
             self.__list_placable = self.__list_placable_cython
         else:
@@ -229,10 +229,6 @@ class Board:
     @staticmethod
     def __get_stand_bits_python(num, x):
         return [n for n in range(num) if (x >> n) & 1]
-
-    @staticmethod
-    def __get_stand_bits_cython(num, x):
-        return get_stand_bits(num, x)
 
 
     @property

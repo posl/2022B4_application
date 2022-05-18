@@ -8,6 +8,8 @@ from libc.time cimport time, time_t
 
 ctypedef unsigned long long uint
 
+
+
 # 合法手の箇所だけ１が立った、ボードを表す 64 bit 符号無し整数を返す (ブラックボックス化するため、反復処理は展開している)
 # 引数は手番または、相手プレイヤーの石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
 cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
@@ -39,6 +41,8 @@ cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
 
 def get_legal_board(uint move_player, uint opposition_player):
     return __get_legal_board(move_player, opposition_player)
+
+
 
 
 # 反転するマスだけ１が立った、ボードを表す 64 bit 符号無し整数を返す
@@ -88,6 +92,9 @@ cdef inline uint __get_reverse_board(uint set_position, uint move_player, uint o
 def get_reverse_board(uint set_position, uint move_player, uint opposition_player):
     return __get_reverse_board(set_position, move_player, opposition_player)
 
+
+
+
 # 手番プレイヤーの石から見て、指定方向に相手の石が連続していた場合、その終端のもう１つ先が手番にとっての合法手である
 cdef inline uint search_upper_legal(uint tmp, int n, uint mask):
     tmp = search_upper(tmp, n, mask)
@@ -119,27 +126,42 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
     tmp |= mask & (tmp << n)
     return tmp
 
-# 1が立っているビットの数を数える
-cdef inline int __count_bits(uint n):
+
+
+
+# １が立っているビットの数を数える
+cdef inline uint __count_stand_bits(uint n):
     cdef uint mask
+
+    # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
     mask = 0x5555_5555_5555_5555
-    n = (n & mask) + (n >> 1 & mask)
+    n -= (n >> 1) & mask
+
+    # 4 bit ごとにブロック分けして、各ブロックに 上位 2 bit + 下位 2 bit を計算した値を入れる
     mask = 0x3333_3333_3333_3333
-    n = (n & mask) + (n >> 2 & mask)
+    n = (n & mask) + ((n >> 2) & mask)
+
+    # 8 bit ごとにブロック分けして、各ブロックに 上位 4 bit + 下位 4 bit を計算した値を入れる
     mask = 0x0f0f_0f0f_0f0f_0f0f
-    n = (n & mask) + (n >> 4 & mask)
-    mask = 0x00ff_00ff_00ff_00ff
-    n = (n & mask) + (n >> 8 & mask)
-    mask = 0x0000_ffff_0000_ffff
-    n = (n & mask) + (n >> 16 & mask)
-    mask = 0x0000_0000_ffff_ffff
-    return (n & mask) + (n >> 32 & mask)
+    n += n >> 4
+    n &= mask
 
-def count_bits(uint n):
-    return __count_bits(n)
+    # 以下、同様
+    n += n >> 8
+    n += n >> 16
+    n += n >> 32
+
+    # 0 ~ 64 を表現するために、下位 7 bit のみを取り出して出力とする
+    mask = 0x7f
+    return n & mask
+
+def count_stand_bits(uint n):
+    return __count_stand_bits(n)
 
 
-#１が立っているビット位置のリストを取得する
+
+
+# １が立っているビット位置のリストを取得する
 def get_stand_bits(int num, uint x):
     cdef:
         int n
@@ -153,7 +175,9 @@ def get_stand_bits(int num, uint x):
     return l
 
 
-cdef inline int __alpha_beta(uint move_player, uint opposition_player, int depth, time_t limit_time):
+
+
+cdef inline uint __alpha_beta(uint move_player, uint opposition_player, int depth, time_t limit_time):
     cdef:
         uint mask, legal_board, put
         int value, n
@@ -162,7 +186,7 @@ cdef inline int __alpha_beta(uint move_player, uint opposition_player, int depth
 
     if legal_board == 0:
         if __get_legal_board(opposition_player, move_player) == 0:
-            return __count_bits(move_player) - __count_bits(opposition_player)
+            return __count_stand_bits(move_player) - __count_stand_bits(opposition_player)
         else:
             return - __alpha_beta(opposition_player, move_player, 1, limit_time)
 
@@ -171,12 +195,12 @@ cdef inline int __alpha_beta(uint move_player, uint opposition_player, int depth
             return -100
 
         if (legal_board >> n) & 1:
-            put =  <unsigned long long>1 << n
+            put =  <uint> 1 << n
 
             mask = __get_reverse_board(put, move_player, opposition_player)
 
             value = - __alpha_beta(opposition_player ^ mask, move_player ^ mask ^ put, 1, limit_time)
-            
+
             if value == 100:
                 return -100
 
