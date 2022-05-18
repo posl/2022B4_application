@@ -1,4 +1,3 @@
-from functools import singledispatchmethod
 import random
 from math import sqrt, ceil
 from dataclasses import dataclass
@@ -33,23 +32,6 @@ class PolicyValueNet(Model):
         score = self.p1(self.p0(x))
         value = dzf.tanh(self.v1(self.v0(x)))
         return score, value
-
-    def set_weights(self, passed_params_dict):
-        params_dict = {}
-        self.flatten_params(params_dict)
-        for key, param in params_dict.items():
-            try:
-                if param.data is None:
-                    param.data = passed_params_dict[key].copy()
-                else:
-                    param.data[...] = passed_params_dict[key]
-            except KeyError:
-                param.data = None
-
-    def get_weights(self):
-        params_dict = {}
-        self.flatten_params(params_dict)
-        return {key : param.data for key, param in params_dict.items() if param.data is not None}
 
 
 # ニューラルネットワークの出力を確率形式に変換するための関数
@@ -132,19 +114,7 @@ class AlphaZeroAgent:
         self.placable = {}
         self.rng = np.random.default_rng()
 
-
-    # クラスメソッドのオーバーロードによって、コンピュータとしての使用時と、学習時で処理を分ける
-    @singledispatchmethod
-    def load(self, arg):
-        message = f"\"{arg.__class__}\" is not supported."
-        raise TypeError(message)
-
-    @load.register(str)
-    def __(self, file_name):
-        self.network.load_weights(SelfMatch.get_path(file_name + ".npz").format("parameters"))
-
-    @load.register(dict)
-    def __(self, weights):
+    def load(self, weights):
         self.network.set_weights(weights)
 
 
@@ -253,7 +223,8 @@ class AlphaZeroAgent:
 
 # 実際にコンピュータとして使われるクラス (上のエージェントをそのまま使っても良い)
 class AlphaZeroComputer(AlphaZeroAgent):
-    pass
+    def load(self, file_name):
+        self.network.load_weights(SelfMatch.get_path(file_name + ".npz").format("parameters"))
 
 
 
@@ -336,7 +307,7 @@ def alphazero_play(weights: dict, simulations):
     memory = []
     for count in range(board.action_size):
         action, state, mcts_policy = agent.get_action(board, count)
-        memory.append(ReplayData[state, mcts_policy, board.turn])
+        memory.append(ReplayData(state, mcts_policy, board.turn))
 
         board.put_stone(action)
         if not board.can_continue():
@@ -415,7 +386,7 @@ class AlphaZero:
             ray.init()
 
             # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
-            weights = network.get_weights()
+            weights = ray.put(network.get_weights())
 
             for run in range(restart, updates):
                 with tqdm(desc = f"run {run}", total = interval, leave = False) as pbar:
@@ -442,7 +413,7 @@ class AlphaZero:
                 network.save_weights("{}_{:0{}}.npz".format(params_path, run + 1, len(str(updates))))
 
                 # エージェントの評価
-                weights = network.get_weights()
+                weights = ray.put(network.get_weights())
                 historys[:, run] = self.eval(weights, simulations)
                 print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]))
 
@@ -492,7 +463,7 @@ def eval_alphazero_computer(file_name):
 
     # 並列実行を行うための前処理
     ray.init()
-    weights = network.get_weights()
+    weights = ray.put(network.get_weights())
     del network
 
     # 描画用配列
