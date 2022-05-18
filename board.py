@@ -5,7 +5,6 @@ from math import ceil
 import numpy as np
 
 from board_speedup import get_stand_bits, get_reverse_board, get_legal_board
-import display
 
 
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
@@ -88,10 +87,12 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
+            self.__count_bits = self.__count_bits_python
             self.__get_stand_bits = self.__get_stand_bits_cython
             self.__reverse = self.__reverse_cython
             self.__list_placable = self.__list_placable_cython
         else:
+            self.__count_bits = self.__count_bits_python
             self.__get_stand_bits = self.__get_stand_bits_python
             self.__reverse = self.__reverse_python
             self.__list_placable = self.__list_placable_python
@@ -178,11 +179,16 @@ class Board:
 
     @property
     def black_num(self):
-        return self.stone_black.bit_count()
+        return self.__count_bits(self.stone_white)
 
     @property
     def white_num(self):
-        return self.stone_white.bit_count()
+        return self.__count_bits(self.stone_black)
+
+    @staticmethod
+    def __count_bits_python(x):
+        return bin(x).count("1")
+
 
     # ゲーム終了後、勝敗に応じて報酬を与えるための属性 (最後の手番の人から見て、勝ち : 1, 負け : -1, 分け : 0)
     @property
@@ -193,7 +199,6 @@ class Board:
                 return -1.
             return 1.
         return 0
-
 
     def get_stone_num(self):
         if self.turn:
@@ -360,53 +365,11 @@ class Board:
                 self.reversed = mask
                 self.render(flag, n)
 
-    # エピソード中の画面表示メソッド
-    def render(self, flag, n = 999):
-        self.main_window.game_page.canvas_update(flag, n)
+    # 画面表示用関数 (このクラスを継承した子クラスが具体的に実装する)
+    def render(self):
+        raise NotImplementedError()
 
 
-    def play(self):
-        # ウインドウ
-        self.main_window = display.MainWindow(self)
-
-        # プレイヤーの種類
-        self.player_kinds = display.PlayerKinds(self.main_window)
-
-        while True:
-            self.main_window.change_page(0)
-            self.main_window.mainloop()
-            if self.click_attr:
-                self.__play()
-            else:
-                break
-            self.main_window.game_page.result_view()
-            self.main_window.mainloop()
-
-    def __play(self):
-        #self.main_window.mainloop()
-        #player1_plan, player2_plan = self.click_attr
-        #player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
-        #self.set_plan(player1_plan, player2_plan)
-
-        # 最初の盤面表示
-        self.reset()
-        self.print_state()
-        self.render(None)
-        self.main_window.after(100, self.main_window.quit)
-        self.main_window.mainloop()
-
-        self.game(self.print_state)
-
-        # 最後の１石だけ表示されない問題を解消する (１秒待機)
-        self.main_window.after(1000, self.main_window.quit)
-        self.main_window.mainloop()
-
-    # id...種類のID  diff...難易度
-    # gameの設定
-    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
-        player2_plan = self.player_kinds.get_func(player2id, player2diff, 0)
-        self.set_plan(player1_plan, player2_plan)
 
 
     # 一時的な盤面表示
@@ -414,6 +377,7 @@ class Board:
         for i in range(8):
             print(format(x & 0b1111_1111, "08b")[::-1])
             x >>= 8
+
     def print_state(self):
         self.print_board(self.stone_black)
         print("-" * 20)
@@ -433,16 +397,3 @@ class Board:
             n = self.get_action()
             self.put_stone(n)
             flag = self.can_continue()
-
-
-
-
-if __name__ == "__main__":
-    board = Board()
-    board.reset()
-    board.print_state()
-
-    for i in (19, 18, 26):
-        board.put_stone(i)
-        board.can_continue()
-        board.print_state()

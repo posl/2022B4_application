@@ -1,4 +1,3 @@
-from os import environ
 import os
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -6,9 +5,10 @@ import math
 import random
 
 # pygame のウェルカムメッセージを表示させないための設定
-environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
+from board import Board
 from mc_tree_search import MonteCarloTreeSearch
 #from mc_primitive import PrimitiveMonteCarlo (board_speedupにalpha_betaがないとエラーが出る)
 from drl_rainbow import RainbowComputer
@@ -694,12 +694,60 @@ class MainWindow(tk.Tk):
     
 
 
+class DisplayBoard(Board):
+    def render(self, flag, n = 999):
+        self.main_window.game_page.canvas_update(flag, n)
+
+    def play(self):
+        # ウインドウ
+        self.main_window = MainWindow(self)
+
+        # プレイヤーの種類
+        self.player_kinds = PlayerKinds(self.main_window)
+
+        while True:
+            self.main_window.change_page(0)
+            self.main_window.mainloop()
+            if self.click_attr:
+                self.__play()
+            else:
+                break
+            self.main_window.game_page.result_view()
+            self.main_window.mainloop()
+
+    def __play(self):
+        #self.main_window.mainloop()
+        #player1_plan, player2_plan = self.click_attr
+        #player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
+        #self.set_plan(player1_plan, player2_plan)
+
+        # 最初の盤面表示
+        self.reset()
+        self.print_state()
+        self.render(None)
+        self.main_window.after(100, self.main_window.quit)
+        self.main_window.mainloop()
+
+        self.game(self.print_state)
+
+        # 最後の１石だけ表示されない問題を解消する (１秒待機)
+        self.main_window.after(1000, self.main_window.quit)
+        self.main_window.mainloop()
+
+    # id...種類のID  diff...難易度
+    # gameの設定
+    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
+        player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
+        player2_plan = self.player_kinds.get_func(player2id, player2diff, 0)
+        self.set_plan(player1_plan, player2_plan)
+
+
 
 
 if __name__ == "__main__":
     pass
     # アプリケーションを開始
-    #board = board.Board()
+    #board = DisplayBoard()
     #board.play()
     
     #tkapp = App()
