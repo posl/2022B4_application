@@ -3,6 +3,7 @@ import random
 from math import sqrt, ceil
 from dataclasses import dataclass
 from collections import deque
+import pickle
 
 import numpy as np
 import ray
@@ -26,9 +27,19 @@ class PolicyValueNet(Model):
         self.v = dzl.Affine(1)
 
     def forward(self, x):
-        policy = dzf.softmax(self.p(x))
+        score = self.p(x)
         value = dzf.tanh(self.v(x))
-        return policy, value
+        return score, value
+
+
+# ニューラルネットワークの出力を確率形式に変換するための関数
+def softmax(score, xp = np):
+    # オーバーフロー対策に最大要素との差を取る
+    score -= score.max(axis = 1, keepdims = True)
+
+    score = xp.exp(score)
+    policy = score / score.sum(axis = 1, keepdims = True)
+    return policy
 
 
 
@@ -39,24 +50,41 @@ class AlphaZeroLoss(Function):
         self.mcts_policys = mcts_policys
         self.rewards = rewards
 
-    def forward(self, policy, value):
-        xp = cuda.get_array_module(policy)
+    def forward(self, score, value):
+        xp = cuda.get_array_module(score)
+        policy = softmax(score, xp)
 
-        # 方策の損失関数はクロスエントロピー誤差
+        # ソフトマックス関数の出力を使うと逆伝播が簡単になるので、インスタンス変数として保存しておく
+        self.policy = policy
+
+        # 方策の損失関数は多クラス交差エントロピー誤差
         loss = -self.mcts_policys * xp.log(policy + 0.0001)
         loss = loss.sum(axis = 1, keepdims = True)
 
         # 状態価値関数の損失関数は平均二乗誤差
-        loss += (value - self.rewards) ** 2.
+        loss += 0.5 * ((value - self.rewards) ** 2.)
 
         return xp.average(loss)
 
     def backward(self, gy):
-        pass
+        value = self.inputs[1].data
+        print(value.shape)
+
+        # 誤差関数の逆伝播
+        gy /= len(value)
+        gscore = gy * (self.policy - self.mcts_policys)
+        gvalue = gy * (value - self.rewards)
+
+        # 不要となった配列をメモリから消去する
+        self.mcts_policys = None
+        self.rewards = None
+        self.policy = None
+
+        return gscore, gvalue
 
 
-def alphazero_loss(policy, value, mcts_policys, rewards):
-    return AlphaZeroLoss(mcts_policys, rewards)(policy, value)
+def alphazero_loss(score, value, mcts_policys, rewards):
+    return AlphaZeroLoss(mcts_policys, rewards)(score, value)
 
 
 
@@ -153,7 +181,8 @@ class AlphaZeroAgent:
     def __expand(self, board, state, root_flag = False):
         self.seen_state.add(state)
         state_ndarray = board.get_state_ndarray()
-        policy, value = self.network(state_ndarray[None, :])
+        score, value = self.network(state_ndarray[None, :])
+        policy = softmax(score.data)
 
         placable = board.list_placable()
         self.placable[state] = placable
@@ -167,7 +196,7 @@ class AlphaZeroAgent:
             return state_ndarray
 
         # それ以外は、ニューラルネットワークの出力である過去の勝率を返す
-        return value[0, 0]
+        return value.data[0, 0]
 
 
     # 初到達の盤面の展開をしてゲーム木を大きくしながら、ゲームの報酬や過去のデータをもとに評価値を返すメソッド
@@ -191,7 +220,7 @@ class AlphaZeroAgent:
 
             # 結果を反映させる
             self.T[state][action_index] += value
-            self.N[state][action_index] += 1
+            self.N[state][action_index] += 1.
         else:
             # 展開していなかった盤面の場合は、ニューラルネットワークの出力である過去の勝率を評価値として返す
             value = self.__expand(board, state)
@@ -229,6 +258,18 @@ class ReplayBuffer:
     def max_iter(self):
         return ceil(len(self.buffer) / self.batch_size)
 
+    def save(self, file_path, run):
+        save_data = self.buffer, run
+        with open(file_path, "wb") as f:
+            pickle.dump(save_data, f)
+
+    def load(self, file_path):
+        with open(file_path, "rb") as f:
+            load_data = pickle.load(f)
+        self.buffer, run = load_data
+        return run
+
+
     # １エピソード分のデータがリストとして、まとめて格納される
     def add(self, datas: list):
         self.buffer.extend(datas)
@@ -252,6 +293,9 @@ class ReplayBuffer:
         states = np.stack([x.state for x in selected])
         mcts_policys = np.stack([x.mcts_policy for x in selected])
         rewards = np.array([x.reward for x in selected], dtype = np.float32)
+
+        # ゲームの報酬はニューラルネットワークの教師データとして使うので、形状をそれと合わせる
+        rewards = rewards[:, None]
 
         return states, mcts_policys, rewards
 

@@ -4,7 +4,7 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import get_reverse_board, get_legal_board, get_stand_bits
+from board_speedup import get_stand_bits, get_reverse_board, get_legal_board
 import display
 
 
@@ -88,13 +88,13 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
-            self.__list_placable = self.__list_placable_cython
-            self.__reverse = self.__reverse_cython
             self.__get_stand_bits = self.__get_stand_bits_cython
+            self.__reverse = self.__reverse_cython
+            self.__list_placable = self.__list_placable_cython
         else:
-            self.__list_placable = self.__list_placable_python
-            self.__reverse = self.__reverse_python
             self.__get_stand_bits = self.__get_stand_bits_python
+            self.__reverse = self.__reverse_python
+            self.__list_placable = self.__list_placable_python
 
         # オセロ盤の状態を表現する整数、ターンを表す整数 (先攻(黒) : 1, 後攻(白) : 0)
         self.stone_black = 0
@@ -190,8 +190,8 @@ class Board:
         diff = self.black_num - self.white_num
         if diff:
             if (diff > 0) ^ self.turn:
-                return -1
-            return 1
+                return -1.
+            return 1.
         return 0
 
 
