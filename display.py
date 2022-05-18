@@ -206,8 +206,11 @@ class GamePage(Page):
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 25), command=lambda:None)
         self.button1.place(x=750, y=380)
 
-        self.button2 = tk.Button(self, text=">", font = (self.font_name, 50), command=lambda:self.goto_start_page())
+        self.button2 = tk.Button(self, text=">", font = (self.font_name, 50), command=lambda:self.goto_result_page())
         self.button2.place(x=750, y=380)
+
+        self.button3 = tk.Button(self, text="X", font = (self.font_name, 50), command=lambda:self.goto_start_page())
+        self.button3.place(x=750, y=160)
     
 
     def canvas_update(self, flag=None, n=999):
@@ -431,6 +434,12 @@ class GamePage(Page):
         self.label1.configure(text="")
         self.par.sounds.bgm_play(0)
         self.par.quit()
+
+    def goto_result_page(self):
+        self.par.result_page.graph_draw()
+        self.par.change_page(3)
+        print(self.board.log_state)
+        print(self.board.log_plans)
     
 
     def win_check(self):
@@ -442,6 +451,136 @@ class GamePage(Page):
             self.label1.configure(text="白の勝ち")
         else:
             self.label1.configure(text="引き分け")
+
+
+class ResultPage(Page):
+    def __init__(self, par, board):
+        Page.__init__(self, par, board)
+        self.configure(bg="#992299")
+
+        self.canvas_width = 400
+        self.canvas_height = 400
+
+        self.cell_width = (self.canvas_width-10) // 8
+        self.cell_height = (self.canvas_height-10) // 8
+
+        self.board_canvas_width = 130
+        self.board_canvas_height = 130
+
+        self.cur = 0
+
+        self.stonenum_canvas_width = 600
+        self.stonenum_canvas_height = 300
+
+        self.board_canvas = tk.Canvas(self, width=self.board_canvas_width, height=self.board_canvas_height)
+        self.board_canvas.place(x=200, y=10)
+
+        self.stonenum_canvas = tk.Canvas(self, width=self.stonenum_canvas_width, height=self.stonenum_canvas_height)
+        self.stonenum_canvas.place(x=10, y=150)
+        self.stonenum_canvas.bind("<Button-1>", self.graph_click)
+        self.curline1 = None
+        self.curline2 = None
+        self.curline3 = None
+        self.curline4 = None
+
+        self.button1 = tk.Button(self, text="開始画面へ", font = (self.font_name, 25), command=lambda:self.goto_start_page())
+        self.button1.place(x=520, y=10)
+
+        self.button2 = tk.Button(self, text="->", font = (self.font_name, 15), command=lambda:self.cur_inc())
+        self.button2.place(x=400, y=80)
+
+        self.button3 = tk.Button(self, text="<-", font = (self.font_name, 15), command=lambda:self.cur_dec())
+        self.button3.place(x=120, y=80)
+    
+    def graph_click(self, event):
+        states = self.board.log_state
+        num = len(states)
+        turn_width = 1.0 * self.stonenum_canvas_width / num
+        x = event.x
+        x = int(x/turn_width)
+        if x < 0 : x = 0
+        if x >= num: x = num - 1
+        self.cur = x
+        self.miniboard_draw()
+        return
+    
+
+    def graph_draw(self):
+        self.cur = 0
+        states = self.board.log_state
+        num = len(states)
+        turn_width = 1.0 * self.stonenum_canvas_width / num
+        turn_height = 1.0 * self.stonenum_canvas_height / 64
+        self.stonenum_canvas.delete("all")
+        self.stonenum_canvas.create_rectangle(0, 0, self.stonenum_canvas_width, self.stonenum_canvas_height, fill="#55FF88")
+        for i in range(num):
+            state = states[i]
+            state_b = state[0]
+            state_w = state[1]
+            bnum = bin(state_b).count("1")
+            wnum = bin(state_w).count("1")
+            left_x = float(turn_width*i+1)
+            right_x = float(turn_width*(i+1)-1)
+            bound_bg_y = float(turn_height*bnum) 
+            bound_wg_y = float(turn_height*(64-wnum))
+            self.stonenum_canvas.create_rectangle(left_x, 0, right_x, bound_bg_y, fill="#111111")
+            self.stonenum_canvas.create_rectangle(left_x, bound_wg_y, right_x, self.stonenum_canvas_height, fill="#EEEEEE")
+        self.stonenum_canvas.create_line(0, self.stonenum_canvas_height//2, self.stonenum_canvas_width, self.stonenum_canvas_height//2, fill="#FF0000")
+        self.curline1 = self.stonenum_canvas.create_line(-10, 0, -10, self.stonenum_canvas_height, fill="#0000FF")
+        self.curline2 = self.stonenum_canvas.create_line(0, -10, turn_width-2, -10, fill="#0000FF")
+        self.curline3 = self.stonenum_canvas.create_line(-10, 0, -10, self.stonenum_canvas_height, fill="#0000FF")
+        self.curline4 = self.stonenum_canvas.create_line(0, -10, turn_width-2, -10, fill="#0000FF")
+        self.miniboard_draw()
+
+    def curdraw(self):
+        states = self.board.log_state
+        num = len(states)
+        turn_width = 1.0 * self.stonenum_canvas_width / num
+        turn_height = 1.0 * self.stonenum_canvas_height / 64
+        self.stonenum_canvas.moveto(self.curline1, turn_width*self.cur-2, 0)  # 左上ー左下
+        self.stonenum_canvas.moveto(self.curline2, turn_width*self.cur-2, 0)  # 左上ー右上
+        self.stonenum_canvas.moveto(self.curline3, turn_width*(self.cur+1)-2, 0) # 右上ー右下
+        self.stonenum_canvas.moveto(self.curline4, turn_width*self.cur-2, self.stonenum_canvas_height)  # 左下ー右下
+        pass
+    
+    def miniboard_draw(self):
+        self.curdraw()
+        states = self.board.log_state
+        state = states[self.cur]
+        self.board_canvas.delete("all")
+        self.board_canvas.create_rectangle(0, 0, self.board_canvas_width, self.board_canvas_height, fill="#55FF88")
+        for i in range(9):
+            self.board_canvas.create_line(5+15*i, 5, 5+15*i, 5+15*8, fill="#000000")
+            self.board_canvas.create_line(5, 5+15*i, 5+15*8, 5+15*i, fill="#000000")
+        for i in range(8):
+            for j in range(8):
+                t = (j, i)
+                n = self.board.t2n(t)
+                if (state[0]>>n)&1:
+                    self.draw_stone("#111111", i, j)
+                elif (state[1]>>n)&1:
+                    self.draw_stone("#EEEEEE", i, j)
+        
+    def draw_stone(self, color, x, y):
+        self.board_canvas.create_rectangle(6+15*x, 6+15*y, 4+15*(x+1), 4+15*(y+1), fill=color, outline="#888888")
+    
+    def cur_inc(self):
+        self.cur += 1
+        if self.cur >= len(self.board.log_state):
+            self.cur = len(self.board.log_state)-1
+        self.miniboard_draw()
+    
+    def cur_dec(self):
+        self.cur -= 1
+        if self.cur <0:
+            self.cur = 0
+        self.miniboard_draw()
+
+    def goto_start_page(self):
+        self.board.log_state.clear()
+        self.par.change_page(0)
+        self.par.sounds.bgm_play(0)
+        self.par.quit()
 
 
 
@@ -681,6 +820,7 @@ class MainWindow(tk.Tk):
         self.start_page = StartPage(self, self.board)
         self.option_page = OptionPage(self, self.board)
         self.game_page = GamePage(self, self.board)
+        self.result_page = ResultPage(self, self.board)
         self.change_page(0)
 
         self.sounds = Sounds()
@@ -698,6 +838,8 @@ class MainWindow(tk.Tk):
             self.option_page.tkraise()
         elif page_id==2:
             self.game_page.tkraise()
+        elif page_id==3:
+            self.result_page.tkraise()
 
     
 
@@ -753,13 +895,8 @@ class DisplayBoard(Board):
 
 
 if __name__ == "__main__":
-    pass
-    # アプリケーションを開始
-    #board = DisplayBoard()
-    #board.play()
+    board = Board()
+    displayboard = DisplayBoard()
+    displayboard.play()
+    exit()
     
-    #tkapp = App()
-    #tkapp.title('おせろ')
-    
-    #tkapp.mainloop()
-    #board.set_display(tkapp)
