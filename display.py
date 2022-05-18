@@ -641,7 +641,7 @@ class PlayerKinds:
         if self.kinds_turn_diff[id]:
             return self.kinds_func[id][2*diff+turn]
         else:
-            return self.kinds_func[id][diff+turn]
+            return self.kinds_func[id][diff]
 
     def get_difficulty(self, id):
         if id<0 or id>=len(self.kinds_difficulty):
