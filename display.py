@@ -10,7 +10,7 @@ environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
 from mc_tree_search import MonteCarloTreeSearch
-#from mc_primitive import PrimitiveMonteCarlo (board_speedupにalpha_betaがないとエラーが出る)
+from mc_primitive import PrimitiveMonteCarlo
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
@@ -586,10 +586,10 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
         self.kinds_turn_diff.append(False)
 
-        #self.kinds_name.append("原始MC探索")
-        #self.kinds_func.append(PrimitiveMonteCarlo())
-        #self.kinds_difficulty.append(1)
-        #self.kinds_turn_diff.append(False)
+        self.kinds_name.append("原始MC探索")
+        self.kinds_func.append([PrimitiveMonteCarlo()])
+        self.kinds_difficulty.append(1)
+        self.kinds_turn_diff.append(False)
 
         if False:
             self.rainbow_computer_d0t0 = RainbowComputer(64)
