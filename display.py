@@ -506,6 +506,7 @@ class ResultPage(Page):
     
 
     def graph_draw(self):
+        self.cur = 0
         states = self.board.log_state
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
