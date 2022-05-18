@@ -353,10 +353,13 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
+        self.log_state.clear()
+        self.add_state() # 初期状態を記録
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
             flag = self.can_continue()
+            self.add_state() #記録
 
             if render_flag:
                 self.reversed = mask
