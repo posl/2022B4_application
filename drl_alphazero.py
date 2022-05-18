@@ -386,7 +386,7 @@ class AlphaZero:
             historys = np.zeros((2, updates), dtype = np.int32)
 
         # 画面表示
-        print("\033[92m=== Current Winning Percentage ===\033[0m\n")
+        print("\033[92m=== Current Winning Percentage ===\033[0m")
         print(" run || first | second")
         print("=======================")
 
@@ -431,21 +431,17 @@ class AlphaZero:
             buffer.save(f"{is_yet_path}_buffer.pkl", run)
             np.save(f"{is_yet_path}_history.npy", historys)
 
-            message = "this is simply the interrupt which you raise now, not a error."
-            raise KeyboardInterrupt(message)
+        # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
+        x = np.arange(updates)
+        plt.plot(x, historys[0], label = "first")
+        plt.plot(x, historys[1], label = "second")
+        plt.legend()
 
-        finally:
-            # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
-            x = np.arange(100)
-            plt.plot(x, historys[0], label = "first")
-            plt.plot(x, historys[1], label = "second")
-            plt.legend()
-
-            plt.ylim(-5, 105)
-            plt.xlabel("Progress Rate")
-            plt.ylabel("Mean Winning Percentage")
-            plt.savefig(graphs_path)
-            plt.clf()
+        plt.ylim(-5, 105)
+        plt.xlabel("Progress Rate")
+        plt.ylabel("Mean Winning Percentage")
+        plt.savefig(graphs_path)
+        plt.clf()
 
 
     @staticmethod

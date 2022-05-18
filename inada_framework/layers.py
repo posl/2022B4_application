@@ -1,4 +1,3 @@
-import weakref
 import os
 
 import numpy as np
@@ -27,14 +26,7 @@ class Layer:
         super().__setattr__(name, value)
 
     def __call__(self, *inputs):
-        outputs = self.forward(*inputs)
-        if not isinstance(outputs, tuple):
-            outputs = (outputs, )
-
-        # 弱参照
-        self.inputs = [weakref.ref(x) for x in inputs]
-        self.outputs = [weakref.ref(y) for y in outputs]
-        return outputs if len(outputs) > 1 else outputs[0]
+        return self.forward(*inputs)
 
     def forward(self, inputs):
         raise NotImplementedError()
@@ -78,9 +70,13 @@ class Layer:
 
 
     def save_weights(self, file_path):
+        params_dict = {}
+        self.__flatten_params(params_dict)
+
         # パラメータの保存時には、主記憶上にデータがあるようにする
-        arrays_dict = self.get_weights()
-        arrays_dict = {key : cuda.as_numpy(param) for key, param in arrays_dict.items()}
+        arrays_dict =  {key : cuda.as_numpy(param.data)
+                        for key, param in params_dict.items()
+                        if param.data is not None}
 
         try:
             make_data_dir(file_path)
@@ -115,7 +111,7 @@ class Layer:
     def set_weights(self, passed_params_dict):
         params_dict = {}
         self.__flatten_params(params_dict)
-        for key, param in params_dict.item():
+        for key, param in params_dict.items():
             try:
                 if param.data is None:
                     param.data = passed_params_dict[key].copy()

@@ -7,6 +7,7 @@ import numpy as np
 from board_speedup import count_stand_bits, get_stand_bits, get_reverse_board, get_legal_board
 
 
+
 # 下のジェネレータの引数となる (step, num) を８方向分生成するジェネレータ
 class StepNumGenerator:
     def __init__(self, startpoint):
