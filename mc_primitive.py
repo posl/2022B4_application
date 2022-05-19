@@ -1,21 +1,19 @@
 from random import choice
-from board import Board
-from board_speedup import alpha_beta
 
+from board import Board
+from board_speedup import alpha_beta, count_stand_bits
 
 
 class PrimitiveMonteCarlo:
-    def __init__(self, max_try = 800):
+    def __init__(self, max_try = 6400, limit_time = 10):
         self.max_try = max_try
+        self.limit_time = limit_time
 
     def __call__(self, board : Board):
-        if 0 and (board.stone_black | board.stone_white).bit_count() > 50:
-            move = alpha_beta(*board.players_board)
-            if move:
-                return move
-        else:
-            return self.primitive_monte_carlo(board)
-
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+        return self.primitive_monte_carlo(board)
 
     # ランダムで手を打つplan
     def random_action(self, board : Board):
@@ -77,6 +75,24 @@ class PrimitiveMonteCarlo:
         print("put : ", move)
         return move
 
+class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):
+    def __init__(self):
+        super().__init__()
+    
+    def __call__(self, board : Board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
+        if count_stand_bits(board.stone_black | board.stone_white) > 44:
+            move = alpha_beta(*board.players_board, self.limit_time)
+            print("zazazazazazaz", move)
+            if move in board.list_placable():
+                print("checkmate")
+                return move
+
+        return self.primitive_monte_carlo(board)
+
 
 if __name__ == "__main__":
     def player(board : Board):
@@ -91,8 +107,9 @@ if __name__ == "__main__":
 
 
     pMC = PrimitiveMonteCarlo()
+    abpmc = ABPrimitiveMonteCarlo()
     board = Board()
-    board.debug_game(pMC.random_action, pMC)
+    board.debug_game(abpmc, pMC)
 
     print("game set")
     print("black:", board.black_num)

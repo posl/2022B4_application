@@ -1,7 +1,9 @@
 from math import sqrt, log
-
 from random import choice
+
 from board import Board
+from board_speedup import alpha_beta, count_stand_bits
+
 
 
 class Node:
@@ -17,14 +19,25 @@ class Node:
         
 
     def uct(self, total_visits):
-        return self.wins / self.visits + sqrt(2 * log(total_visits) / self.visits)
+        return self.wins / self.visits + sqrt(log(total_visits) / self.visits)
 
 
 class MonteCarloTreeSearch:
-    def __init__(self, max_tries = 8192):
+    def __init__(self, max_tries = 65536, limit_time = 10):
         self.max_tries = max_tries
+        self.limit_time = limit_time
 
     def __call__(self, board : Board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+        
+        if count_bits(board.stone_black | board.stone_white) > 44:
+            move = alpha_beta(*board.players_board, self.limit_time)
+            if move in board.list_placable():
+                print("checkmate")
+                return move
+        
         return self.monte_carlo_tree_search(board)
 
     # ランダムで手を打つplan
@@ -56,14 +69,14 @@ class MonteCarloTreeSearch:
         if board.black_num == board.white_num:
             judge = 0
         elif board.black_num > board.white_num:
-            judge = 1
+            judge = 0.5
         else:
-            judge = -1
+            judge = -0.5
 
         while node:
             node.visits += 1
             # 記録されているターンと勝ちは反転していることに注意
-            node.wins += judge * (-1 if node.turn else 1) / 2 + 0.5
+            node.wins += judge * (-1 if node.turn else 1) + 0.5
 
             node = node.parent
 
@@ -118,6 +131,24 @@ class MonteCarloTreeSearch:
         return move
 
 
+class ABMonteCarloTreeSearch(MonteCarloTreeSearch):
+    def __init__(self):
+        super().__init__()
+    
+    def __call__(self, board : Board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
+        if count_stand_bits(board.stone_black | board.stone_white) > 44:
+            move = alpha_beta(*board.players_board, self.limit_time)
+            print(move, board.turn)
+            if move in board.list_placable():
+                print("checkmate")
+                return move
+        
+        return self.monte_carlo_tree_search(board)
+
 if __name__ == "__main__":
     def player(board : Board):
         while 1:
@@ -129,10 +160,10 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
-
     mcts = MonteCarloTreeSearch()
+    abmcts = ABMonteCarloTreeSearch()
     board = Board()
-    board.debug_game(mcts.random_action, mcts)
+    board.debug_game(abmcts, mcts)
 
     print("game set")
     print("black:", board.black_num)
