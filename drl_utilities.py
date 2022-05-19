@@ -231,5 +231,5 @@ def eval_computer(computer_class, to_gpu, gammas, file_name, graph_index):
     plt.xlabel("Gamma")
     plt.ylabel("Winning Percentage")
     plt.title(f"{computer_class.__name__}")
-    plt.savefig(self_match.get_path(file_name + f"_bar{graph_index}").format("graphs"))
+    plt.savefig(self_match.get_path(file_name + "_bar").format("graphs"))
     plt.clf()

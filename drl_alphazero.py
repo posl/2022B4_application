@@ -70,7 +70,6 @@ class AlphaZeroLoss(Function):
 
     def backward(self, gy):
         value = self.inputs[1].data
-        print(value.shape)
 
         # 誤差関数の逆伝播
         gy /= len(value)
@@ -83,10 +82,6 @@ class AlphaZeroLoss(Function):
         self.policy = None
 
         return gscore, gvalue
-
-
-def alphazero_loss(score, value, mcts_policys, rewards):
-    return AlphaZeroLoss(mcts_policys, rewards)(score, value)
 
 
 
@@ -299,7 +294,7 @@ def alphazero_play(weights: dict, simulations):
     memory = []
     for count in range(board.action_size):
         action, state, mcts_policy = agent.get_action(board, count)
-        memory.append((state, mcts_policy, board.turn))
+        memory.append([state, mcts_policy, board.turn])
 
         board.put_stone(action)
         if not board.can_continue():
@@ -309,7 +304,7 @@ def alphazero_play(weights: dict, simulations):
     final_player = board.turn
     reward = board.reward
     for data in memory:
-        data.reward = reward if data.reward == final_player else -reward
+        data.append(reward if data.pop() == final_player else -reward)
 
     return memory
 
@@ -369,12 +364,13 @@ class AlphaZero:
             historys = np.zeros((2, updates), dtype = np.int32)
 
         # 画面表示
-        print("\033[92m=== Current Winning Percentage ===\033[0m")
+        print("\033[92m=== Current Winning Percentage  (Total Elapsed Time) ===\033[0m")
         print(" run || first | second")
         print("=======================")
 
-        # 累計経過時間
-        start = time()
+        # その他の変数定義
+        run_digits = len(str(updates - 1))
+        start_time = time()
 
         try:
             # 並列実行を行うための初期設定
@@ -400,19 +396,25 @@ class AlphaZero:
                         pbar.set_description(f"epoch {epoch}")
 
                         for states, mcts_policys, rewards in buffer:
-                            alphazero_loss(*network(states), mcts_policys, rewards)
+                            loss = AlphaZeroLoss(mcts_policys, rewards)(*network(states))
+
+                            # 勾配が加算されていかないように、先にリセットしてから逆伝播を行う
+                            network.clear_grads()
+                            loss.backward()
                             optimizer.update()
+
                             pbar.update(1)
 
                 # パラメータの保存
-                network.save_weights("{}_{:0{}}.npz".format(params_path, run + 1, len(str(updates))))
+                network.save_weights("{}_{:0{}}.npz".format(params_path, run, run_digits))
 
                 # エージェントの評価
                 weights = ray.put(network.get_weights())
                 historys[:, run] = self.eval(weights, simulations)
-                print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]))
+                print("{:>4} || {:>3} % | {:>3} %".format(run, *historys[:, run]), end = "   ")
 
                 # 累計経過時間の表示
+                print("({:.5g} min)".format((time() - start_time) / 60.))
 
         except KeyboardInterrupt:
             network.save_weights(f"{is_yet_path}_weights.npz")
@@ -497,6 +499,7 @@ def eval_alphazero_computer(file_name):
     plt.title("AlphaZero")
     plt.savefig(file_path.format("graphs") + "_bar")
     plt.clf()
+
 
 
 
