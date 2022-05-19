@@ -489,11 +489,11 @@ class ResultPage(Page):
         self.button1 = tk.Button(self, text="開始画面へ", font = (self.font_name, 25), command=lambda:self.goto_start_page())
         self.button1.place(x=480, y=10)
 
-        self.button2 = tk.Button(self, width=30, height=130, text=">", font = (self.font_name, 15), command=lambda:self.cur_inc())
-        self.button2.place(x=340, y=10)
+        self.button2 = tk.Button(self, width=1, height=3, text=">", font = (self.font_name, 15), command=lambda:self.cur_inc())
+        self.button2.place(x=350, y=30)
 
-        self.button3 = tk.Button(self, width=30, height=130, text="<", font = (self.font_name, 15), command=lambda:self.cur_dec())
-        self.button3.place(x=160, y=10)
+        self.button3 = tk.Button(self, width=1, height=3, text="<", font = (self.font_name, 15), command=lambda:self.cur_dec())
+        self.button3.place(x=140, y=30)
     
     def graph_click(self, event):
         states = self.board.play_log
