@@ -86,7 +86,6 @@ class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):
 
         if count_stand_bits(board.stone_black | board.stone_white) > 44:
             move = alpha_beta(*board.players_board, self.limit_time)
-            print("zazazazazazaz", move)
             if move in board.list_placable():
                 print("checkmate")
                 return move

@@ -27,17 +27,7 @@ class MonteCarloTreeSearch:
         self.max_tries = max_tries
         self.limit_time = limit_time
 
-    def __call__(self, board : Board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
-        
-        if count_bits(board.stone_black | board.stone_white) > 44:
-            move = alpha_beta(*board.players_board, self.limit_time)
-            if move in board.list_placable():
-                print("checkmate")
-                return move
-        
+    def __call__(self, board : Board):  
         return self.monte_carlo_tree_search(board)
 
     # ランダムで手を打つplan
