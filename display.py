@@ -724,13 +724,13 @@ class PlayerKinds:
         self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("MC木探索")
-        self.kinds_func.append([MonteCarloTreeSearch()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([MonteCarloTreeSearch(1024*1, 1), MonteCarloTreeSearch(1024*4, 2), MonteCarloTreeSearch(1024*16, 4), MonteCarloTreeSearch(1024*64, 10)])
+        self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("原始MC探索")
-        self.kinds_func.append([PrimitiveMonteCarlo()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([PrimitiveMonteCarlo(256*1, 1), PrimitiveMonteCarlo(256*4, 2), PrimitiveMonteCarlo(256*16, 4), PrimitiveMonteCarlo(256*128, 10)])
+        self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
         self.alphabeta_d0t0 = AlphaBeta(0)
