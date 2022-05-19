@@ -358,15 +358,16 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
-        self.clear_playlog()
-        self.add_playlog() # 初期状態を記録
+        if render_flag:
+            self.clear_playlog()
+            self.add_playlog() # 初期状態を記録
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
             flag = self.can_continue()
-            self.add_playlog()  #記録
 
             if render_flag:
+                self.add_playlog()  #記録
                 self.reversed = mask
                 self.render(flag, n)
 
