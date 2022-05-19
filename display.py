@@ -438,7 +438,10 @@ class GamePage(Page):
     def goto_result_page(self):
         self.par.result_page.graph_draw()
         self.par.change_page(3)
-        print(self.board.log_state)
+        self.button2.place(x=1000)
+        self.label1.place(x=1000)
+        self.label1.configure(text="")
+        print(self.board.play_log)
         print(self.board.log_plans)
     
 
@@ -484,16 +487,16 @@ class ResultPage(Page):
         self.curline4 = None
 
         self.button1 = tk.Button(self, text="開始画面へ", font = (self.font_name, 25), command=lambda:self.goto_start_page())
-        self.button1.place(x=520, y=10)
+        self.button1.place(x=480, y=10)
 
-        self.button2 = tk.Button(self, text="->", font = (self.font_name, 15), command=lambda:self.cur_inc())
-        self.button2.place(x=400, y=80)
+        self.button2 = tk.Button(self, width=1, height=3, text=">", font = (self.font_name, 15), command=lambda:self.cur_inc())
+        self.button2.place(x=350, y=30)
 
-        self.button3 = tk.Button(self, text="<-", font = (self.font_name, 15), command=lambda:self.cur_dec())
-        self.button3.place(x=120, y=80)
+        self.button3 = tk.Button(self, width=1, height=3, text="<", font = (self.font_name, 15), command=lambda:self.cur_dec())
+        self.button3.place(x=140, y=30)
     
     def graph_click(self, event):
-        states = self.board.log_state
+        states = self.board.play_log
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         x = event.x
@@ -507,7 +510,7 @@ class ResultPage(Page):
 
     def graph_draw(self):
         self.cur = 0
-        states = self.board.log_state
+        states = self.board.play_log
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
@@ -533,7 +536,7 @@ class ResultPage(Page):
         self.miniboard_draw()
 
     def curdraw(self):
-        states = self.board.log_state
+        states = self.board.play_log
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
@@ -545,7 +548,7 @@ class ResultPage(Page):
     
     def miniboard_draw(self):
         self.curdraw()
-        states = self.board.log_state
+        states = self.board.play_log
         state = states[self.cur]
         self.board_canvas.delete("all")
         self.board_canvas.create_rectangle(0, 0, self.board_canvas_width, self.board_canvas_height, fill="#55FF88")
@@ -566,8 +569,8 @@ class ResultPage(Page):
     
     def cur_inc(self):
         self.cur += 1
-        if self.cur >= len(self.board.log_state):
-            self.cur = len(self.board.log_state)-1
+        if self.cur >= len(self.board.play_log):
+            self.cur = len(self.board.play_log)-1
         self.miniboard_draw()
     
     def cur_dec(self):
@@ -577,7 +580,6 @@ class ResultPage(Page):
         self.miniboard_draw()
 
     def goto_start_page(self):
-        self.board.log_state.clear()
         self.par.change_page(0)
         self.par.sounds.bgm_play(0)
         self.par.quit()
@@ -722,13 +724,13 @@ class PlayerKinds:
         self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("MC木探索")
-        self.kinds_func.append([MonteCarloTreeSearch()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([MonteCarloTreeSearch(1024*1, 1), MonteCarloTreeSearch(1024*4, 2), MonteCarloTreeSearch(1024*16, 4), MonteCarloTreeSearch(1024*64, 10)])
+        self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("原始MC探索")
-        self.kinds_func.append([PrimitiveMonteCarlo()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([PrimitiveMonteCarlo(256*1, 1), PrimitiveMonteCarlo(256*4, 2), PrimitiveMonteCarlo(256*16, 4), PrimitiveMonteCarlo(256*128, 10)])
+        self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
         self.alphabeta_d0t0 = AlphaBeta(0)
