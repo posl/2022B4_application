@@ -74,7 +74,7 @@ class GTValue:
 class AlphaBeta:
 	def __init__(self, select_value = 0):
 		if type(select_value) == type(int()):
-			self.value = GTValue(select_value)
+			self.value = GTValue(0)
 		else:
 			self.value = select_value
 		self.__min_value = -999
