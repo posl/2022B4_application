@@ -106,6 +106,7 @@ class Board:
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
         self.log_state = []
         self.log_plans = []
+        self.play_log = [] # mcのときの不具合を避けるためlog_stateとわける
 
         # プレイヤーの方策を設定するための属性
         self.player1_plan = None
@@ -138,6 +139,12 @@ class Board:
 
     def undo_state(self):
         self.set_state(self.log_state.pop())
+    
+    def add_playlog(self):
+        self.play_log.append(self.state)
+
+    def clear_playlog(self):
+        self.play_log.clear()
 
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
@@ -351,13 +358,13 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
-        self.log_state.clear()
-        self.add_state() # 初期状態を記録
+        self.clear_playlog()
+        self.add_playlog() # 初期状態を記録
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
             flag = self.can_continue()
-            self.add_state() #記録
+            self.add_playlog()  #記録
 
             if render_flag:
                 self.reversed = mask
