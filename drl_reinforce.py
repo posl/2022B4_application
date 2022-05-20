@@ -54,13 +54,13 @@ class ReinforceAgent:
         action, __ = self.get_action(board)
         return action
 
-    def get_action(self, board):
+    def get_action(self, board, placable = None):
+        if placable is None:
+            placable = board.list_placable()
+
         xp = cuda.cp if self.use_gpu else np
         state = board.get_state_ndarray(xp)
         policy = self.pi(state[None, :])
-
-        # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
-        placable = board.list_placable()
         probs = dzf.softmax(policy[:, np.array(placable)])
 
         if len(placable) == 1:
@@ -99,14 +99,17 @@ class Reinforce(SelfMatch):
     def fit_episode(self, progress = None):
         board = self.board
         board.reset()
+        placable = board.list_placable()
+        agents = self.agents
 
         while True:
-            agent = self.agents[board.turn]
-            action, prob = agent.get_action(board)
+            turn = board.turn
+            agent = self.agents[turn]
+            action, prob = agent.get_action(board, placable)
             board.put_stone(action)
 
             # 報酬はゲーム終了まで出ない
-            flag = board.can_continue()
+            flag = board.can_continue_placable()
             if flag:
                 agent.add((0, prob))
 
@@ -117,7 +120,7 @@ class Reinforce(SelfMatch):
                 agent.update()
                 break
 
-        agent = self.agents[board.turn ^ 1]
+        agent = self.agents[turn ^ 1]
         agent.add((-reward, None))
         agent.update()
 

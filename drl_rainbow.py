@@ -619,13 +619,15 @@ class RainbowAgent:
 class Rainbow(SelfMatch):
     def fit_episode(self, progress):
         board = self.board
+        agents = self.agents
+        transition_infos = deque(), deque()
+
         board.reset()
         placable = board.list_placable()
-        transition_infos = deque(), deque()
 
         while placable:
             turn = board.turn
-            agent = self.agents[turn]
+            agent = agents[turn]
 
             action, state = agent.get_action(board, placable)
             board.put_stone(action)
@@ -655,7 +657,7 @@ class Rainbow(SelfMatch):
             if turn == board.turn:
                 turn ^= 1
                 buffer = transition_infos[turn]
-                agent = self.agents[turn]
+                agent = agents[turn]
                 reward = -reward
             else:
                 break
