@@ -126,18 +126,18 @@ class SelfMatch:
             np.save(f"{is_yet_path}_history.npy", historys)
             self.save(is_yet_path)
 
-        # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
-        x = np.arange(100)
-        y = historys[:, :-1]
-        plt.plot(x, y[1], label = "first")
-        plt.plot(x, y[0], label = "second")
-        plt.legend()
+            # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
+            x = np.arange(100)
+            y = historys[:, :-1]
+            plt.plot(x, y[1], label = "first")
+            plt.plot(x, y[0], label = "second")
+            plt.legend()
 
-        plt.ylim(-5, 105)
-        plt.xlabel("Progress Rate")
-        plt.ylabel("Mean Winning Percentage")
-        plt.savefig(graphs_path)
-        plt.clf()
+            plt.ylim(-5, 105)
+            plt.xlabel("Progress Rate")
+            plt.ylabel("Mean Winning Percentage")
+            plt.savefig(graphs_path)
+            plt.clf()
 
 
     # このメソッドは、このクラスを継承した子クラスが実装する

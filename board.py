@@ -310,11 +310,21 @@ class Board:
         self.turn ^= 1
         if self.list_placable():
             return 1 + pass_flag
-
-        if pass_flag:
+        elif pass_flag:
             return 0
         else:
             return self.can_continue(True)
+
+    # フラグの代わりに合法手のリストを返すようにした can_continue メソッド (パスがあったかどうかは判定できない)
+    def can_continue_placable(self, pass_flag = False):
+        self.turn ^= 1
+        placable = self.list_placable()
+        if placable:
+            return placable
+        elif pass_flag:
+            return []
+        else:
+            return self.can_continue_placable(True)
 
 
     # ゲーム本体

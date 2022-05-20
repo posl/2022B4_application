@@ -139,9 +139,9 @@ class RainbowNet(Model):
         # 分位点が等間隔であることを想定しているので、確率変数の期待値は分位点の単純平均に一致する
         qs = quantile_values.mean(axis = 2)
 
-        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元配列の placable とする
+        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元リストの placable とする
         if len(qs) == 1:
-            return placables[ int( qs[0, placables].argmax() ) ]
+            return placables[ int( qs[0, np.array(placables)].argmax() ) ]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
         actions = [pl[ int( q[pl].argmax() ) ] if pl.size else 0 for q, pl in zip(qs, placables)]
@@ -410,10 +410,9 @@ class ReplayBuffer:
             nstep_data = zlib.compress(pickle.dumps(nstep_data))
 
         try:
-            buffer = self.buffer
-            buffer[count] = nstep_data
+            self.buffer[count] = nstep_data
         except IndexError:
-            buffer.append(nstep_data)
+            self.buffer.append(nstep_data)
 
         if self.prioritized:
             try:
@@ -537,7 +536,7 @@ class RainbowAgent:
 
         with no_grad():
             state = board.get_state_ndarray()
-            action = self.qnet.get_actions(state[None, :], np.array(placable))
+            action = self.qnet.get_actions(state[None, :], placable)
             return action, state
 
 
@@ -621,18 +620,15 @@ class Rainbow(SelfMatch):
     def fit_episode(self, progress):
         board = self.board
         board.reset()
+        placable = board.list_placable()
         transition_infos = deque(), deque()
-        flag = 1
 
-        while flag:
+        while placable:
             turn = board.turn
             agent = self.agents[turn]
 
-            placable = board.list_placable()
             action, state = agent.get_action(board, placable)
-
             board.put_stone(action)
-            flag = board.can_continue()
 
             # 遷移情報を一時バッファに格納する
             buffer = transition_infos[turn]
@@ -646,14 +642,15 @@ class Rainbow(SelfMatch):
                 # 報酬はゲーム終了まで出ない
                 agent.update((state, action, 0, next_state, next_placable), progress)
 
+            placable = board.can_continue_placable()
+
         reward = board.reward
         next_state = board.get_state_ndarray()
-        next_placable = []
 
         # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
         while True:
-            state, action = buffer.popleft()[1:]
-            agent.update((state, action, reward, next_state, next_placable), progress)
+            __, state, action = buffer.popleft()
+            agent.update((state, action, reward, next_state, placable), progress)
 
             if turn == board.turn:
                 turn ^= 1
@@ -670,7 +667,7 @@ def fit_rainbow_agent(episodes = 3000000, restart = False):
     prioritized = True
     compress = False
     step_num = 3
-    gamma = 0.98
+    gamma = 0.90
     batch_size = 32
     quantiles_num = 200
     lr = 0.00025
