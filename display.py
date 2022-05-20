@@ -742,9 +742,9 @@ class PlayerKinds:
 
         if False:
             self.rainbow_computer_d0t0 = RainbowComputer(64)
-            self.rainbow_computer_d0t0.reset("rainbow", 0.98, 1)
+            self.rainbow_computer_d0t0.reset("rainbow", 1)
             self.rainbow_computer_d0t1 = RainbowComputer(64)
-            self.rainbow_computer_d0t1.reset("rainbow", 0.98, 0)
+            self.rainbow_computer_d0t1.reset("rainbow", 0)
             self.kinds_name.append("Rainbow")
             self.kinds_func.append([ self.rainbow_computer_d0t0, self.rainbow_computer_d0t1 ])
             self.kinds_difficulty.append(1)
@@ -843,12 +843,55 @@ class MainWindow(tk.Tk):
         elif page_id==3:
             self.result_page.tkraise()
 
-    
+
 
 
 class DisplayBoard(Board):
-    def render(self, flag, n = 999):
+    def __init__(self):
+        super().__init__()
+
+        # 画面表示用のクリックイベントを保持するための属性
+        self.click_attr = None
+
+        # 画面表示用にどこがひっくり返されたかを保持するための属性
+        self.reversed = 0
+
+        # mcのときの不具合を避けるためlog_stateとわける
+        self.play_log = []
+
+
+    def add_playlog(self):
+        self.play_log.append(self.state)
+
+    def clear_playlog(self):
+        self.play_log.clear()
+
+
+    @property
+    def black_positions(self):
+        return self.__get_stand_bits(self.action_size, self.stone_black)
+
+    @property
+    def white_positions(self):
+        return self.__get_stand_bits(self.action_size, self.stone_white)
+
+    @property
+    def reverse_positions(self):
+        return self.__get_stand_bits(self.action_size, self.reversed)
+
+
+    # id...種類のID  diff...難易度
+    # gameの設定
+    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
+        player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
+        player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
+        self.set_plan(player1_plan, player2_plan)
+
+    def render(self, mask, flag, n = 999):
+        self.add_playlog()
+        self.reversed = mask
         self.main_window.game_page.canvas_update(flag, n)
+
 
     def play(self):
         # ウインドウ
@@ -879,19 +922,14 @@ class DisplayBoard(Board):
         self.render(None)
         self.main_window.after(100, self.main_window.quit)
         self.main_window.mainloop()
-        
+
+        self.clear_playlog()
+        self.add_playlog()
         self.game(self.print_state)
 
         # 最後の１石だけ表示されない問題を解消する (１秒待機)
         self.main_window.after(1000, self.main_window.quit)
         self.main_window.mainloop()
-
-    # id...種類のID  diff...難易度
-    # gameの設定
-    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
-        player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
-        self.set_plan(player1_plan, player2_plan)
 
 
 
@@ -901,4 +939,3 @@ if __name__ == "__main__":
     displayboard = DisplayBoard()
     displayboard.play()
     exit()
-    

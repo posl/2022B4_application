@@ -130,7 +130,7 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
 
 
 # １が立っているビットの数を数える
-cdef inline uint __count_stand_bits(uint n):
+cdef inline int __count_stand_bits(uint n):
     cdef uint mask
 
     # 2 bit ごとにブロック分けして、それぞれのブロックにおいて１が立っているビット数を各ブロックの 2 bit で表現する
@@ -177,7 +177,7 @@ def get_stand_bits(int num, uint x):
 
 
 
-cdef inline uint __alpha_beta(uint move_player, uint opposition_player, int depth, time_t limit_time):
+cdef inline int __alpha_beta(uint move_player, uint opposition_player, int depth, time_t limit_time):
     cdef:
         uint mask, legal_board, put
         int value, n

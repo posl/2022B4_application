@@ -105,18 +105,10 @@ class Board:
 
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
         self.log_state = []
-        self.log_plans = []
-        self.play_log = [] # mcのときの不具合を避けるためlog_stateとわける
 
         # プレイヤーの方策を設定するための属性
         self.player1_plan = None
         self.player2_plan = None
-
-        # 画面表示用のクリックイベントを保持するための属性
-        self.click_attr = None
-
-        # 画面表示用にどこがひっくり返されたかを保持するための属性
-        self.reversed = 0
 
 
     @property
@@ -139,12 +131,6 @@ class Board:
 
     def undo_state(self):
         self.set_state(self.log_state.pop())
-    
-    def add_playlog(self):
-        self.play_log.append(self.state)
-
-    def clear_playlog(self):
-        self.play_log.clear()
 
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
@@ -217,19 +203,6 @@ class Board:
             return self.get_stone_num()
 
 
-    @property
-    def black_positions(self):
-        return self.__get_stand_bits(self.action_size, self.stone_black)
-
-    @property
-    def white_positions(self):
-        return self.__get_stand_bits(self.action_size, self.stone_white)
-
-    @property
-    def reverse_positions(self):
-        return self.__get_stand_bits(self.action_size, self.reversed)
-
-
     # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
     @staticmethod
     def __get_stand_bits_python(num, x):
@@ -275,6 +248,10 @@ class Board:
         self.set_players_board(mask | (1 << n), mask)
         return mask
 
+    @staticmethod
+    def __reverse_cython(startpoint, move_player, opposition_player):
+        return get_reverse_board(1 << startpoint, move_player, opposition_player)
+
     # n に置いた時に返るマスを返す
     @staticmethod
     def __reverse_python(startpoint, move_player, opposition_player):
@@ -292,25 +269,13 @@ class Board:
                     break
         return mask
 
-    @staticmethod
-    def __reverse_cython(startpoint, move_player, opposition_player):
-        return get_reverse_board(1 << startpoint, move_player, opposition_player)
-
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
     def list_placable(self):
         return self.__list_placable(self.players_board)
-        p_list = self.p_list
 
-        # can_continue で計算したものが存在する場合は、それを利用する
-        if p_list:
-            self.p_list = []
-            return p_list
-
-        p_list = self.__list_placable(self.players_board)
-        if save_flag:
-            self.p_list = p_list
-        return p_list
+    def __list_placable_cython(self, players_board):
+        return self.__get_stand_bits(self.action_size, get_legal_board(*players_board))
 
     def __list_placable_python(self, players_board):
         move_player, opposition_player = players_board
@@ -339,9 +304,6 @@ class Board:
                     break
         return False
 
-    def __list_placable_cython(self, players_board):
-        return self.__get_stand_bits(self.action_size, get_legal_board(*players_board))
-
 
     # 終了 : 0, 手番を交代 : 1, 手番そのままで続行 : 2
     def can_continue(self, pass_flag = False):
@@ -358,26 +320,22 @@ class Board:
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
-        if render_flag:
-            self.clear_playlog()
-            self.add_playlog() # 初期状態を記録
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
             flag = self.can_continue()
 
             if render_flag:
-                self.add_playlog()  #記録
-                self.reversed = mask
-                self.render(flag, n)
+                self.render(mask, flag, n)
 
     # 画面表示用関数 (このクラスを継承した子クラスが具体的に実装する)
-    def render(self):
+    def render(self, mask, flag, n):
         raise NotImplementedError()
 
 
 
 
+# 以下、最終的には消す
 
     # 一時的な盤面表示
     def print_board(self, x):
