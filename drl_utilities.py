@@ -68,6 +68,7 @@ class SelfMatch:
         assert not episodes % 100
         eval_interval = episodes // 100
         win_rates = np.zeros(2, dtype = np.int32)
+        self.max_win_rates = np.full((2, 3), -1, dtype = np.int32)
 
         if restart:
             # 学習を途中再開する場合は、描画用配列と開始インデックスも引き継ぐ
@@ -167,30 +168,26 @@ class SelfMatch:
 
     # win_rates が渡されるのは、学習済みのパラメータを保存するときのみ
     def save(self, file_path: str, win_rates = None):
+        agents = self.agents
         file_path += "_{}"
 
         if win_rates is None:
-            agents = self.agents
             is_yet = True
             agents[1].save(file_path.format(1), is_yet)
             agents[0].save(file_path.format(0), is_yet)
 
         else:
-            try:
-                name = "max_win_rates"
-                max_win_rates = getattr(self, name)
-            except AttributeError:
-                max_win_rates = np.zeros((2, 3), dtype = np.int32)
-                setattr(self, name, max_win_rates)
+            max_win_rates = self.max_win_rates
 
             for turn in {1, 0}:
-                agent = self.agents[turn]
+                win_rate = win_rates[turn]
+                agent = agents[turn]
 
                 # 同じ条件で学習したエージェントのうち、評価相手への勝率が高いものを最大３人分保存する
                 index = max_win_rates[turn].argmin()
-                if max_win_rates[turn, index] < win_rates[turn]:
-                    file_path += f"{index}"
-                    agent.save(file_path.format(turn))
+                if max_win_rates[turn, index] < win_rate:
+                    max_win_rates[turn, index] = win_rate
+                    agent.save(file_path.format(turn) + f"{index}")
 
                 # エージェントの初期化も同時に行う
                 agent.reset()

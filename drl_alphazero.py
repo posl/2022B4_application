@@ -22,10 +22,10 @@ from inada_framework.optimizers import Momentum, WeightDecay
 class PolicyValueNet(Model):
     def __init__(self, action_size):
         super().__init__()
-        self.p0 = dzl.Affine(512)
+        self.p0 = dzl.Affine(256)
         self.p1 = dzl.Affine(action_size)
 
-        self.v0 = dzl.Affine(512)
+        self.v0 = dzl.Affine(256)
         self.v1 = dzl.Affine(1)
 
     def forward(self, x):
@@ -60,8 +60,9 @@ class AlphaZeroLoss(Function):
         self.policy = policy
 
         # 方策の損失関数は多クラス交差エントロピー誤差
-        loss = -self.mcts_policys * xp.log(policy + 0.0001)
-        loss = loss.sum(axis = 1, keepdims = True)
+        policy = xp.clip(policy, a_min = 1e-15, a_max = None)
+        loss = self.mcts_policys * xp.log(policy)
+        loss = -loss.sum(axis = 1, keepdims = True)
 
         # 状態価値関数の損失関数は平均二乗誤差
         loss += 0.5 * ((value - self.rewards) ** 2.)
@@ -149,7 +150,7 @@ class AlphaZeroAgent:
 
         # 探索の初期状態ではランダムな手が選ばれやすくなるように、ノイズをかける
         P = self.P[root_state]
-        P = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
+        P = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.03))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations):
@@ -342,7 +343,7 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(weight_decay))
 
 
-    def fit(self, updates = 100, interval = 500, epochs = 5, simulations = 800, restart = False):
+    def fit(self, updates = 700, interval = 1000, epochs = 5, simulations = 800, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -416,22 +417,22 @@ class AlphaZero:
                 # 累計経過時間の表示
                 print("({:.5g} min)".format((time() - start_time) / 60.))
 
-        except KeyboardInterrupt:
+        finally:
             network.save_weights(f"{is_yet_path}_weights.npz")
             buffer.save(f"{is_yet_path}_buffer.pkl", run)
             np.save(f"{is_yet_path}_history.npy", historys)
 
-        # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
-        x = np.arange(updates)
-        plt.plot(x, historys[0], label = "first")
-        plt.plot(x, historys[1], label = "second")
-        plt.legend()
+            # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
+            x = np.arange(updates)
+            plt.plot(x, historys[0], label = "first")
+            plt.plot(x, historys[1], label = "second")
+            plt.legend()
 
-        plt.ylim(-5, 105)
-        plt.xlabel("Progress Rate")
-        plt.ylabel("Mean Winning Percentage")
-        plt.savefig(graphs_path)
-        plt.clf()
+            plt.ylim(-5, 105)
+            plt.xlabel("Progress Rate")
+            plt.ylabel("Mean Winning Percentage")
+            plt.savefig(graphs_path)
+            plt.clf()
 
 
     @staticmethod

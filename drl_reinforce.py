@@ -98,19 +98,21 @@ class ReinforceAgent:
 class Reinforce(SelfMatch):
     def fit_episode(self, progress = None):
         board = self.board
+        agents = self.agents
+
         board.reset()
         placable = board.list_placable()
-        agents = self.agents
 
         while True:
             turn = board.turn
-            agent = self.agents[turn]
+            agent = agents[turn]
+
             action, prob = agent.get_action(board, placable)
             board.put_stone(action)
 
             # 報酬はゲーム終了まで出ない
-            flag = board.can_continue_placable()
-            if flag:
+            placable = board.can_continue_placable()
+            if placable:
                 agent.add((0, prob))
 
             # エージェントの学習はエピソードが終わるごとに行う
@@ -120,7 +122,7 @@ class Reinforce(SelfMatch):
                 agent.update()
                 break
 
-        agent = self.agents[turn ^ 1]
+        agent = agents[turn ^ 1]
         agent.add((-reward, None))
         agent.update()
 
@@ -251,7 +253,7 @@ if __name__ == "__main__":
     gammas = 0.88, 0.93, 0.98
 
     # 学習用コード
-    fit_reinforce_agent(gammas, restart = True)
+    fit_reinforce_agent(gammas, restart = False)
 
     # 評価用コード
     eval_reinforce_computer(gammas)
