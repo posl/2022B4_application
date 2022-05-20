@@ -250,10 +250,10 @@ def eval_reinforce_computer(gammas):
 
 
 if __name__ == "__main__":
-    gammas = 0.88, 0.93, 0.98
-
     # 学習用コード
-    fit_reinforce_agent(gammas, restart = False)
+    gammas = 0.93, 0.98
+    fit_reinforce_agent(gammas, restart = True)
 
     # 評価用コード
+    gammas = 0.88, 0.93, 0.98
     eval_reinforce_computer(gammas)

@@ -110,12 +110,13 @@ class Momentum(Optimizer):
 
     def update_param(self, param):
         v_key = id(param)
-        if v_key not in self.vs:
+        if v_key in self.vs:
+            v = self.vs[v_key]
+        else:
             xp = cuda.get_array_module(param.data)
-            self.vs[v_key] = xp.zeros_like(param.data)
+            v = xp.zeros_like(param.data)
+            self.vs[v_key] = v
 
-        # v にポインタをコピーし、in-place 演算を行っている
-        v = self.vs[v_key]
         v *= self.momentum
         v -= self.lr * param.grad.data
         param.data += v
@@ -130,11 +131,13 @@ class Nesterov(Optimizer):
 
     def update_param(self, param):
         v_key = id(param)
-        if v_key not in self.vs:
+        if v_key in self.vs:
+            v = self.vs[v_key]
+        else:
             xp = cuda.get_array_module(param.data)
-            self.vs[v_key] = xp.zeros_like(param.data)
+            v = xp.zeros_like(param.data)
+            self.vs[v_key] = v
 
-        v = self.vs[v_key]
         grad = param.grad.data
         param.data += (self.momentum ** 2) * v - (1 + self.momentum) * self.lr * grad
         v *= self.momentum
@@ -153,11 +156,13 @@ class AdaGrad(Optimizer):
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
-        if h_key not in self.hs:
-            self.hs[h_key] = xp.zeros_like(param.data)
+        if h_key in self.hs:
+            h = self.hs[h_key]
+        else:
+            h = xp.zeros_like(param.data)
+            self.hs[h_key] = h
 
         # 勾配の２乗和で学習の進行具合を表す
-        h = self.hs[h_key]
         grad = param.grad.data
         h += grad * grad
         param.data -= self.lr * grad / (xp.sqrt(h) + self.eps)
@@ -176,11 +181,13 @@ class AdaDelta(Optimizer):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)
-        if key not in self.msg:
-            self.msg[key] = xp.zeros_like(param.data)
-            self.msdx[key] = xp.zeros_like(param.data)
+        if key in self.msg:
+            msg, msdx = self.msg[key], self.msdx[key]
+        else:
+            msg, msdx = xp.zeros_like(param.data), xp.zeros_like(param.data)
+            self.msg[key] = msg
+            self.msdx[key] = msdx
 
-        msg, msdx = self.msg[key], self.msdx[key]
         lr, eps = self.lr, self.eps
         grad = param.grad.data
 
@@ -202,10 +209,12 @@ class RMSprop:
         xp = cuda.get_array_module(param.data)
 
         h_key = id(param)
-        if h_key not in self.hs:
-            self.hs[h_key] = xp.zeros_like(param.data)
+        if h_key in self.hs:
+            h = self.hs[h_key]
+        else:
+            h = xp.zeros_like(param.data)
+            self.hs[h_key] = h
 
-        h = self.h[h_key]
         grad = param.grad.data
         h += (1 - self.decay_rate) * (grad ** 2 - h)
         param.data -= self.lr * grad / (xp.sqrt(h) + self.eps)
@@ -235,13 +244,14 @@ class Adam(Optimizer):
         xp = cuda.get_array_module(param.data)
 
         key = id(param)
-        if key not in self.ms:
-            self.ms[key] = xp.zeros_like(param.data)
-            self.vs[key] = xp.zeros_like(param.data)
+        if key in self.ms:
+            m, v = self.ms[key], self.vs[key]
+        else:
+            m, v = xp.zeros_like(param.data), xp.zeros_like(param.data)
+            self.ms[key] = m
+            self.vs[key] = v
 
-        m, v = self.ms[key], self.vs[key]
         grad = param.grad.data
-
         m += (1 - self.beta1) * (grad - m)
         v += (1 - self.beta2) * (grad * grad - v)
         param.data -= self.biased_lr * m / (xp.sqrt(v) + self.eps)

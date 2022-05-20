@@ -762,7 +762,7 @@ class PlayerKinds:
 
         if False:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
-            self.alphazero_computer_d0.reset("alphazero_50")
+            self.alphazero_computer_d0.reset("alphazero_9")
             self.kinds_name.append("Alphazero")
             self.kinds_func.append([ self.alphazero_computer_d0 ])
             self.kinds_difficulty.append(1)
