@@ -275,7 +275,7 @@ class Board:
         return self.__list_placable(self.players_board)
 
     def __list_placable_cython(self, players_board):
-        return self.__get_stand_bits(self.action_size, get_legal_board(*players_board))
+        return self.__get_stand_bits(get_legal_board(*players_board))
 
     def __list_placable_python(self, players_board):
         move_player, opposition_player = players_board
