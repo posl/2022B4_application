@@ -162,14 +162,15 @@ def count_stand_bits(uint n):
 
 
 # １が立っているビット位置のリストを取得する
-def get_stand_bits(int num, uint x):
+def get_stand_bits(uint x):
     cdef:
-        int n
-        vector[int] l = []
-
-    for n in range(num):
+        int n = 0
+        vector[int] l
+    
+    while x:
         if x & 1:
             l.push_back(n)
+        n += 1
         x >>= 1
 
     return l
