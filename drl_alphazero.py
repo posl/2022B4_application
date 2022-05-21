@@ -1,5 +1,5 @@
 from math import log, sqrt, ceil
-import random
+from random import choices, choice
 from collections import deque
 import pickle
 from time import time
@@ -74,6 +74,7 @@ class AlphaZeroLoss(Function):
 
         # 誤差関数の逆伝播
         gy /= len(value)
+        print(len(value))
         gscore = gy * (self.policy - self.mcts_policys)
         gvalue = gy * (value - self.rewards)
 
@@ -125,10 +126,10 @@ class AlphaZeroAgent:
         state_ndarray, policy = self.__search(board, board.state, train_flag)
 
         if train_flag and count < self.sampling_limits:
-            action = random.choices(placable, policy)[0]
+            action = choices(placable, policy)[0]
         else:
             indices = np.where(policy == policy.max())[0]
-            action_index = indices[0] if len(indices) == 1 else random.choice(indices)
+            action_index = indices[0] if len(indices) == 1 else choice(indices)
             action = placable[action_index]
 
         if train_flag:
@@ -144,7 +145,7 @@ class AlphaZeroAgent:
     # シミュレーションを行なって得た方策を返すメソッド
     def __search(self, board, root_state, train_flag):
         if root_state in self.P:
-            state_ndarray = board.get_state_ndarray()
+            state_ndarray = board.get_state_ndarray(invert_flag = True)
         else:
             state_ndarray = self.__expand(board, root_state, root_flag = True)
 
@@ -166,7 +167,7 @@ class AlphaZeroAgent:
 
     # 子盤面を展開し、その方策・累計行動価値・探索回数の初期化を行うメソッド
     def __expand(self, board, state, root_flag = False):
-        state_ndarray = board.get_state_ndarray()
+        state_ndarray = board.get_state_ndarray(invert_flag = True)
         score, value = self.network(state_ndarray[None, :])
         policy = softmax(score.data)
 
@@ -192,11 +193,11 @@ class AlphaZeroAgent:
         elif state in self.P:
             # 右辺の第１項が過去の結果を勘案しつつ探索を促進する項で、第２項が勝率を見て活用を促進する項
             N = self.N[state]
-            pucts = (self.c_puct(N.sum()) * self.P[state]) / (1 + N) + self.W[state] / (N + 1e-15)
+            pucts = self.c_puct(N.sum()) * self.P[state] / (1 + N) + self.W[state] / (N + 1e-15)
 
             # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
             indices = np.where(pucts == pucts.max())[0]
-            action_index = indices[0] if len(indices) == 1 else random.choice(indices)
+            action_index = indices[0] if len(indices) == 1 else choice(indices)
 
             action = self.placable_dict[state][action_index]
             board.put_stone(action)
@@ -363,7 +364,7 @@ def alphazero_test(weights, simulations, turn):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 720000, batch_size = 1024, lr_init = 0.2, weight_decay = 0.001):
+    def __init__(self, buffer_size = 720000, batch_size = 1024, lr_init = 0.02, weight_decay = 0.0001):
         # ニューラルネットワーク・経験再生バッファ
         self.network = PolicyValueNet(Board.action_size)
         self.buffer = ReplayBuffer(buffer_size, batch_size)
@@ -373,7 +374,7 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(weight_decay))
 
 
-    def fit(self, updates = 10000, episodes = 60, epochs = 5, simulations = 800, restart = False):
+    def fit(self, updates = 2000, episodes = 300, epochs = 5, simulations = 800, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -392,17 +393,18 @@ class AlphaZero:
             historys = np.load(f"{is_yet_path}_history.npy")
 
             # 学習の進行度合いに応じた学習率に再設定する
-            if restart > 10:
-                if restart > 300:
-                    optimizer.lr /= 100.
-                else:
-                    optimizer.lr /= 10.
+            if restart > 300:
+                optimizer.lr /= 10.
+
         else:
+            # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
+            network(np.zeros((1, Board.get_ndarray_size()), dtype = np.float32))
+
             restart = 1
             historys = np.zeros((2, 100), dtype = np.int32)
 
         # 画面表示
-        print("\033[92m=== Current Winning Percentage  (Total Elapsed Time) ===\033[0m")
+        print("\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
         print("progress || first | second")
         print("=======================")
 
@@ -430,6 +432,7 @@ class AlphaZero:
                             buffer.add(ray.get(finished[0]))
                             pbar.update(1)
 
+                # バッファに十分な量の経験データが溜まってから、学習をスタートする
                 if run < 20:
                     continue
 
@@ -468,7 +471,7 @@ class AlphaZero:
                     print("({:.5g} min)".format((time() - start_time) / 60.))
 
                 # 学習の進行度合いによって、学習率を減少させる
-                if run in {100, 300}:
+                if run == 300:
                     optimizer.lr /= 10.
 
         finally:

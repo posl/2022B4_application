@@ -159,9 +159,7 @@ class SelfMatch:
             board.game()
 
             result = board.black_num - board.white_num
-            is_win = (result > 0) if turn else (result < 0)
-            if is_win:
-                win_count += 1
+            win_count += (result > 0) if turn else (result < 0)
 
         return win_count
 

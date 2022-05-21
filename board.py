@@ -134,18 +134,22 @@ class Board:
 
 
     # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
-    def get_state_ndarray(self, xp = np):
+    def get_state_ndarray(self, xp = np, invert_flag = False):
         size = ceil(Board.action_size / 8)
         box = xp.empty(size * 2, dtype = np.float32)
-        stone_black, stone_white = self.stone_black, self.stone_white
+        left_s, right_s = (self.players_board) if invert_flag else (self.stone_black, self.stone_white)
 
         for i in range(size):
             n = i * 8
-            box[i] = (stone_black >> n) % 256
-            box[i + size] = (stone_white >> n) % 256
+            box[i] = (left_s >> n) % 256
+            box[i + size] = (right_s >> n) % 256
 
         # 正規化してから出力する
         return box / 255.
+
+    @staticmethod
+    def get_ndarray_size():
+        return ceil(Board.action_size / 8) * 2
 
 
     # オセロ盤を初期状態にセットする
