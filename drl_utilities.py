@@ -7,8 +7,6 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from board import Board
-
 
 
 # エージェントの評価に使う単純な方策
@@ -60,27 +58,31 @@ class SelfMatch:
 
     # 前回の状態を引き継いで、学習を途中再開することができる
     def fit(self, runs, episodes, restart = False, file_name = "params"):
-        file_name = self.get_path(file_name)
+        file_path = SelfMatch.get_path(file_name)
+        is_yet_path = file_path.format("is_yet")
+        params_path = file_path.format("parameters")
+        graphs_path = file_path.format("graphs")
+        del file_path
 
         # エージェントの評価は、学習中にちょうど 100 回だけ行う
         assert not episodes % 100
         eval_interval = episodes // 100
         win_rates = np.zeros(2, dtype = np.int32)
+        self.max_win_rates = np.full((2, 3), -1, dtype = np.int32)
 
         if restart:
             # 学習を途中再開する場合は、描画用配列と開始インデックスも引き継ぐ
-            load_file = file_name.format("is_yet")
-            historys = np.load(f"{load_file}_history.npy")
+            historys = np.load(f"{is_yet_path}_history.npy")
             run_start, start = historys[:, -1].astype(int)
 
             # 前回保存した学習途中のデータを読み込むために、エージェントの初期化も行う
             for turn in {1, 0}:
                 agent = self.agents[turn]
                 agent.reset()
-                agent.load_to_restart(f"{load_file}_{turn}")
+                agent.load_to_restart(f"{is_yet_path}_{turn}")
 
             # ここで定義した変数は学習中ずっと残ることになるので、不要なものは削除する
-            del restart, load_file, turn, agent
+            del restart, turn, agent
 
         else:
             # 勝率の推移を描画するための配列 (最後の列は学習再開に使う変数を記録するための領域)
@@ -114,22 +116,17 @@ class SelfMatch:
                             index += 1
 
                 # パラメータの保存と累計経過時間の表示
-                self.save(file_name.format("parameters"), run - 1)
+                self.save(params_path, win_rates)
                 print("run {}: {:.5g} min".format(run, (time() - start_time) / 60))
                 start = 1
 
-        except KeyboardInterrupt:
+        finally:
             # 配列に学習を途中再開するために必要な情報も入れる
             historys[:, -1] = run, episode
 
-            save_file = file_name.format("is_yet")
-            np.save(f"{save_file}_history.npy", historys)
-            self.save(save_file)
+            np.save(f"{is_yet_path}_history.npy", historys)
+            self.save(is_yet_path)
 
-            message = "this is simply the interrupt which you raise now, not a error."
-            raise KeyboardInterrupt(message)
-
-        finally:
             # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
             x = np.arange(100)
             y = historys[:, :-1]
@@ -140,7 +137,7 @@ class SelfMatch:
             plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
             plt.ylabel("Mean Winning Percentage")
-            plt.savefig(file_name.format("graphs"))
+            plt.savefig(graphs_path)
             plt.clf()
 
 
@@ -169,67 +166,28 @@ class SelfMatch:
         return win_count
 
 
-    # index が指定されるのは、学習済みのパラメータを保存するときのみとする
-    def save(self, file_path: str, index = None):
+    # win_rates が渡されるのは、学習済みのパラメータを保存するときのみ
+    def save(self, file_path: str, win_rates = None):
+        agents = self.agents
         file_path += "_{}"
-        if index is None:
+
+        if win_rates is None:
             is_yet = True
+            agents[1].save(file_path.format(1), is_yet)
+            agents[0].save(file_path.format(0), is_yet)
+
         else:
-            file_path += f"{index}"
-            is_yet = False
+            max_win_rates = self.max_win_rates
 
-        for turn in {1, 0}:
-            agent = self.agents[turn]
-            agent.save(file_path.format(turn), is_yet)
-            agent.reset()
+            for turn in {1, 0}:
+                win_rate = win_rates[turn]
+                agent = agents[turn]
 
+                # 同じ条件で学習したエージェントのうち、評価相手への勝率が高いものを最大３人分保存する
+                index = max_win_rates[turn].argmin()
+                if max_win_rates[turn, index] < win_rate:
+                    max_win_rates[turn, index] = win_rate
+                    agent.save(file_path.format(turn) + f"{index}")
 
-
-
-# コンピュータの性能を割引率の値ごとに評価し、グラフ形式で保存する関数
-def eval_computer(computer_class, to_gpu, gammas, file_name, graph_index):
-    # 環境
-    board = Board()
-
-    # コンピュータ
-    computer_args = board.action_size, to_gpu
-    computer = computer_class(*computer_args)
-
-    # その他の設定
-    self_match = SelfMatch(board, computer, computer)
-    length = len(gammas)
-    win_rates = np.empty((2, length))
-
-    # 先攻か後攻か・難易度ごとに、コンピュータの評価を合計 20 回行い、その平均をグラフに描画する勝率とする
-    for i, gamma in enumerate(gammas):
-        print(f"\n\033[92mgamma = {gamma}\033[0m")
-
-        for turn in (1, 0):
-            target = f"turn {turn}"
-            win_rate = 0
-
-            for __ in tqdm(range(20), desc = target, leave = False):
-                computer.reset(file_name, gamma, turn)
-                win_rate += self_match.eval(turn)
-
-            win_rate /= 20
-            win_rates[turn, i] = win_rate
-            print(f"{target}: {win_rate:.5g} %")
-
-    # グラフの目盛り位置を設定するための変数
-    width = 1 / 3
-    left = np.arange(length)
-    center = left + width
-
-    # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
-    plt.bar(left, win_rates[1], width = width, align = "edge", label = "first")
-    plt.bar(center, win_rates[0], width = width, align = "edge", label = "second")
-    plt.xticks(ticks = center, labels = gammas)
-    plt.legend()
-
-    plt.ylim(-5, 105)
-    plt.xlabel("Gamma")
-    plt.ylabel("Winning Percentage")
-    plt.title(f"{computer_class.__name__}")
-    plt.savefig(self_match.get_path(file_name + f"_bar{graph_index}").format("graphs"))
-    plt.clf()
+                # エージェントの初期化も同時に行う
+                agent.reset()

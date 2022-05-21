@@ -5,11 +5,12 @@ import pickle
 import zlib
 
 import numpy as np
+from tqdm import tqdm
 
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
 import inada_framework.functions as dzf
 from inada_framework.utilities import reshape_for_broadcast
-from drl_utilities import SelfMatch, eval_computer
+from drl_utilities import SelfMatch
 from board import Board
 
 
@@ -140,11 +141,10 @@ class RainbowNet(Model):
 
         # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元リストの placable とする
         if len(qs) == 1:
-            return placables[int(qs[0, np.array(placables)].argmax())]
+            return placables[ int( qs[0, np.array(placables)].argmax() ) ]
 
         # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        actions = [placable[ int( q[placable].argmax() ) ] if placable.size > 0 else 0
-                   for q, placable in zip(qs, placables)]
+        actions = [pl[ int( q[pl].argmax() ) ] if pl.size else 0 for q, pl in zip(qs, placables)]
 
         # インデックスとして使うので、高速化のために np.ndarray に変換する
         return np.array(actions)
@@ -277,7 +277,7 @@ class SumTree:
 
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
-    def sample(self, batch_size = 1):
+    def sample(self, batch_size):
         zs = self.rng.uniform(0, self.sum, batch_size)
         indices = [self.__sample(zs[i]) for i in range(batch_size)]
         return np.array(indices)
@@ -410,21 +410,19 @@ class ReplayBuffer:
             nstep_data = zlib.compress(pickle.dumps(nstep_data))
 
         try:
-            buffer = self.buffer
-            buffer[count] = nstep_data
+            self.buffer[count] = nstep_data
         except IndexError:
-            buffer.append(nstep_data)
+            self.buffer.append(nstep_data)
 
         if self.prioritized:
-            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
             try:
-                priorities = self.priorities
-                priorities[count] = self.max_priority
+                # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
+                self.priorities[count] = self.max_priority
                 self.count = count + 1
 
             # 優先度の不整合は IndexError を起こす可能性があるので、学習がこのタイミングで中断された場合の処理が必要
             except KeyboardInterrupt:
-                priorities[count] = 0
+                self.priorities[count] = 0
                 raise KeyboardInterrupt()
 
     def get_batch(self, batch_size, progress):
@@ -617,43 +615,22 @@ class RainbowAgent:
 
 
 
-# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
-class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size, to_gpu = False):
-        self.action_size = action_size
-        self.use_gpu = to_gpu and cuda.gpu_enable
-
-    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
-    def reset(self, file_name, gamma, turn, quantiles_num = 200):
-        qnet = RainbowNet(self.action_size, quantiles_num)
-        self.qnet = qnet
-
-        file_path = Rainbow.get_path(file_name).format("parameters")
-        file_path += "-{}_{}0.npz".format(str(gamma * 100)[:2], turn)
-        qnet.load_weights(file_path)
-        if self.use_gpu:
-            qnet.to_gpu()
-
-
-
-
 # Rainbow エージェント同士で対戦を行うためのクラス (自己対戦)
 class Rainbow(SelfMatch):
     def fit_episode(self, progress):
         board = self.board
-        board.reset()
+        agents = self.agents
         transition_infos = deque(), deque()
-        flag = 1
 
-        while flag:
+        board.reset()
+        placable = board.list_placable()
+
+        while placable:
             turn = board.turn
-            agent = self.agents[turn]
+            agent = agents[turn]
 
-            placable = board.list_placable()
             action, state = agent.get_action(board, placable)
-
             board.put_stone(action)
-            flag = board.can_continue()
 
             # 遷移情報を一時バッファに格納する
             buffer = transition_infos[turn]
@@ -667,35 +644,36 @@ class Rainbow(SelfMatch):
                 # 報酬はゲーム終了まで出ない
                 agent.update((state, action, 0, next_state, next_placable), progress)
 
+            placable = board.can_continue_placable()
+
         reward = board.reward
         next_state = board.get_state_ndarray()
-        next_placable = []
 
         # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
         while True:
-            state, action = buffer.popleft()[1:]
-            agent.update((state, action, reward, next_state, next_placable), progress)
+            __, state, action = buffer.popleft()
+            agent.update((state, action, reward, next_state, placable), progress)
 
             if turn == board.turn:
                 turn ^= 1
                 buffer = transition_infos[turn]
-                agent = self.agents[turn]
+                agent = agents[turn]
                 reward = -reward
             else:
                 break
 
 
-def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = False):
-    file_name += "-{}".format(str(gamma * 100)[:2])
-
+def fit_rainbow_agent(episodes = 3000000, restart = False):
     # ハイパーパラメータ設定
     buffer_size = 1000000
     prioritized = True
     compress = False
     step_num = 3
+    gamma = 0.90
     batch_size = 32
     quantiles_num = 200
     lr = 0.00025
+    to_gpu = True
 
     # 環境
     board = Board()
@@ -710,23 +688,61 @@ def fit_rainbow_agent(to_gpu, gamma, file_name, episodes = 3000000, restart = Fa
     first_agent = RainbowAgent(replay_buffer0, *agent_args)
     second_agent = RainbowAgent(replay_buffer1, *agent_args)
 
-    # 自己対戦場
+    # 自己対戦
     self_match = Rainbow(board, first_agent, second_agent)
-    self_match.fit(1, episodes, restart, file_name)
+    self_match.fit(1, episodes, restart, file_name = "rainbow")
+
+
+
+
+# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
+class RainbowComputer(RainbowAgent):
+    def __init__(self, action_size, to_gpu = False):
+        self.action_size = action_size
+        self.use_gpu = to_gpu and cuda.gpu_enable
+
+    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
+    def reset(self, file_name, turn, quantiles_num = 200):
+        qnet = RainbowNet(self.action_size, quantiles_num)
+        self.qnet = qnet
+
+        file_path = Rainbow.get_path(file_name).format("parameters")
+        file_path += f"_{turn}0.npz"
+        qnet.load_weights(file_path)
+        if self.use_gpu:
+            qnet.to_gpu()
+
+
+def eval_rainbow_computer():
+    # 環境
+    board = Board()
+
+    # コンピュータ
+    computer = RainbowComputer(board.action_size, to_gpu = True)
+
+    # 対戦場
+    self_match = SelfMatch(board, computer, computer)
+
+    # コンピュータの評価を合計 20 回行い、その平均をグラフに描画する勝率とする
+    print("\nnow evaluating")
+    for turn in (1, 0):
+        computer.reset("rainbow", turn)
+        target = f"turn {turn}"
+
+        win_rate = 0
+        for __ in tqdm(range(20), desc = target, leave = False):
+            win_rate += self_match.eval(turn)
+
+        win_rate /= 20
+        print(f"{target}: {win_rate:.5g} %")
+    print("done!")
 
 
 
 
 if __name__ == "__main__":
-    to_gpu = True
-    gamma = 0.98
-    file_name = "rainbow"
-
-    # 学習の進行具合によって変更する必要がある変数
-    restart = False
-
     # 学習用コード (CPU : 3.80 s / iter,  GPU : 0.54 s / iter)
-    fit_rainbow_agent(to_gpu, gamma, file_name, restart = restart)
+    fit_rainbow_agent(restart = False)
 
     # 評価用コード
-    # eval_computer(RainbowComputer, to_gpu, gammas, file_name)
+    eval_rainbow_computer()

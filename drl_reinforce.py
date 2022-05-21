@@ -1,11 +1,13 @@
 import random
 
 import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from inada_framework import Model, cuda, optimizers, no_grad
 import inada_framework.layers as dzl
 import inada_framework.functions as dzf
-from drl_utilities import SelfMatch, eval_computer
+from drl_utilities import SelfMatch
 from board import Board
 
 
@@ -52,13 +54,13 @@ class ReinforceAgent:
         action, __ = self.get_action(board)
         return action
 
-    def get_action(self, board):
+    def get_action(self, board, placable = None):
+        if placable is None:
+            placable = board.list_placable()
+
         xp = cuda.cp if self.use_gpu else np
         state = board.get_state_ndarray(xp)
         policy = self.pi(state[None, :])
-
-        # 学習時は方策を合法手のみに絞って、確率形式に変換し、それと学習の進行状況に応じて行動を選択する
-        placable = board.list_placable()
         probs = dzf.softmax(policy[:, np.array(placable)])
 
         if len(placable) == 1:
@@ -93,6 +95,67 @@ class ReinforceAgent:
 
 
 
+class Reinforce(SelfMatch):
+    def fit_episode(self, progress = None):
+        board = self.board
+        agents = self.agents
+
+        board.reset()
+        placable = board.list_placable()
+
+        while True:
+            turn = board.turn
+            agent = agents[turn]
+
+            action, prob = agent.get_action(board, placable)
+            board.put_stone(action)
+
+            # 報酬はゲーム終了まで出ない
+            placable = board.can_continue_placable()
+            if placable:
+                agent.add((0, prob))
+
+            # エージェントの学習はエピソードが終わるごとに行う
+            else:
+                reward = board.reward
+                agent.add((reward, prob))
+                agent.update()
+                break
+
+        agent = agents[turn ^ 1]
+        agent.add((-reward, None))
+        agent.update()
+
+
+# ガンマの値が学習結果に大きく寄与することがわかったため、それを変更しながら学習して、結果を比較する
+def fit_reinforce_agent(gammas, episodes = 150000, restart = False):
+    # ハイパーパラメータ設定
+    gamma = None
+    lr = 0.000025
+    to_gpu = False
+
+    # 環境
+    board = Board()
+
+    # エージェント
+    agent_args = board.action_size, gamma, lr, to_gpu
+    first_agent = ReinforceAgent(*agent_args)
+    second_agent = ReinforceAgent(*agent_args)
+
+    # 自己対戦
+    self_match = Reinforce(board, first_agent, second_agent)
+
+    for gamma in gammas:
+        print(f"\n\"gamma = {gamma}\" is started.\n")
+        first_agent.gamma = gamma
+        second_agent.gamma = gamma
+        self_match.fit(5, episodes, restart, "reinforce-{}".format(str(gamma * 100)[:2]))
+        restart = False
+        print(f"\ndone!")
+
+
+
+
 # 実際にコンピュータとして使われるクラス
 class ReinforceComputer:
     def __init__(self, action_size, to_gpu = False):
@@ -107,7 +170,6 @@ class ReinforceComputer:
         # 各エージェントの方策を表すインスタンス変数をリセットし、新たに登録する
         each_pi = self.each_pi
         each_pi.clear()
-        use_gpu = self.use_gpu
 
         # 同じ条件で学習した３人のエージェントの中から、２人だけ、ランダムに選ぶ
         for i in random.sample(range(3), 2):
@@ -115,7 +177,7 @@ class ReinforceComputer:
             each_pi.append(pi)
 
             pi.load_weights(file_path + f"{i}.npz")
-            if use_gpu:
+            if self.use_gpu:
                 pi.to_gpu()
 
     def __call__(self, board):
@@ -136,74 +198,62 @@ class ReinforceComputer:
         return random.choices(placable, xp.exp(policy))[0]
 
 
-
-
-class Reinforce(SelfMatch):
-    def fit_episode(self, progress = None):
-        board = self.board
-        board.reset()
-
-        while True:
-            agent = self.agents[board.turn]
-            action, prob = agent.get_action(board)
-            board.put_stone(action)
-
-            # 報酬はゲーム終了まで出ない
-            flag = board.can_continue()
-            if flag:
-                agent.add((0, prob))
-
-            # エージェントの学習はエピソードが終わるごとに行う
-            else:
-                reward = board.reward
-                agent.add((reward, prob))
-                agent.update()
-                break
-
-        agent = self.agents[board.turn ^ 1]
-        agent.add((-reward, None))
-        agent.update()
-
-
-# ガンマの値が学習結果に大きく寄与することがわかったため、それを変更しながら学習して、結果を比較する
-def fit_reinforce_agent(to_gpu, gammas, file_name, episodes = 100000, restart = False):
-    # ハイパーパラメータ設定
-    gamma = None
-    lr = 0.000025
-
+# コンピュータの性能を割引率の値ごとに評価し、グラフ形式で保存する関数
+def eval_reinforce_computer(gammas):
     # 環境
     board = Board()
 
-    # エージェント
-    agent_args = board.action_size, gamma, lr, to_gpu
-    first_agent = ReinforceAgent(*agent_args)
-    second_agent = ReinforceAgent(*agent_args)
+    # コンピュータ
+    computer = ReinforceComputer(board.action_size)
 
-    # 自己対戦
-    self_match = Reinforce(board, first_agent, second_agent)
+    # 対戦場
+    self_match = SelfMatch(board, computer, computer)
 
-    for gamma in gammas:
-        print(f"\n\"gamma = {gamma}\" is started.\n")
-        first_agent.gamma = gamma
-        second_agent.gamma = gamma
-        self_match.fit(3, episodes, restart, file_name + "-{}".format(str(gamma * 100)[:2]))
-        restart = False
-        print(f"\ndone!")
+    # 描画用配列
+    length = len(gammas)
+    win_rates = np.empty((2, length))
+
+    # 先攻か後攻か・難易度ごとに、コンピュータの評価を合計 20 回行い、その平均をグラフに描画する勝率とする
+    for i, gamma in enumerate(gammas):
+        print(f"\n\033[92mgamma = {gamma}\033[0m")
+
+        for turn in (1, 0):
+            target = f"turn {turn}"
+            win_rate = 0
+
+            for __ in tqdm(range(20), desc = target, leave = False):
+                computer.reset("reinforce", gamma, turn)
+                win_rate += self_match.eval(turn)
+
+            win_rate /= 20
+            win_rates[turn, i] = win_rate
+            print(f"{target}: {win_rate:.5g} %")
+
+    # グラフの目盛り位置を設定するための変数
+    width = 1 / 3
+    left = np.arange(length)
+    center = left + width
+
+    # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
+    plt.bar(left, win_rates[1], width = width, align = "edge", label = "first")
+    plt.bar(center, win_rates[0], width = width, align = "edge", label = "second")
+    plt.xticks(ticks = center, labels = gammas)
+    plt.legend()
+
+    plt.ylim(-5, 105)
+    plt.xlabel("Gamma")
+    plt.ylabel("Winning Percentage")
+    plt.savefig(self_match.get_path("reinforce_bar").format("graphs"))
+    plt.clf()
 
 
 
 
 if __name__ == "__main__":
-    to_gpu = False
-    gammas = [0.98]
-    file_name = "reinforce"
-
-    # 学習の進行具合によって変更する必要がある変数
-    restart = False
-
     # 学習用コード
-    fit_reinforce_agent(to_gpu, gammas, file_name, restart = restart)
+    gammas = 0.93, 0.98
+    fit_reinforce_agent(gammas, restart = True)
 
     # 評価用コード
-    gammas = 0.90, 0.92, 0.95, 0.98
-    eval_computer(ReinforceComputer, to_gpu, gammas, file_name, graph_index = 4)
+    gammas = 0.88, 0.93, 0.98
+    eval_reinforce_computer(gammas)
