@@ -10,9 +10,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from inada_framework import Model, Function, cuda, no_grad
+from drl_utilities import ResNet50, SelfMatch, corners_plan
 import inada_framework.layers as dzl
-import inada_framework.functions as dzf
-from drl_utilities import SelfMatch, corners_plan
+from inada_framework.functions import flatten, tanh
 from board import Board
 from inada_framework.optimizers import Momentum, WeightDecay
 
@@ -22,16 +22,25 @@ from inada_framework.optimizers import Momentum, WeightDecay
 class PolicyValueNet(Model):
     def __init__(self, action_size):
         super().__init__()
-        self.p0 = dzl.Affine(256)
-        self.p1 = dzl.Affine(action_size)
 
-        self.v0 = dzl.Affine(256)
-        self.v1 = dzl.Affine(1)
+        # 画像認識部
+        self.cnn = ResNet50()
+
+        # policy head
+        self.p_conv = dzl.Conv2d1x1(2)
+        self.p_bn = dzl.BatchNorm()
+        self.p_fc = dzl.Affine(action_size)
+
+        # value head
+        self.v_conv = dzl.Conv2d1x1(1)
+        self.v_bn = dzl.BatchNorm()
+        self.v_fc = dzl.Affine(1)
 
     def forward(self, x):
-        score = self.p1(self.p0(x))
-        value = dzf.tanh(self.v1(self.v0(x)))
-        return score, value
+        x = self.cnn(x)
+        score = self.p_fc( self.p_bn( flatten( self.p_conv(x) ) ) )
+        value = self.v_fc( self.v_bn( flatten( self.v_conv(x) ) ) )
+        return score, tanh(value)
 
 
 # ニューラルネットワークの出力を確率形式に変換するための関数
@@ -74,7 +83,6 @@ class AlphaZeroLoss(Function):
 
         # 誤差関数の逆伝播
         gy /= len(value)
-        print(len(value))
         gscore = gy * (self.policy - self.mcts_policys)
         gvalue = gy * (value - self.rewards)
 
@@ -364,7 +372,7 @@ def alphazero_test(weights, simulations, turn):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 720000, batch_size = 1024, lr_init = 0.02, weight_decay = 0.0001):
+    def __init__(self, buffer_size = 300000, batch_size = 1024, lr_init = 0.02, weight_decay = 0.0001):
         # ニューラルネットワーク・経験再生バッファ
         self.network = PolicyValueNet(Board.action_size)
         self.buffer = ReplayBuffer(buffer_size, batch_size)
@@ -374,7 +382,7 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(weight_decay))
 
 
-    def fit(self, updates = 2000, episodes = 300, epochs = 5, simulations = 800, restart = False):
+    def fit(self, updates = 700, episodes = 300, epochs = 5, simulations = 800, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -393,20 +401,23 @@ class AlphaZero:
             historys = np.load(f"{is_yet_path}_history.npy")
 
             # 学習の進行度合いに応じた学習率に再設定する
-            if restart > 300:
-                optimizer.lr /= 10.
+            if restart > 10:
+                if restart > 500:
+                    optimizer.lr /= 100.
+                else:
+                    optimizer.lr /= 10.
 
         else:
             # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
-            network(np.zeros((1, Board.get_ndarray_size()), dtype = np.float32))
+            network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
 
             restart = 1
             historys = np.zeros((2, 100), dtype = np.int32)
 
         # 画面表示
-        print("\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
+        print("\n\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
         print("progress || first | second")
-        print("=======================")
+        print("===========================")
 
         # 変数定義
         assert not updates % 100
@@ -439,7 +450,7 @@ class AlphaZero:
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
                 with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
                     for epoch in range(epochs):
-                        pbar.set_description(f"epoch {epoch}")
+                        pbar.set_description(f"run {run}, epoch {epoch}")
 
                         for states, mcts_policys, rewards in buffer:
                             loss = AlphaZeroLoss(mcts_policys, rewards)(*network(states))
@@ -471,7 +482,7 @@ class AlphaZero:
                     print("({:.5g} min)".format((time() - start_time) / 60.))
 
                 # 学習の進行度合いによって、学習率を減少させる
-                if run == 300:
+                if run in {10, 500}:
                     optimizer.lr /= 10.
 
         finally:

@@ -147,9 +147,9 @@ class Board:
         # 正規化してから出力する
         return box / 255.
 
-    @staticmethod
-    def get_ndarray_size():
-        return ceil(Board.action_size / 8) * 2
+
+    def get_img(self, xp = np):
+        pass
 
 
     # オセロ盤を初期状態にセットする

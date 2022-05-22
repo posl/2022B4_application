@@ -7,6 +7,103 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+from inada_framework import Layer
+import inada_framework.layers as dzl
+from inada_framework.functions import relu
+
+
+
+# Residual Networks (残余ネットワーク : 前のレイヤが学習しきれなかった残余を次の層に渡すという工程を繰り返す)
+class ResNet50(Layer):
+    def __init__(self):
+        super().__init__()
+
+        self.conv1 = dzl.Conv2d(8, 3, 1, 1)
+        self.bn1 = dzl.BatchNorm()
+
+        # 画像データの高さ・幅はそのままで、チャネル数を倍々にしていく
+        self.res2 = BuildingBlock(3, 8, 32)
+        self.res3 = BuildingBlock(4, 16, 64)
+        self.res4 = BuildingBlock(6, 32, 128)
+        self.res5 = BuildingBlock(3, 64, 256)
+
+    def forward(self, x):
+        x = relu(self.bn1(self.conv1(x)))
+        x = self.res2(x)
+        x = self.res3(x)
+        x = self.res4(x)
+        x = self.res5(x)
+        return x
+
+
+# bottleneck building block : 通常の building block と同等の計算量で、層をさらに深くできる残余ブロック
+class BuildingBlock(Layer):
+    def __init__(self, n_layers, mid_channels, out_channels):
+        super().__init__()
+
+        a = BottleneckA(mid_channels, out_channels)
+        self.a = a
+        self.__forward = [a]
+
+        for i in range(1, n_layers):
+            b = BottleneckB(mid_channels, out_channels)
+            setattr(self, f"b{i}", b)
+            self.__forward.append(b)
+
+    def forward(self, x):
+        for layer in self.__forward:
+            x = layer(x)
+        return x
+
+
+
+
+# building block の最初に組み込む残余ブロック
+class BottleneckA(Layer):
+    def __init__(self, mid_channels, out_channels):
+        super().__init__()
+
+        # 入力チャネル数と出力チャネル数が異なる
+        self.res = BottleneckC(mid_channels, out_channels)
+        self.conv = dzl.Conv2d1x1(out_channels)
+        self.bn = dzl.BatchNorm()
+
+    # Skip Connection により勾配消失問題を解決
+    def forward(self, x):
+        return relu(self.res(x) + self.bn(self.conv(x)))
+
+
+# building block のループ部分に組み込む残余ブロック
+class BottleneckB(Layer):
+    def __init__(self, mid_channels, out_channels):
+        super().__init__()
+
+        self.res = BottleneckC(mid_channels, out_channels)
+
+    # Skip Connection により勾配消失問題を解決
+    def forward(self, x):
+        return relu(self.res(x) + x)
+
+
+# 入力チャネル数と出力チャネル数が等しい残余ブロック
+class BottleneckC(Layer):
+    def __init__(self, mid_channels, out_channels):
+        super().__init__()
+
+        # 1×1 の畳み込みで次元削減を行った後、3×3 の畳み込みを行い、1×1 の畳み込みで次元を元に戻している
+        self.conv1 = dzl.Conv2d1x1(mid_channels)
+        self.bn1 = dzl.BatchNorm()
+        self.conv2 = dzl.Conv2d(mid_channels, 3, 1, 1, nobias = True)
+        self.bn2 = dzl.BatchNorm()
+        self.conv3 = dzl.Conv2d1x1(out_channels)
+        self.bn3 = dzl.BatchNorm()
+
+    def forward(self, x):
+        x = relu(self.bn1(self.conv1(x)))
+        x = relu(self.bn2(self.conv2(x)))
+        return self.bn3(self.conv3(x))
+
+
 
 
 # エージェントの評価に使う単純な方策

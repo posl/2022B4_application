@@ -6,7 +6,15 @@
 from libcpp.vector cimport vector
 from libc.time cimport time, time_t
 
+import numpy as np
+cimport numpy as cnp
+cimport cython
+from cython import boundscheck, wraparound
+
+
 ctypedef unsigned long long uint
+
+ctypedef cnp.float32_t DTYPE_t
 
 
 
@@ -219,3 +227,15 @@ cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag,
 def nega_alpha(uint move_player, uint opposition_player, time_t limit_time):
     return __nega_alpha(move_player, opposition_player, -1, time(NULL) + limit_time)
 
+
+
+
+cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] state2image(uint move_player, uint opposition_player):
+    cdef:
+        uint i
+        cnp.ndarray[DTYPE_t, ndim = 3] A
+
+    with boundscheck(False), wraparound(False):
+        A = np.empty((2, 8, 8), dtype = np.float32)
+
+        
