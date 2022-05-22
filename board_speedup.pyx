@@ -166,7 +166,7 @@ def get_stand_bits(uint x):
     cdef:
         int n = 0
         vector[int] l
-    
+
     while x:
         if x & 1:
             l.push_back(n)
@@ -176,42 +176,46 @@ def get_stand_bits(uint x):
     return l
 
 
-
-
-cdef inline int __alpha_beta(uint move_player, uint opposition_player, int depth, time_t limit_time):
+# nega_max + 枝刈り
+# flag -1:初回呼び出し、0:正常、１:パスした
+cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag, time_t limit_time):
     cdef:
         uint mask, legal_board, put
-        int value, n
+        int value, n = 0
 
     legal_board = __get_legal_board(move_player, opposition_player)
 
     if legal_board == 0:
-        if __get_legal_board(opposition_player, move_player) == 0:
-            return __count_stand_bits(move_player) - __count_stand_bits(opposition_player)
-        else:
-            return - __alpha_beta(opposition_player, move_player, 1, limit_time)
+        if flag:
+            return  __count_stand_bits(move_player) - __count_stand_bits(opposition_player)
 
-    for n in range(64):
+        else:
+            return - __nega_alpha(opposition_player, move_player, 1, limit_time)
+
+    while legal_board:
         if time(NULL) > limit_time:
             return -100
 
-        if (legal_board >> n) & 1:
-            put =  <uint> 1 << n
-
+        if legal_board & 1:
+            put =  <uint>1 << n
             mask = __get_reverse_board(put, move_player, opposition_player)
 
-            value = - __alpha_beta(opposition_player ^ mask, move_player ^ mask ^ put, 1, limit_time)
+            value = - __nega_alpha(opposition_player ^ mask, move_player ^ mask ^ put, 0, limit_time)
 
             if value == 100:
                 return -100
 
             if value > 0:
-                if depth:
-                    return value
-                else:
+                if flag == -1:
                     return n
+                else:
+                    return value
+
+        n += 1
+        legal_board >>= 1
 
     return -1
 
-def alpha_beta(uint move_player, uint opposition_player, time_t limit_time):
-    return __alpha_beta(move_player, opposition_player, 0, time(NULL) + limit_time)
+def nega_alpha(uint move_player, uint opposition_player, time_t limit_time):
+    return __nega_alpha(move_player, opposition_player, -1, time(NULL) + limit_time)
+

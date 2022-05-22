@@ -2,7 +2,7 @@ from math import sqrt, log
 from random import choice
 
 from board import Board
-from board_speedup import alpha_beta, count_stand_bits
+from board_speedup import nega_alpha, count_stand_bits
 
 
 
@@ -23,9 +23,8 @@ class Node:
 
 
 class MonteCarloTreeSearch:
-    def __init__(self, max_tries = 65536, limit_time = 10):
+    def __init__(self, max_tries = 65536):
         self.max_tries = max_tries
-        self.limit_time = limit_time
 
     def __call__(self, board : Board):  
         return self.monte_carlo_tree_search(board)
@@ -122,17 +121,17 @@ class MonteCarloTreeSearch:
 
 
 class ABMonteCarloTreeSearch(MonteCarloTreeSearch):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, max_tries = 65536, limit_time = 10):
+        self.max_tries = max_tries
+        self.limit_time = limit_time
     
     def __call__(self, board : Board):
         placable = board.list_placable()
         if len(placable) == 1:
             return placable[0]
 
-        if count_stand_bits(board.stone_black | board.stone_white) > 44:
-            move = alpha_beta(*board.players_board, self.limit_time)
-            print(move, board.turn)
+        if count_stand_bits(board.stone_black | board.stone_white) > 40:
+            move = nega_alpha(*board.players_board, self.limit_time)
             if move in board.list_placable():
                 print("checkmate")
                 return move
@@ -150,6 +149,12 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
+    import cProfile
+    import pstats
+
+    pr = cProfile.Profile()
+    pr.enable()
+
     mcts = MonteCarloTreeSearch()
     abmcts = ABMonteCarloTreeSearch()
     board = Board()
@@ -158,3 +163,8 @@ if __name__ == "__main__":
     print("game set")
     print("black:", board.black_num)
     print("white:", board.white_num)
+
+    pr.disable()
+    stats = pstats.Stats(pr)
+    stats.sort_stats('tottime')
+    stats.print_stats()

@@ -1,13 +1,12 @@
 from random import choice
 
 from board import Board
-from board_speedup import alpha_beta, count_stand_bits
+from board_speedup import nega_alpha, count_stand_bits
 
 
 class PrimitiveMonteCarlo:
-    def __init__(self, max_try = 6400, limit_time = 10):
+    def __init__(self, max_try = 6400):
         self.max_try = max_try
-        self.limit_time = limit_time
 
     def __call__(self, board : Board):
         placable = board.list_placable()
@@ -76,18 +75,19 @@ class PrimitiveMonteCarlo:
         return move
 
 class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, max_try = 6400, limit_time = 10):
+        self.max_try = max_try
+        self.limit_time = limit_time
     
     def __call__(self, board : Board):
         placable = board.list_placable()
         if len(placable) == 1:
             return placable[0]
 
-        if count_stand_bits(board.stone_black | board.stone_white) > 44:
-            move = alpha_beta(*board.players_board, self.limit_time)
+        if count_stand_bits(board.stone_black | board.stone_white) > 40:
+            move = nega_alpha(*board.players_board, self.limit_time)
             if move in board.list_placable():
-                print("checkmate")
+                print(move, "checkmate")
                 return move
 
         return self.primitive_monte_carlo(board)
