@@ -153,7 +153,7 @@ class AlphaZeroAgent:
     # シミュレーションを行なって得た方策を返すメソッド
     def __search(self, board, root_state, train_flag):
         if root_state in self.P:
-            state_ndarray = board.get_state_ndarray(invert_flag = True)
+            state_ndarray = board.get_img()
         else:
             state_ndarray = self.__expand(board, root_state, root_flag = True)
 
@@ -175,7 +175,7 @@ class AlphaZeroAgent:
 
     # 子盤面を展開し、その方策・累計行動価値・探索回数の初期化を行うメソッド
     def __expand(self, board, state, root_flag = False):
-        state_ndarray = board.get_state_ndarray(invert_flag = True)
+        state_ndarray = board.get_img()
         score, value = self.network(state_ndarray[None, :])
         policy = softmax(score.data)
 
@@ -415,7 +415,7 @@ class AlphaZero:
             historys = np.zeros((2, 100), dtype = np.int32)
 
         # 画面表示
-        print("\n\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
+        print("\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
         print("progress || first | second")
         print("===========================")
 

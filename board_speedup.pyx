@@ -230,12 +230,18 @@ def nega_alpha(uint move_player, uint opposition_player, time_t limit_time):
 
 
 
-cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] state2image(uint move_player, uint opposition_player):
+cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] get_board_image(uint move_player, uint opposition_player):
     cdef:
-        uint i
         cnp.ndarray[DTYPE_t, ndim = 3] A
+        int i, j, n
 
     with boundscheck(False), wraparound(False):
         A = np.empty((2, 8, 8), dtype = np.float32)
 
-        
+        for i in range(8):
+            for j in range(8):
+                n = 8 * i + j
+                A[0, i, j] = (move_player >> n) & 1
+                A[1, i, j] = (opposition_player >> n) & 1
+
+    return A

@@ -4,7 +4,8 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import count_stand_bits, get_stand_bits, get_reverse_board, get_legal_board
+import board_speedup as bs
+from board_speedup import get_reverse_board, get_legal_board
 
 
 
@@ -88,11 +89,13 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
-            self.__count_bits = count_stand_bits
-            self.__get_stand_bits = get_stand_bits
+            self.__get_img = bs.get_board_image
+            self.__count_bits = bs.count_stand_bits
+            self.__get_stand_bits = bs.get_stand_bits
             self.__reverse = self.__reverse_cython
             self.__list_placable = self.__list_placable_cython
         else:
+            self.__get_img = self.__get_board_image_python
             self.__count_bits = self.__count_bits_python
             self.__get_stand_bits = self.__get_stand_bits_python
             self.__reverse = self.__reverse_python
@@ -148,8 +151,21 @@ class Board:
         return box / 255.
 
 
+    # オセロ盤の状態を画像データとして取得する (形状は (2, height, width))
     def get_img(self, xp = np):
-        pass
+        img = self.__get_img(*self.players_board)
+        if xp != np:
+            return xp.asarray(img)
+        return img
+
+    def __get_board_image_python(self, move_player, opposition_player):
+        img = [self.__int2img(move_player), self.__int2img(opposition_player)]
+        return np.array(img, dtype = np.float32)
+
+    @staticmethod
+    def __int2img(x):
+        height, width = Board.height, Board.width
+        return [[(x >> (width * i + j)) & 1 for j in range(width)] for i in range(height)]
 
 
     # オセロ盤を初期状態にセットする
