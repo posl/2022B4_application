@@ -469,6 +469,10 @@ class AlphaZero:
 
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
                 with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
+                    if use_gpu:
+                        # GPU を使う場合は、モデルの重みをそれ対応にする
+                        network.to_gpu()
+
                     for epoch in range(1, epochs + 1):
                         pbar.set_description(f"fit {step}, epoch {epoch}")
 
@@ -483,9 +487,6 @@ class AlphaZero:
 
                                 rewards, source, rewards_stream = preprocess_to_gpu(rewards)
                                 rewards.set(source, stream = rewards_stream)
-
-                                # モデルの重みも GPU 対応にする
-                                network.to_gpu()
 
                                 # データを使う前に非同期の転送処理と実行スクリプトを同期させる
                                 states_stream.synchronize()
@@ -503,11 +504,11 @@ class AlphaZero:
                             loss.backward()
                             optimizer.update()
 
-                            if use_gpu:
-                                # モデルの重みを CPU 対応に戻す
-                                network.to_cpu()
-
                             pbar.update(1)
+
+                    if use_gpu:
+                        # GPU を使った場合は、モデルの重みを CPU 対応に戻す
+                        network.to_cpu()
 
                 # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
                 weights = ray.put(network.get_weights())
