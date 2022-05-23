@@ -391,7 +391,7 @@ def alphazero_test(weights, simulations, turn):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 200000, batch_size = 128, lr = 0.001, to_gpu = False):
+    def __init__(self, buffer_size = 200000, batch_size = 128, lr = 0.001, to_gpu = True):
         # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
 
@@ -484,6 +484,9 @@ class AlphaZero:
                                 rewards, source, rewards_stream = preprocess_to_gpu(rewards)
                                 rewards.set(source, stream = rewards_stream)
 
+                                # モデルの重みも GPU 対応にする
+                                network.to_gpu()
+
                                 # データを使う前に非同期の転送処理と実行スクリプトを同期させる
                                 states_stream.synchronize()
 
@@ -499,6 +502,10 @@ class AlphaZero:
                             network.clear_grads()
                             loss.backward()
                             optimizer.update()
+
+                            if use_gpu:
+                                # モデルの重みを CPU 対応に戻す
+                                network.to_cpu()
 
                             pbar.update(1)
 
