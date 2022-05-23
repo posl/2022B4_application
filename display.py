@@ -15,6 +15,7 @@ from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
+from board_speedup import get_stand_bits
 
 
 class Page(tk.Frame):
@@ -869,15 +870,15 @@ class DisplayBoard(Board):
 
     @property
     def black_positions(self):
-        return self.__get_stand_bits(self.action_size, self.stone_black)
+        return get_stand_bits(self.action_size, self.stone_black)
 
     @property
     def white_positions(self):
-        return self.__get_stand_bits(self.action_size, self.stone_white)
+        return get_stand_bits(self.action_size, self.stone_white)
 
     @property
     def reverse_positions(self):
-        return self.__get_stand_bits(self.action_size, self.reversed)
+        return get_stand_bits(self.action_size, self.reversed)
 
 
     # id...種類のID  diff...難易度

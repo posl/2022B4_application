@@ -4,8 +4,7 @@ from math import ceil
 
 import numpy as np
 
-import board_speedup as bs
-from board_speedup import get_reverse_board, get_legal_board
+from board_speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
 
 
 
@@ -89,15 +88,11 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
-            self.__get_img = bs.get_board_image
-            self.__count_bits = bs.count_stand_bits
-            self.__get_stand_bits = bs.get_stand_bits
-            self.__reverse = self.__reverse_cython
-            self.__list_placable = self.__list_placable_cython
+            self.__count_bits = count_stand_bits
+            self.__reverse = get_reverse_board
+            self.__list_placable = get_legal_list
         else:
-            self.__get_img = self.__get_board_image_python
             self.__count_bits = self.__count_bits_python
-            self.__get_stand_bits = self.__get_stand_bits_python
             self.__reverse = self.__reverse_python
             self.__list_placable = self.__list_placable_python
 
@@ -153,19 +148,10 @@ class Board:
 
     # オセロ盤の状態を画像データとして取得する (形状は (2, height, width))
     def get_img(self, xp = np):
-        img = self.__get_img(*self.players_board)
+        img = get_board_img(*self.players_board, self.height, self.width)
         if xp != np:
             return xp.asarray(img)
         return img
-
-    def __get_board_image_python(self, move_player, opposition_player):
-        img = [self.__int2img(move_player), self.__int2img(opposition_player)]
-        return np.array(img, dtype = np.float32)
-
-    @staticmethod
-    def __int2img(x):
-        height, width = Board.height, Board.width
-        return [[(x >> (width * i + j)) & 1 for j in range(width)] for i in range(height)]
 
 
     # オセロ盤を初期状態にセットする
@@ -223,12 +209,6 @@ class Board:
             return self.get_stone_num()
 
 
-    # ボードを表現する整数を引数として、１が立っている箇所のリストを取得する
-    @staticmethod
-    def __get_stand_bits_python(num, x):
-        return [n for n in range(num) if (x >> n) & 1]
-
-
     @property
     def plans(self):
         return self.player1_plan, self.player2_plan
@@ -268,10 +248,6 @@ class Board:
         self.set_players_board(mask | (1 << n), mask)
         return mask
 
-    @staticmethod
-    def __reverse_cython(startpoint, move_player, opposition_player):
-        return get_reverse_board(1 << startpoint, move_player, opposition_player)
-
     # n に置いた時に返るマスを返す
     @staticmethod
     def __reverse_python(startpoint, move_player, opposition_player):
@@ -292,13 +268,9 @@ class Board:
 
     # プレイヤーが石を置ける箇所の通し番号をリストで取得する
     def list_placable(self):
-        return self.__list_placable(self.players_board)
+        return self.__list_placable(*self.players_board)
 
-    def __list_placable_cython(self, players_board):
-        return self.__get_stand_bits(get_legal_board(*players_board))
-
-    def __list_placable_python(self, players_board):
-        move_player, opposition_player = players_board
+    def __list_placable_python(self, move_player, opposition_player):
         stone_exist = move_player | opposition_player
         is_placable = self.is_placable
         p_list = []

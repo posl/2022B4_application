@@ -47,8 +47,8 @@ cdef inline uint __get_legal_board(uint move_player, uint opposition_player):
     # 空白箇所だけに絞って、出力を得る
     return legal & (~(move_player | opposition_player))
 
-def get_legal_board(uint move_player, uint opposition_player):
-    return __get_legal_board(move_player, opposition_player)
+def get_legal_list(uint move_player, uint opposition_player):
+    return __get_stand_bits(__get_legal_board(move_player, opposition_player))
 
 
 
@@ -97,8 +97,8 @@ cdef inline uint __get_reverse_board(uint set_position, uint move_player, uint o
 
     return reverse
 
-def get_reverse_board(uint set_position, uint move_player, uint opposition_player):
-    return __get_reverse_board(set_position, move_player, opposition_player)
+def get_reverse_board(int startpoint, uint move_player, uint opposition_player):
+    return __get_reverse_board(<uint>1 << startpoint, move_player, opposition_player)
 
 
 
@@ -137,6 +137,26 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
 
 
 
+# １が立っているビット位置のリストを取得する
+cdef vector[int] __get_stand_bits(uint x):
+    cdef:
+        int n = 0
+        vector[int] l
+
+    while x:
+        if x & 1:
+            l.push_back(n)
+        n += 1
+        x >>= 1
+
+    return l
+
+def get_stand_bits(uint x):
+    return __get_stand_bits(x)
+
+
+
+
 # １が立っているビットの数を数える
 cdef inline int __count_stand_bits(uint n):
     cdef uint mask
@@ -167,21 +187,6 @@ def count_stand_bits(uint n):
     return __count_stand_bits(n)
 
 
-
-
-# １が立っているビット位置のリストを取得する
-def get_stand_bits(uint x):
-    cdef:
-        int n = 0
-        vector[int] l
-
-    while x:
-        if x & 1:
-            l.push_back(n)
-        n += 1
-        x >>= 1
-
-    return l
 
 
 # nega_max + 枝刈り
@@ -230,18 +235,18 @@ def nega_alpha(uint move_player, uint opposition_player, time_t limit_time):
 
 
 
-cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] get_board_image(uint move_player, uint opposition_player):
+cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] get_board_img(uint move, uint opposition, int h, int w):
     cdef:
         cnp.ndarray[DTYPE_t, ndim = 3] A
         int i, j, n
 
     with boundscheck(False), wraparound(False):
-        A = np.empty((2, 8, 8), dtype = np.float32)
+        A = np.empty((2, h, w), dtype = np.float32)
 
-        for i in range(8):
-            for j in range(8):
-                n = 8 * i + j
-                A[0, i, j] = (move_player >> n) & 1
-                A[1, i, j] = (opposition_player >> n) & 1
+        for i in range(h):
+            for j in range(w):
+                n = w * i + j
+                A[0, i, j] = (move >> n) & 1
+                A[1, i, j] = (opposition >> n) & 1
 
     return A
