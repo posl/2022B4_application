@@ -9,12 +9,12 @@ import ray
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from inada_framework import Model, Function, cuda, no_grad
-from drl_utilities import ResNet50, SelfMatch, corners_plan
+from inada_framework import Model, Function, cuda, test_mode
 import inada_framework.layers as dzl
-from inada_framework.functions import flatten, tanh
+from inada_framework.functions import relu, flatten, dropout, tanh
+from drl_utilities import SelfMatch, corners_plan, preprocess_to_gpu
 from board import Board
-from inada_framework.optimizers import Momentum, WeightDecay
+from inada_framework.optimizers import Adam
 
 
 
@@ -23,23 +23,42 @@ class PolicyValueNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        # 画像認識部
-        self.cnn = ResNet50()
+        # 全結合層への入力形式を学習する、畳み込み層
+        self.conv1 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
+        self.bn1 = dzl.BatchNorm()
+        self.conv2 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
+        self.bn2 = dzl.BatchNorm()
+        self.conv3 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
+        self.bn3 = dzl.BatchNorm()
+        self.conv4 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
+        self.bn4 = dzl.BatchNorm()
+
+        # 全結合層
+        self.fc5 = dzl.Affine(1024, nobias = True)
+        self.bn5 = dzl.BatchNorm()
+        self.fc6 = dzl.Affine(512, nobias = True)
+        self.bn6 = dzl.BatchNorm()
 
         # policy head
-        self.p_conv = dzl.Conv2d1x1(2)
-        self.p_bn = dzl.BatchNorm()
-        self.p_fc = dzl.Affine(action_size)
+        self.policy_h = dzl.Affine(action_size)
 
         # value head
-        self.v_conv = dzl.Conv2d1x1(1)
-        self.v_bn = dzl.BatchNorm()
-        self.v_fc = dzl.Affine(1)
+        self.value_h = dzl.Affine(1)
 
     def forward(self, x):
-        x = self.cnn(x)
-        score = self.p_fc( self.p_bn( flatten( self.p_conv(x) ) ) )
-        value = self.v_fc( self.v_bn( flatten( self.v_conv(x) ) ) )
+        x = relu(self.bn1(self.conv1(x)))
+        x = relu(self.bn2(self.conv2(x)))
+        x = relu(self.bn3(self.conv3(x)))
+        x = relu(self.bn4(self.conv4(x)))
+
+        x = flatten(x)
+        x = relu(self.bn5(self.fc5(x)))
+        x = dropout(x, dropout_ratio = 0.3)
+        x = relu(self.bn6(self.fc6(x)))
+        x = dropout(x, dropout_ratio = 0.3)
+
+        score = self.policy_h(x)
+        value = self.value_h(x)
         return score, tanh(value)
 
 
@@ -98,7 +117,7 @@ class AlphaZeroLoss(Function):
 
 # モンテカルロ木探索の要領で、深層強化学習を駆使し、行動選択をするエージェント (コンピュータとしても使う)
 class AlphaZeroAgent:
-    def __init__(self, action_size, sampling_limits = 10, c_base = 19652, c_init = 1.25):
+    def __init__(self, action_size, sampling_limits = 15, c_base = 19652, c_init = 1.25):
         self.network = PolicyValueNet(action_size)
 
         # ハイパーパラメータ
@@ -123,24 +142,24 @@ class AlphaZeroAgent:
 
 
     def __call__(self, board):
-        with no_grad():
+        with test_mode():
             return self.get_action(board)
 
     def get_action(self, board, count = None):
         # 必要に応じて、ルート盤面の合法手リストの登録も行うので、先に呼ぶ必要がある
         placable = self.__get_placable(board)
 
-        train_flag = (count is not None)
-        state_ndarray, policy = self.__search(board, board.state, train_flag)
+        selfplay_flag = (count is not None)
+        state_ndarray, policy = self.__search(board, board.state, selfplay_flag)
 
-        if train_flag and count < self.sampling_limits:
+        if selfplay_flag and count < self.sampling_limits:
             action = choices(placable, policy)[0]
         else:
             indices = np.where(policy == policy.max())[0]
             action_index = indices[0] if len(indices) == 1 else choice(indices)
             action = placable[action_index]
 
-        if train_flag:
+        if selfplay_flag:
             # 方策の形状をニューラルネットワークのものと合わせる
             mcts_policy = np.zeros(board.action_size, dtype = np.float32)
             mcts_policy[np.array(placable)] = policy
@@ -151,16 +170,16 @@ class AlphaZeroAgent:
 
 
     # シミュレーションを行なって得た方策を返すメソッド
-    def __search(self, board, root_state, train_flag):
+    def __search(self, board, root_state, selfplay_flag):
         if root_state in self.P:
             state_ndarray = board.get_img()
         else:
             state_ndarray = self.__expand(board, root_state, root_flag = True)
 
-        # 学習時の探索初期状態では、どれか１つの手が選ばれやすくなるように、ノイズをかける
-        if train_flag:
+        # 自己対戦時の探索初期状態では、どれか１つの手が選ばれやすくなるように、ノイズをかける
+        if selfplay_flag:
             P = self.P[root_state]
-            self.P[root_state] = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.03))
+            self.P[root_state] = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations):
@@ -274,16 +293,16 @@ class ReplayBuffer:
     def max_iter(self):
         return ceil(len(self.buffer) / self.batch_size)
 
-    def save(self, file_path, run):
-        save_data = self.buffer, run
+    def save(self, file_path, step):
+        save_data = self.buffer, step
         with open(file_path, "wb") as f:
             pickle.dump(save_data, f)
 
     def load(self, file_path):
         with open(file_path, "rb") as f:
             load_data = pickle.load(f)
-        self.buffer, run = load_data
-        return run
+        self.buffer, step = load_data
+        return step
 
 
     # １エピソード分のデータがリストとして、まとめて格納される
@@ -372,20 +391,25 @@ def alphazero_test(weights, simulations, turn):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 300000, batch_size = 1024, lr_init = 0.02, weight_decay = 0.0001):
-        # ニューラルネットワーク・経験再生バッファ
+    def __init__(self, buffer_size = 200000, batch_size = 128, lr = 0.001, to_gpu = False):
+        # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
+
+        # 経験再生バッファ
         self.buffer = ReplayBuffer(buffer_size, batch_size)
 
-        # 最適化手法は慣性に着想を得た手法である Momentum で、パラメータのノルムが過大にならないように重み減衰も行う
-        self.optimizer = Momentum(lr_init).setup(self.network)
-        self.optimizer.add_hook(WeightDecay(weight_decay))
+        # オリジナルは Momentum で、WeightDecay による正則化も行なっている
+        self.optimizer = Adam(lr).setup(self.network)
+
+        # 学習パートだけ GPU による高速化の余地がある
+        self.use_gpu = to_gpu and cuda.gpu_enable
 
 
-    def fit(self, updates = 700, episodes = 300, epochs = 5, simulations = 800, restart = False):
+    def fit(self, updates = 1000, episodes = 100, epochs = 5, simulations = 50, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
+        use_gpu = self.use_gpu
 
         # 各ファイルパス
         file_path = SelfMatch.get_path("alphazero")
@@ -400,22 +424,16 @@ class AlphaZero:
             restart = buffer.load(f"{is_yet_path}_buffer.pkl")
             historys = np.load(f"{is_yet_path}_history.npy")
 
-            # 学習の進行度合いに応じた学習率に再設定する
-            if restart > 10:
-                if restart > 500:
-                    optimizer.lr /= 100.
-                else:
-                    optimizer.lr /= 10.
-
         else:
             # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
-            network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
+            with test_mode():
+                network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
 
             restart = 1
             historys = np.zeros((2, 100), dtype = np.int32)
 
         # 画面表示
-        print("\033[92m=== Current Winning Percentage (Total Elapsed Time) ===\033[0m")
+        print("\033[92m=== Winning Percentage ===\033[0m")
         print("progress || first | second")
         print("===========================")
 
@@ -424,6 +442,7 @@ class AlphaZero:
         eval_interval = updates // 100
         start_time = time()
 
+
         try:
             # 並列実行を行うための初期設定
             ray.init()
@@ -431,9 +450,9 @@ class AlphaZero:
             # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
             weights = ray.put(network.get_weights())
 
-            for run in range(restart, updates + 1):
-                with tqdm(desc = f"run {run}", total = episodes, leave = False) as pbar:
-                    with no_grad():
+            for step in range(restart, updates + 1):
+                with tqdm(desc = f"step {step}", total = episodes, leave = False) as pbar:
+                    with test_mode():
                         # まだ完遂していないタスクがリストの中に残るようになる
                         remains = [alphazero_play.remote(weights, simulations) for __ in range(episodes)]
 
@@ -443,17 +462,36 @@ class AlphaZero:
                             buffer.add(ray.get(finished[0]))
                             pbar.update(1)
 
-                # バッファに十分な量の経験データが溜まってから、学習をスタートする
-                if run < 20:
+                if step < 10:
                     continue
 
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
                 with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
                     for epoch in range(epochs):
-                        pbar.set_description(f"run {run}, epoch {epoch}")
+                        pbar.set_description(f"step {step}, epoch {epoch}")
 
                         for states, mcts_policys, rewards in buffer:
-                            loss = AlphaZeroLoss(mcts_policys, rewards)(*network(states))
+                            # GPU を使う場合は、そのメモリへデータを非同期転送する
+                            if use_gpu:
+                                states, source, states_stream = preprocess_to_gpu(states)
+                                states.set(source, stream = states_stream)
+
+                                mcts_policys, source, mcts_policys_stream = preprocess_to_gpu(mcts_policys)
+                                mcts_policys.set(source, stream = mcts_policys_stream)
+
+                                rewards, source, rewards_stream = preprocess_to_gpu(rewards)
+                                rewards.set(source, stream = rewards_stream)
+
+                                # データを使う前に非同期の転送処理と実行スクリプトを同期させる
+                                states_stream.synchronize()
+
+                            score, value = network(states)
+
+                            if use_gpu:
+                                mcts_policys_stream.synchronize()
+                                rewards_stream.synchronize()
+
+                            loss = AlphaZeroLoss(mcts_policys, rewards)(score, value)
 
                             # 勾配が加算されていかないように、先にリセットしてから逆伝播を行う
                             network.clear_grads()
@@ -465,7 +503,7 @@ class AlphaZero:
                 # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
                 weights = ray.put(network.get_weights())
 
-                eval_q, eval_r = divmod(run, eval_interval)
+                eval_q, eval_r = divmod(step, eval_interval)
                 if not eval_r:
                     save_q, save_r = divmod(eval_q, 10)
 
@@ -476,18 +514,15 @@ class AlphaZero:
                     # エージェントの評価 (合計 100 回)
                     win_rates = self.eval(weights, simulations)
                     historys[:, eval_q - 1] = win_rates
-                    print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
+                    print("{:>4} || {:>3} % | {:>3} %".format(step, *win_rates), end = "   ")
 
                     # 累計経過時間の表示
                     print("({:.5g} min)".format((time() - start_time) / 60.))
 
-                # 学習の進行度合いによって、学習率を減少させる
-                if run in {10, 500}:
-                    optimizer.lr /= 10.
 
         finally:
             network.save_weights(f"{is_yet_path}_weights.npz")
-            buffer.save(f"{is_yet_path}_buffer.pkl", run)
+            buffer.save(f"{is_yet_path}_buffer.pkl", step)
             np.save(f"{is_yet_path}_history.npy", historys)
 
             # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
@@ -498,7 +533,7 @@ class AlphaZero:
 
             plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
-            plt.ylabel("Mean Winning Percentage")
+            plt.ylabel("Winning Percentage")
             plt.savefig(graphs_path)
             plt.clf()
 
@@ -506,20 +541,19 @@ class AlphaZero:
     @staticmethod
     def eval(weights, simulations):
         with tqdm(desc = "now evaluating", total = 200, leave = False) as pbar:
-            with no_grad():
-                win_rates = []
+            win_rates = []
 
-                for turn in (1, 0):
-                    remains = [alphazero_test.remote(weights, simulations, turn) for __ in range(100)]
+            for turn in (1, 0):
+                remains = [alphazero_test.remote(weights, simulations, turn) for __ in range(100)]
 
-                    # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
-                    win_count = 0
-                    while remains:
-                        finished, remains = ray.wait(remains, num_returns = 1)
-                        win_count += ray.get(finished[0])
-                        pbar.update(1)
+                # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
+                win_count = 0
+                while remains:
+                    finished, remains = ray.wait(remains, num_returns = 1)
+                    win_count += ray.get(finished[0])
+                    pbar.update(1)
 
-                    win_rates.append(win_count)
+                win_rates.append(win_count)
         return win_rates
 
 
@@ -536,9 +570,8 @@ def eval_alphazero_computer(file_name):
     del network
 
     # 描画用配列
-    simulations = 25 * (2 ** np.arange(6))
-    simulations = simulations.astype(int)
-    win_rates = np.empty((2, 6))
+    simulations = 25 * (2 ** np.arange(5))
+    win_rates = np.empty((2, 5))
 
 
     # 画面表示
@@ -554,7 +587,7 @@ def eval_alphazero_computer(file_name):
 
     # グラフの目盛り位置を設定するための変数
     width = 1 / 3
-    left = np.arange(6)
+    left = np.arange(5)
     center = left + width
 
     # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
@@ -564,7 +597,7 @@ def eval_alphazero_computer(file_name):
     plt.legend()
 
     plt.ylim(-5, 105)
-    plt.xlabel("The Number of Simulation")
+    plt.xlabel("The Number of Simulations")
     plt.ylabel("Winning Percentage")
     plt.title("AlphaZero")
     plt.savefig(file_path.format("graphs") + "_bar")

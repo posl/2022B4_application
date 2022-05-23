@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from inada_framework import Layer
+from inada_framework import Layer, cuda
 import inada_framework.layers as dzl
 from inada_framework.functions import relu
 
@@ -18,7 +18,7 @@ class ResNet50(Layer):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = dzl.Conv2d(8, 3, 1, 1)
+        self.conv1 = dzl.Conv2d(8, 3, 1, 1, nobias = True)
         self.bn1 = dzl.BatchNorm()
 
         # 画像データの高さ・幅はそのままで、チャネル数を倍々にしていく
@@ -102,6 +102,21 @@ class BottleneckC(Layer):
         x = relu(self.bn1(self.conv1(x)))
         x = relu(self.bn2(self.conv2(x)))
         return self.bn3(self.conv3(x))
+
+
+
+
+def preprocess_to_gpu(array):
+        # 非同期で GPU メモリへのデータ転送を行うために、スワップアウトされないメモリ領域にソース配列をコピーする
+        xp = cuda.cp
+        p_mem = xp.cuda.alloc_pinned_memory(array.nbytes)
+        source = np.frombuffer(p_mem, array.dtype, array.size).reshape(array.shape)
+        source[...] = array
+
+        # ストリームを用意し、GPU メモリ上の領域を確保する
+        stream = xp.cuda.Stream(non_blocking = True)
+        destination = xp.ndarray(source.shape, source.dtype)
+        return destination, source, stream
 
 
 

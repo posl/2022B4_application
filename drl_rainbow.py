@@ -8,9 +8,9 @@ import numpy as np
 from tqdm import tqdm
 
 from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
+from drl_utilities import preprocess_to_gpu, SelfMatch
 import inada_framework.functions as dzf
 from inada_framework.utilities import reshape_for_broadcast
-from drl_utilities import SelfMatch
 from board import Board
 
 
@@ -43,7 +43,7 @@ class NoisyAffine(Layer):
         # GPU メモリへの転送が必要な場合は、cuda の DMA を用いて非同期で行う
         transfer = self.transfer
         if transfer:
-            x, source, stream = self.preprocess_to_gpu(x)
+            x, source, stream = preprocess_to_gpu(x)
             x.set(source, stream = stream)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
@@ -79,19 +79,6 @@ class NoisyAffine(Layer):
         initial_sigma = 0.5 * stdv
         self.W_sigma.data = xp.full((in_size, out_size), initial_sigma, dtype = np.float32)
         self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
-
-    @staticmethod
-    def preprocess_to_gpu(array):
-        # 非同期で GPU メモリへのデータ転送を行うために、スワップアウトされないメモリ領域にソース配列をコピーする
-        xp = cuda.cp
-        p_mem = xp.cuda.alloc_pinned_memory(array.nbytes)
-        source = np.frombuffer(p_mem, array.dtype, array.size).reshape(array.shape)
-        source[...] = array
-
-        # ストリームを用意し、GPU メモリ上の領域を確保する
-        stream = xp.cuda.Stream(non_blocking = True)
-        destination = xp.ndarray(source.shape, source.dtype)
-        return destination, source, stream
 
     @staticmethod
     def noise_f(x):
@@ -560,14 +547,13 @@ class RainbowAgent:
         # GPU を使用する場合は、非同期メモリ転送を開始する
         use_gpu = self.use_gpu
         if use_gpu:
-            preprocess = NoisyAffine.preprocess_to_gpu
-            rewards, source, rewards_stream = preprocess(rewards)
+            rewards, source, rewards_stream = preprocess_to_gpu(rewards)
             rewards.set(source, stream = rewards_stream)
 
-            gammas, source, gammas_stream = preprocess(gammas)
+            gammas, source, gammas_stream = preprocess_to_gpu(gammas)
             gammas.set(source, stream = gammas_stream)
 
-            weights, source, weights_stream = preprocess(weights)
+            weights, source, weights_stream = preprocess_to_gpu(weights)
             weights.set(source, stream = weights_stream)
 
         # 誤差を含む出力に max 演算子を使うことで過大評価を起こさないように、行動はオンライン分布から取る (Double DQN)
