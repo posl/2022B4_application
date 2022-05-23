@@ -150,7 +150,7 @@ class AlphaZeroAgent:
         placable = self.__get_placable(board)
 
         selfplay_flag = (count is not None)
-        state_ndarray, policy = self.__search(board, board.state, selfplay_flag)
+        board_img, policy = self.__search(board, board.state, selfplay_flag)
 
         if selfplay_flag and count < self.sampling_limits:
             action = choices(placable, policy)[0]
@@ -163,7 +163,7 @@ class AlphaZeroAgent:
             # 方策の形状をニューラルネットワークのものと合わせる
             mcts_policy = np.zeros(board.action_size, dtype = np.float32)
             mcts_policy[np.array(placable)] = policy
-            return action, state_ndarray, mcts_policy
+            return action, board_img, mcts_policy
 
         # 学習時以外、方策の計算などの処理は不要
         return action
@@ -172,11 +172,11 @@ class AlphaZeroAgent:
     # シミュレーションを行なって得た方策を返すメソッド
     def __search(self, board, root_state, selfplay_flag):
         if root_state in self.P:
-            state_ndarray = board.get_img()
+            board_img = board.get_img()
         else:
-            state_ndarray = self.__expand(board, root_state, root_flag = True)
+            board_img = self.__expand(board, root_state, root_flag = True)
 
-        # 自己対戦時の探索初期状態では、どれか１つの手が選ばれやすくなるように、ノイズをかける
+        # 自己対戦時の探索初期状態では、ランダムな手が選ばれやすくなるように、ノイズをかける
         if selfplay_flag:
             P = self.P[root_state]
             self.P[root_state] = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
@@ -189,13 +189,13 @@ class AlphaZeroAgent:
         # 評価値が高いほど探索回数が多くなるように収束するので、それを方策として使う
         N = self.N[root_state]
         policy = N / N.sum()
-        return state_ndarray, policy
+        return board_img, policy
 
 
     # 子盤面を展開し、その方策・累計行動価値・探索回数の初期化を行うメソッド
     def __expand(self, board, state, root_flag = False):
-        state_ndarray = board.get_img()
-        score, value = self.network(state_ndarray[None, :])
+        board_img = board.get_img()
+        score, value = self.network(board_img[None, :])
         policy = softmax(score.data)
 
         placable = self.placable_dict[state]
@@ -203,9 +203,9 @@ class AlphaZeroAgent:
         self.W[state] = np.zeros(len(placable))
         self.N[state] = np.zeros(len(placable))
 
-        # ルート盤面の展開時は評価値の代わりに、学習時用にニューラルネットワークへの入力としての状態データを返す
+        # ルート盤面の展開時は評価値の代わりに、学習時用にニューラルネットワークへの入力としての画像データを返す
         if root_flag:
-            return state_ndarray
+            return board_img
 
         # それ以外は、ニューラルネットワークの出力である過去の勝率を返す
         return value.data[0, 0]
@@ -406,10 +406,12 @@ class AlphaZero:
 
 
     def fit(self, updates = 1000, episodes = 100, epochs = 5, simulations = 50, restart = False):
+        # getattr の呼び出しを最初の１回に集約する
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
         use_gpu = self.use_gpu
+        eval = self.eval
 
         # 各ファイルパス
         file_path = SelfMatch.get_path("alphazero")
@@ -467,8 +469,8 @@ class AlphaZero:
 
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
                 with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
-                    for epoch in range(epochs):
-                        pbar.set_description(f"step {step}, epoch {epoch}")
+                    for epoch in range(1, epochs + 1):
+                        pbar.set_description(f"fit {step}, epoch {epoch}")
 
                         for states, mcts_policys, rewards in buffer:
                             # GPU を使う場合は、そのメモリへデータを非同期転送する
@@ -512,12 +514,12 @@ class AlphaZero:
                         network.save_weights(params_path + "_{}.npz".format(save_q - 1))
 
                     # エージェントの評価 (合計 100 回)
-                    win_rates = self.eval(weights, simulations)
+                    win_rates = eval(weights, simulations)
                     historys[:, eval_q - 1] = win_rates
-                    print("{:>4} || {:>3} % | {:>3} %".format(step, *win_rates), end = "   ")
+                    print("{:>5} %  || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
 
                     # 累計経過時間の表示
-                    print("({:.5g} min)".format((time() - start_time) / 60.))
+                    print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
 
         finally:
@@ -609,7 +611,7 @@ def eval_alphazero_computer(file_name):
 if __name__ == "__main__":
     # 学習用コード
     arena = AlphaZero()
-    arena.fit(restart = False)
+    arena.fit(restart = True)
 
     # 評価用コード
     # eval_alphazero_computer(file_name = "alphazero_9")
