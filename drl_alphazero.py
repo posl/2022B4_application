@@ -2,6 +2,7 @@ from math import log, sqrt, ceil
 from random import choices, choice
 from collections import deque
 import pickle
+from bz2 import BZ2File
 from time import time
 
 import numpy as np
@@ -10,9 +11,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from inada_framework import Model, Function, cuda, test_mode
+from drl_utilities import ResNet50, SelfMatch, corners_plan, preprocess_to_gpu
 import inada_framework.layers as dzl
-from inada_framework.functions import relu, flatten, dropout, tanh
-from drl_utilities import SelfMatch, corners_plan, preprocess_to_gpu
+from inada_framework.functions import relu, flatten, tanh
 from board import Board
 from inada_framework.optimizers import Adam
 
@@ -24,41 +25,22 @@ class PolicyValueNet(Model):
         super().__init__()
 
         # 全結合層への入力形式を学習する、畳み込み層
-        self.conv1 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
-        self.bn1 = dzl.BatchNorm()
-        self.conv2 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
-        self.bn2 = dzl.BatchNorm()
-        self.conv3 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
-        self.bn3 = dzl.BatchNorm()
-        self.conv4 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
-        self.bn4 = dzl.BatchNorm()
-
-        # 全結合層
-        self.fc5 = dzl.Affine(1024, nobias = True)
-        self.bn5 = dzl.BatchNorm()
-        self.fc6 = dzl.Affine(512, nobias = True)
-        self.bn6 = dzl.BatchNorm()
+        self.cnn = ResNet50()
 
         # policy head
-        self.policy_h = dzl.Affine(action_size)
+        self.conv_p = dzl.Conv2d1x1(2)
+        self.bn_p = dzl.BatchNorm()
+        self.fc_p = dzl.Affine(action_size)
 
         # value head
-        self.value_h = dzl.Affine(1)
+        self.conv_v = dzl.Conv2d1x1(1)
+        self.bn_v = dzl.BatchNorm()
+        self.fc_v = dzl.Affine(1)
 
     def forward(self, x):
-        x = relu(self.bn1(self.conv1(x)))
-        x = relu(self.bn2(self.conv2(x)))
-        x = relu(self.bn3(self.conv3(x)))
-        x = relu(self.bn4(self.conv4(x)))
-
-        x = flatten(x)
-        x = relu(self.bn5(self.fc5(x)))
-        x = dropout(x, dropout_ratio = 0.3)
-        x = relu(self.bn6(self.fc6(x)))
-        x = dropout(x, dropout_ratio = 0.3)
-
-        score = self.policy_h(x)
-        value = self.value_h(x)
+        x = self.cnn(x)
+        score = self.fc_p(flatten(relu(self.bn_p(self.conv_p(x)))))
+        value = self.fc_v(flatten(relu(self.bn_v(self.conv_v(x)))))
         return score, tanh(value)
 
 
@@ -200,8 +182,8 @@ class AlphaZeroAgent:
 
         placable = self.placable_dict[state]
         self.P[state] = policy[0, np.array(placable)]
-        self.W[state] = np.zeros(len(placable))
-        self.N[state] = np.zeros(len(placable))
+        self.W[state] = np.zeros(len(placable), dtype = np.float32)
+        self.N[state] = np.zeros(len(placable), dtype = np.float32)
 
         # ルート盤面の展開時は評価値の代わりに、学習時用にニューラルネットワークへの入力としての画像データを返す
         if root_flag:
@@ -294,14 +276,20 @@ class ReplayBuffer:
         return ceil(len(self.buffer) / self.batch_size)
 
     def save(self, file_path, step):
-        save_data = self.buffer, step
-        with open(file_path, "wb") as f:
-            pickle.dump(save_data, f)
+        fout = BZ2File(file_path, "wb", compresslevel = 9)
+        try:
+            save_data = pickle.dumps((self.buffer, step))
+            fout.write(save_data)
+        finally:
+            fout.close()
 
     def load(self, file_path):
-        with open(file_path, "rb") as f:
-            load_data = pickle.load(f)
-        self.buffer, step = load_data
+        fin = BZ2File(file_path, "rb")
+        try:
+            load_data = fin.read()
+            self.buffer, step = pickle.loads(load_data)
+        finally:
+            fin.close()
         return step
 
 
@@ -423,7 +411,7 @@ class AlphaZero:
         if restart:
             # 学習の途中再開に必要なデータをファイルから読み込む
             network.load_weights(f"{is_yet_path}_weights.npz")
-            restart = buffer.load(f"{is_yet_path}_buffer.pkl")
+            restart = buffer.load(f"{is_yet_path}_buffer.bz2")
             historys = np.load(f"{is_yet_path}_history.npy")
 
         else:
@@ -532,7 +520,7 @@ class AlphaZero:
 
         finally:
             network.save_weights(f"{is_yet_path}_weights.npz")
-            buffer.save(f"{is_yet_path}_buffer.pkl", step)
+            buffer.save(f"{is_yet_path}_buffer.bz2", step)
             np.save(f"{is_yet_path}_history.npy", historys)
 
             # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
