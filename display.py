@@ -9,8 +9,8 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
 from board import Board
-from mc_tree_search import MonteCarloTreeSearch
-from mc_primitive import PrimitiveMonteCarlo
+from mc_tree_search import MonteCarloTreeSearch, NAMonteCarloTreeSearch
+from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
@@ -725,14 +725,24 @@ class PlayerKinds:
         self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("MC木探索")
-        self.kinds_func.append([MonteCarloTreeSearch(1024*1, 1), MonteCarloTreeSearch(1024*4, 2), MonteCarloTreeSearch(1024*16, 4), MonteCarloTreeSearch(1024*64, 10)])
+        self.kinds_func.append([MonteCarloTreeSearch(1024*1), MonteCarloTreeSearch(1024*4), MonteCarloTreeSearch(1024*16), MonteCarloTreeSearch(1024*64)])
         self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
+        # self.kinds_name.append("MC木探索+nega_alpha")
+        # self.kinds_func.append([NAMonteCarloTreeSearch(1024*1, 2), NAMonteCarloTreeSearch(1024*4, 4), NAMonteCarloTreeSearch(1024*16, 8), NAMonteCarloTreeSearch(1024*64, 16)])
+        # self.kinds_difficulty.append(4)
+        # self.kinds_turn_diff.append(False)
+
         self.kinds_name.append("原始MC探索")
-        self.kinds_func.append([PrimitiveMonteCarlo(256*1, 1), PrimitiveMonteCarlo(256*4, 2), PrimitiveMonteCarlo(256*16, 4), PrimitiveMonteCarlo(256*128, 10)])
+        self.kinds_func.append([PrimitiveMonteCarlo(256*1), PrimitiveMonteCarlo(256*4), PrimitiveMonteCarlo(256*16), PrimitiveMonteCarlo(256*32)])
         self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
+
+        # self.kinds_name.append("原始MC探索+nega_alpha")
+        # self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
+        # self.kinds_difficulty.append(4)
+        # self.kinds_turn_diff.append(False)
 
         self.alphabeta_d0t0 = AlphaBeta(0)
         self.alphabeta_d0t1 = AlphaBeta(1)
@@ -751,7 +761,7 @@ class PlayerKinds:
             self.kinds_difficulty.append(1)
             self.kinds_turn_diff.append(True)
 
-        if True:
+        if False:
             self.reinforce_computer_d0t0 = ReinforceComputer(64)
             self.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
             self.reinforce_computer_d0t1 = ReinforceComputer(64)
@@ -870,15 +880,15 @@ class DisplayBoard(Board):
 
     @property
     def black_positions(self):
-        return get_stand_bits(self.action_size, self.stone_black)
+        return get_stand_bits(self.stone_black)
 
     @property
     def white_positions(self):
-        return get_stand_bits(self.action_size, self.stone_white)
+        return get_stand_bits(self.stone_white)
 
     @property
     def reverse_positions(self):
-        return get_stand_bits(self.action_size, self.reversed)
+        return get_stand_bits(self.reversed)
 
 
     # id...種類のID  diff...難易度
@@ -920,7 +930,7 @@ class DisplayBoard(Board):
         # 最初の盤面表示
         self.reset()
         self.print_state()
-        self.render(None)
+        self.render(None, None)
         self.main_window.after(100, self.main_window.quit)
         self.main_window.mainloop()
 

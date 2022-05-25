@@ -26,7 +26,11 @@ class MonteCarloTreeSearch:
     def __init__(self, max_tries = 65536):
         self.max_tries = max_tries
 
-    def __call__(self, board : Board):  
+    def __call__(self, board : Board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
         return self.monte_carlo_tree_search(board)
 
     # ランダムで手を打つplan
@@ -120,7 +124,7 @@ class MonteCarloTreeSearch:
         return move
 
 
-class ABMonteCarloTreeSearch(MonteCarloTreeSearch):
+class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
     def __init__(self, max_tries = 65536, limit_time = 10):
         self.max_tries = max_tries
         self.limit_time = limit_time
@@ -130,13 +134,14 @@ class ABMonteCarloTreeSearch(MonteCarloTreeSearch):
         if len(placable) == 1:
             return placable[0]
 
-        if count_stand_bits(board.stone_black | board.stone_white) > 40:
+        if count_stand_bits(board.stone_black | board.stone_white) > 44:
             move = nega_alpha(*board.players_board, self.limit_time)
-            if move in board.list_placable():
+            if move in placable:
                 print("checkmate")
                 return move
         
         return self.monte_carlo_tree_search(board)
+
 
 if __name__ == "__main__":
     def player(board : Board):

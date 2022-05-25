@@ -74,7 +74,7 @@ class PrimitiveMonteCarlo:
         print("put : ", move)
         return move
 
-class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):
+class NAPrimitiveMonteCarlo(PrimitiveMonteCarlo):
     def __init__(self, max_try = 6400, limit_time = 10):
         self.max_try = max_try
         self.limit_time = limit_time
@@ -84,9 +84,9 @@ class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):
         if len(placable) == 1:
             return placable[0]
 
-        if count_stand_bits(board.stone_black | board.stone_white) > 40:
+        if count_stand_bits(board.stone_black | board.stone_white) > 44:
             move = nega_alpha(*board.players_board, self.limit_time)
-            if move in board.list_placable():
+            if move in placable:
                 print(move, "checkmate")
                 return move
 
