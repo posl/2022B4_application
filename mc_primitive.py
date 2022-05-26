@@ -63,7 +63,7 @@ class PrimitiveMonteCarlo:
                 else:
                     score = self.play_out(board, original_turn)
                     scores.append(score)
-                    print(n, score)
+                    # print(n, score)
 
         # 原状回復
         board.set_plan(*original_plans)
@@ -71,7 +71,7 @@ class PrimitiveMonteCarlo:
         # スコアが同点ならランダムで打つ
         max_index = [i for i, s in enumerate(scores) if s == max(scores)]
         move = placable[choice(max_index)]
-        print("put : ", move)
+        # print("put : ", move)
         return move
 
 class ABPrimitiveMonteCarlo(PrimitiveMonteCarlo):

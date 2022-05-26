@@ -109,14 +109,14 @@ class MonteCarloTreeSearch:
         board.set_plan(*original_plans)
 
 
-        print([i.move for i in self.root.children])
+        # print([i.move for i in self.root.children])
         wins = [child.wins for child in self.root.children]
-        print(wins)
+        # print(wins)
         visits = [child.visits for child in self.root.children]
-        print(visits)
+        # print(visits)
         max_index = [i for i, v in enumerate(visits) if v == max(visits)]
         move = self.root.children[choice(max_index)].move
-        print("put", move)
+        # print("put", move)
         return move
 
 

@@ -15,7 +15,7 @@ from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu, corners_plan
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, tanh
 from board import Board
-from inada_framework.optimizers import Adam
+from inada_framework.optimizers import Adam, WeightDecay
 
 from mc_tree_search import MonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo
@@ -110,7 +110,7 @@ class AlphaZeroAgent:
         self.c_puct = lambda T: (log(1 + (1 + T) / c_base) + c_init) * sqrt(T)
 
     # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def setup(self, arg, simulations = 800):
+    def reset(self, arg, simulations = 800):
         self.load(arg)
         self.simulations = simulations
 
@@ -121,8 +121,6 @@ class AlphaZeroAgent:
 
         self.placable_dict = {}
         self.rng = np.random.default_rng()
-
-        return self
 
     def load(self, weights):
         self.network.set_weights(weights)
@@ -337,7 +335,8 @@ def alphazero_play(weights, simulations):
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size).setup(weights, simulations)
+    agent = AlphaZeroAgent(board.action_size)
+    agent.reset(weights, simulations)
 
     # 実際に１ゲームプレイして、対局データを収集する
     memory = []
@@ -367,7 +366,8 @@ def alphazero_test(weights, simulations, turn, enemy):
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size).setup(weights, simulations)
+    agent = AlphaZeroAgent(board.action_size)
+    agent.reset(weights, simulations)
 
     # 方策の設定・１ゲーム勝負
     plans = (agent, enemy) if turn else (enemy, agent)
@@ -382,27 +382,26 @@ def alphazero_test(weights, simulations, turn, enemy):
 
 
 class AlphaZero:
-    def __init__(self, buffer_size = 200000, batch_size = 128, lr = 0.001, to_gpu = True):
+    def __init__(self, buffer_size = 60000, batch_size = 128, lr = 0.0005, decay = 0.001, to_gpu = True):
         # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
 
         # 経験再生バッファ
         self.buffer = ReplayBuffer(buffer_size, batch_size)
 
-        # オリジナルは Momentum で、WeightDecay による正則化も行なっている
+        # 最適化手法
         self.optimizer = Adam(lr).setup(self.network)
+        self.optimizer.add_hook(WeightDecay(decay))
 
-        # 学習パートだけ GPU による高速化の余地がある
+        # 学習部分は GPU による高速化の余地がある
         self.use_gpu = to_gpu and cuda.gpu_enable
 
 
-    def fit(self, updates = 1000, episodes = 100, epochs = 5, simulations = 50, restart = False):
-        # getattr の呼び出しを最初の１回に集約する
+    def fit(self, updates = 300, episodes = 100, epochs = 5, simulations = 50, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
         use_gpu = self.use_gpu
-        eval = self.eval
 
         # 各ファイルパス
         file_path = SelfMatch.get_path("alphazero")
@@ -415,7 +414,7 @@ class AlphaZero:
             # 学習の途中再開に必要なデータをファイルから読み込む
             network.load_weights(f"{is_yet_path}_weights.npz")
             restart = buffer.load(f"{is_yet_path}_buffer.bz2")
-            historys = np.load(f"{is_yet_path}_history.npy")
+            history = np.load(f"{is_yet_path}_history.npy")
 
         else:
             # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
@@ -423,16 +422,16 @@ class AlphaZero:
                 network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
 
             restart = 1
-            historys = np.zeros((2, 100), dtype = np.int32)
+            history = np.zeros((2, 30), dtype = np.int32)
 
         # 画面表示
         print("\033[92m=== Winning Percentage ===\033[0m")
-        print("progress || first | second")
-        print("===========================")
+        print("step || first | second")
+        print("=======================")
 
         # 変数定義
-        assert not updates % 100
-        eval_interval = updates // 100
+        assert not updates % 30
+        eval_interval = updates // 30
         start_time = time()
 
 
@@ -455,7 +454,7 @@ class AlphaZero:
                             buffer.add(ray.get(finished[0]))
                             pbar.update(1)
 
-                if step < 10:
+                if step < 5:
                     continue
 
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
@@ -504,16 +503,16 @@ class AlphaZero:
 
                 eval_q, eval_r = divmod(step, eval_interval)
                 if not eval_r:
-                    save_q, save_r = divmod(eval_q, 10)
+                    save_q, save_r = divmod(eval_q, 3)
 
                     # パラメータの保存 (合計 10 回)
                     if not save_r:
                         network.save_weights(params_path + "-{}.npz".format(save_q - 1))
 
-                    # エージェントの評価 (合計 100 回)
-                    win_rates = eval(weights, simulations)
-                    historys[:, eval_q - 1] = win_rates
-                    print("{:>5} %  || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
+                    # エージェントの評価 (合計 30 回)
+                    win_rates = self.eval(weights, simulations)
+                    history[:, eval_q - 1] = win_rates
+                    print("{:>4} || {:>3} % | {:>3} %".format(step, *win_rates), end = "   ")
 
                     # 累計経過時間の表示
                     print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
@@ -522,17 +521,17 @@ class AlphaZero:
                 # 途中再開に必要な暫定の情報を上書きする
                 network.save_weights(f"{is_yet_path}_weights.npz")
                 buffer.save(f"{is_yet_path}_buffer.bz2", step)
-                np.save(f"{is_yet_path}_history.npy", historys)
+                np.save(f"{is_yet_path}_history.npy", history)
 
         finally:
             # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
-            x = np.arange(100)
-            plt.plot(x, historys[0], label = "first")
-            plt.plot(x, historys[1], label = "second")
+            x = np.arange(1, 31) * eval_interval
+            plt.plot(x, history[0], label = "first")
+            plt.plot(x, history[1], label = "second")
             plt.legend()
 
             plt.ylim(-5, 105)
-            plt.xlabel("Progress Rate")
+            plt.xlabel("Steps")
             plt.ylabel("Winning Percentage")
             plt.savefig(graphs_path)
             plt.clf()
@@ -570,8 +569,8 @@ def eval_alphazero_computer(file_name):
     del network
 
     # 描画用配列
-    simulations_array = 50 * (2 ** np.arange(5))
-    win_rates = np.empty((2, 5))
+    simulations_array = 25 * (2 ** np.arange(6))
+    win_rates = np.empty((2, 6))
 
 
     # 画面表示
@@ -587,7 +586,7 @@ def eval_alphazero_computer(file_name):
 
     # グラフの目盛り位置を設定するための変数
     width = 1 / 3
-    left = np.arange(5)
+    left = np.arange(6)
     center = left + width
 
     # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する

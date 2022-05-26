@@ -193,9 +193,9 @@ def corners_plan(board):
 
 # 自己対戦で学習・評価を行うためのクラスの基底クラス
 class SelfMatch:
-    def __init__(self, board, first_agent, second_agent):
+    def __init__(self, board, agent):
         self.board = board
-        self.agents = second_agent, first_agent
+        self.agent = agent
 
     @staticmethod
     def get_path(file_name):
@@ -210,76 +210,78 @@ class SelfMatch:
         graphs_path = file_path.format("graphs")
         del file_path
 
-        # エージェントの評価は、学習中にちょうど 100 回だけ行う
-        assert not episodes % 100
-        eval_interval = episodes // 100
-        win_rates = np.zeros(2, dtype = np.int32)
-        self.max_win_rates = np.full((2, 3), -1, dtype = np.int32)
-
         if restart:
-            # 学習を途中再開する場合は、描画用配列と開始インデックスも引き継ぐ
-            historys = np.load(f"{is_yet_path}_history.npy")
-            run_start, start = historys[:, -1].astype(int)
+            # 学習を途中再開する場合は、描画用配列と開始番号も引き継ぐ
+            history = np.load(f"{is_yet_path}_history.npy")
+            run, restart = history[:, -1].astype(int)
 
             # 前回保存した学習途中のデータを読み込むために、エージェントの初期化も行う
-            for turn in {1, 0}:
-                agent = self.agents[turn]
-                agent.reset()
-                agent.load_to_restart(f"{is_yet_path}_{turn}")
-
-            # ここで定義した変数は学習中ずっと残ることになるので、不要なものは削除する
-            del restart, turn, agent
+            self.agent.reset()
+            self.agent.load_to_restart(is_yet_path)
 
         else:
             # 勝率の推移を描画するための配列 (最後の列は学習再開に使う変数を記録するための領域)
-            historys = np.zeros((2, 101), dtype = np.float32)
-            run_start, start = 1, 1
+            history = np.zeros((2, 101), dtype = np.int32)
+            run, restart = 1, 1
 
             # エージェントの初期化
-            self.agents[1].reset()
-            self.agents[0].reset()
+            self.agent.reset()
 
+        # 画面表示
+        print("\033[92m=== Winning Percentage ===\033[0m")
+        print("run || first | second")
+        print("======================")
 
-        # 累計経過時間の表示
-        print("\033[92m=== Total Elapsed Time ===\033[0m")
+        # 変数定義
+        assert not episodes % 100
+        eval_interval = episodes // 100
         start_time = time()
 
-        try:
-            for run in range(run_start, runs + 1):
-                index = ceil(start / eval_interval) - 1
 
-                with tqdm(range(start, episodes + 1), desc = f"run {run}", leave = False) as pbar:
+        try:
+            for run in range(run, runs + 1):
+                index = ceil(restart / eval_interval) - 1
+
+                with tqdm(range(restart, episodes + 1), desc = f"run {run}", leave = False) as pbar:
                     for episode in pbar:
                         self.fit_episode(progress = episode / episodes)
 
                         # 定期的に現在の方策を評価し、現在の勝率をプログレスバーの後ろに出力して、描画用配列に追加する
                         if not episode % eval_interval:
-                            win_rates[...] = self.eval(0), self.eval(1)
-                            pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates[::-1])))
+                            win_rates = self.eval()
+                            pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
 
                             # 学習の中断によって描画用配列の整合性を損なうことがないように、ここの反映はまとめて行う
-                            historys[:, index] += (win_rates - historys[:, index]) / run
+                            history[:, index] += win_rates
                             index += 1
 
-                # パラメータの保存と累計経過時間の表示
-                self.save(params_path, win_rates)
-                print("run {}: {:.5g} min".format(run, (time() - start_time) / 60))
-                start = 1
+                # パラメータの保存・画面表示
+                self.save(params_path, run - 1)
+                print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
+                print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
+
+                restart = 1
 
         finally:
             # 配列に学習を途中再開するために必要な情報も入れる
-            historys[:, -1] = run, episode
+            history[:, -1] = run, episode
 
-            np.save(f"{is_yet_path}_history.npy", historys)
+            np.save(f"{is_yet_path}_history.npy", history)
             self.save(is_yet_path)
 
-            # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
-            x = np.arange(100)
-            y = historys[:, :-1]
-            plt.plot(x, y[1], label = "first")
-            plt.plot(x, y[0], label = "second")
-            plt.legend()
 
+            # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
+            x = np.arange(1, 101)
+            y = np.empty((2, 100))
+            y[...] = history[:, :-1]
+
+            if run > 1:
+                y[:, :index] /= run
+                y[:, index:] /= run - 1
+
+            plt.plot(x, y[0], label = "first")
+            plt.plot(x, y[1], label = "second")
+            plt.legend()
             plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
             plt.ylabel("Mean Winning Percentage")
@@ -293,45 +295,32 @@ class SelfMatch:
 
 
     # エージェントを指定した敵と 100 回戦わせた時の勝利数を取得する
-    def eval(self, turn, enemy_plan = corners_plan):
+    def eval(self, enemy = corners_plan):
         board = self.board
-        agent = self.agents[turn]
-        plans = (agent, enemy_plan) if turn else (enemy_plan, agent)
-        board.set_plan(*plans)
+        agent = self.agent
+        win_rates = []
 
-        win_count = 0
-        for __ in range(100):
-            board.reset()
-            board.game()
+        for turn in (1, 0):
+            plans = (agent, enemy) if turn else (enemy, agent)
+            board.set_plan(*plans)
 
-            result = board.black_num - board.white_num
-            win_count += (result > 0) if turn else (result < 0)
+            win_count = 0
+            for __ in range(100):
+                board.reset()
+                board.game()
 
-        return win_count
+                result = board.black_num - board.white_num
+                win_count += (result > 0) if turn else (result < 0)
+
+            win_rates.append(win_count)
+        return win_rates
 
 
-    # win_rates が渡されるのは、学習済みのパラメータを保存するときのみ
-    def save(self, file_path: str, win_rates = None):
-        agents = self.agents
-        file_path += "_{}"
-
-        if win_rates is None:
-            is_yet = True
-            agents[1].save(file_path.format(1), is_yet)
-            agents[0].save(file_path.format(0), is_yet)
-
+    def save(self, file_path, index = None):
+        if index is None:
+            self.agent.save(file_path, is_yet = True)
         else:
-            max_win_rates = self.max_win_rates
-
-            for turn in {1, 0}:
-                win_rate = win_rates[turn]
-                agent = agents[turn]
-
-                # 同じ条件で学習したエージェントのうち、評価相手への勝率が高いものを最大３人分保存する
-                index = max_win_rates[turn].argmin()
-                if max_win_rates[turn, index] < win_rate:
-                    max_win_rates[turn, index] = win_rate
-                    agent.save(file_path.format(turn) + f"{index}")
-
-                # エージェントの初期化も同時に行う
-                agent.reset()
+            # パラメータの最終保存を行う場合は、その後エージェントの初期化も行う
+            agent = self.agent
+            agent.save(file_path + f"-{index}")
+            agent.reset()
