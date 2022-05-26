@@ -529,7 +529,7 @@ class AlphaZero:
 
 
                 # 途中再開に必要な暫定の情報を上書きする
-                print("  now saving: Don't suspend right now, please.", end = "\r")
+                print("  now saving: \"Don't suspend right now, please.\"", end = "\r")
                 network.save_weights(f"{is_yet_path}_weights.npz")
                 buffer.save(f"{is_yet_path}_buffer.bz2", step)
                 np.save(f"{is_yet_path}_history.npy", history)

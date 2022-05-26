@@ -260,8 +260,7 @@ class ReplayBuffer:
 
         # Multi-step Q Learning を実現するためのバッファ
         self.step_num = step_num
-        self.tmp_buffer1 = deque(maxlen = step_num)
-        self.tmp_buffer0 = deque(maxlen = step_num)
+        self.tmp_buffer = deque(maxlen = step_num), deque(maxlen = step_num)
         self.gamma = gamma
 
         # 優先度付き経験再生のハイパーパラメータは、オリジナルの Rainbow のものを採用する
@@ -275,8 +274,8 @@ class ReplayBuffer:
     # 使用する前に呼ぶ必要がある
     def reset(self):
         self.buffer.clear()
-        self.tmp_buffer1.clear()
-        self.tmp_buffer0.clear()
+        self.tmp_buffer[1].clear()
+        self.tmp_buffer[0].clear()
         self.count = 0
 
         if self.prioritized:
@@ -287,7 +286,7 @@ class ReplayBuffer:
 
     # エージェントの情報である合計ステップ数も一緒に保存する
     def save(self, file_path, total_steps):
-        save_data = [self.buffer, self.count, total_steps]
+        save_data = [self.buffer, self.tmp_buffer, self.count, total_steps]
 
         if self.prioritized:
             self.priorities.save(file_path)
@@ -300,7 +299,6 @@ class ReplayBuffer:
         finally:
             fout.close()
 
-    # 学習の途中からの再開によってあり得ない遷移が学習されないように、tmp_buffer は前回のものを引き継がない
     def load(self, file_path):
         fin = BZ2File(file_path + "_buffer.bz2", "rb")
         try:
@@ -313,7 +311,7 @@ class ReplayBuffer:
             self.priorities.load(file_path)
             self.max_priority = load_data.pop()
 
-        self.buffer, self.count, total_steps = load_data
+        self.buffer, self.tmp_buffer, self.count, total_steps = load_data
         return total_steps
 
 
@@ -321,7 +319,7 @@ class ReplayBuffer:
         return len(self.buffer)
 
     def add(self, data, turn):
-        tmp_buffer = getattr(self, f"tmp_buffer{turn}")
+        tmp_buffer = self.tmp_buffer[turn]
         tmp_buffer.append(data)
         if len(tmp_buffer) < self.step_num:
             return
@@ -341,7 +339,6 @@ class ReplayBuffer:
                 nstep_reward = reward_gamma * reward
                 break
 
-        # next_placable はモデルの出力を合法手のものに絞るために使うので、高速化のために np.ndarray に変換する
         state, action = tmp_buffer[0][:2]
         nstep_data = state, action, nstep_reward, nstep_gamma, next_state, next_placable
 
@@ -360,15 +357,10 @@ class ReplayBuffer:
             self.buffer.append(nstep_data)
 
         if self.prioritized:
-            try:
-                # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
-                self.priorities[count] = self.max_priority
-                self.count = count + 1
+            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
+            self.priorities[count] = self.max_priority
 
-            # 優先度の不整合は IndexError を起こす可能性があるので、学習がこのタイミングで中断された場合の処理が必要
-            except KeyboardInterrupt:
-                self.priorities[count] = 0
-                raise KeyboardInterrupt()
+        self.count = count + 1
 
     def get_batch(self, batch_size, progress):
         priorities = self.priorities
@@ -491,6 +483,7 @@ class RainbowAgent:
 
     def update(self, data, turn, progress):
         total_steps = self.total_steps
+        self.total_steps = total_steps + 1
         replay_buffer = self.replay_buffer
         replay_buffer.add(data, turn)
 
@@ -558,9 +551,6 @@ class RainbowAgent:
         self.qnet.clear_grads()
         loss.backward()
         self.optimizer.update()
-
-        # ステップ数の更新は最後に行う
-        self.total_steps = total_steps + 1
 
 
 

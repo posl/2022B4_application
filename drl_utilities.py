@@ -260,7 +260,7 @@ class SelfMatch:
                         eval_q, eval_r = divmod(episode, eval_interval)
                         if not eval_r:
                             pbar.set_description("now evaluating")
-                            pbar.set_postfix(dict(caution = "Don't suspend right now, please."))
+                            pbar.set_postfix(dict(caution = "\"Don't suspend right now, please.\""))
 
                             # エージェントの評価 (合計 100 回)
                             win_rates = self.eval()
