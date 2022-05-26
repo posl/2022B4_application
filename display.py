@@ -744,12 +744,11 @@ class PlayerKinds:
         self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
-        self.alphabeta_d0t0 = AlphaBeta(0)
-        self.alphabeta_d0t1 = AlphaBeta(1)
+
         self.kinds_name.append("Alpha Beta")
-        self.kinds_func.append([self.alphabeta_d0t0, self.alphabeta_d0t1])
+        self.kinds_func.append([AlphaBeta()])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(True)
+        self.kinds_turn_diff.append(False)
 
         if False:
             self.rainbow_computer_d0 = RainbowComputer(64)
