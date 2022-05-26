@@ -155,7 +155,7 @@ class OptionPage(Page):
 
         name1 = self.board.player_kinds.get_name(player1_id)
         name2 = self.board.player_kinds.get_name(player2_id)
-        self.par.title(name1 + "(黒) vs " + name2 + "(白)")
+        self.par.title(name1 + "Lv." + str(player1_diff+1) + "(黒) vs " + name2  + "Lv." + str(player2_diff+1) + "(白)")
         return
 
     def start_game(self):
