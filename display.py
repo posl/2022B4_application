@@ -752,28 +752,21 @@ class PlayerKinds:
         self.kinds_turn_diff.append(True)
 
         if False:
-            self.rainbow_computer_d0t0 = RainbowComputer(64)
-            self.rainbow_computer_d0t0.reset("rainbow", 1)
-            self.rainbow_computer_d0t1 = RainbowComputer(64)
-            self.rainbow_computer_d0t1.reset("rainbow", 0)
+            self.rainbow_computer_d0 = RainbowComputer(64)
             self.kinds_name.append("Rainbow")
-            self.kinds_func.append([ self.rainbow_computer_d0t0, self.rainbow_computer_d0t1 ])
+            self.kinds_func.append([ self.rainbow_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(True)
+            self.kinds_turn_diff.append(False)
 
         if False:
-            self.reinforce_computer_d0t0 = ReinforceComputer(64)
-            self.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
-            self.reinforce_computer_d0t1 = ReinforceComputer(64)
-            self.reinforce_computer_d0t1.reset("reinforce", 0.9, 0)
+            self.reinforce_computer_d0 = ReinforceComputer(64)
             self.kinds_name.append("Reinforce")
-            self.kinds_func.append([ self.reinforce_computer_d0t0, self.reinforce_computer_d0t1 ])
+            self.kinds_func.append([ self.reinforce_computer_d0 ])
             self.kinds_difficulty.append(1)
             self.kinds_turn_diff.append(True)
 
         if 1:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
-            self.alphazero_computer_d0.reset("alphazero_weights")
             self.kinds_name.append("Alphazero")
             self.kinds_func.append([ self.alphazero_computer_d0 ])
             self.kinds_difficulty.append(1)
@@ -895,10 +888,8 @@ class DisplayBoard(Board):
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
         if False:
-            self.player_kinds.rainbow_computer_d0t0.reset("rainbow", 1)
-            self.player_kinds.rainbow_computer_d0t1.reset("rainbow", 0)
-            self.player_kinds.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
-            self.player_kinds.reinforce_computer_d0t1.reset("reinforce", 0.9, 0)
+            self.player_kinds.rainbow_computer_d0.reset("rainbow", 1)
+            self.player_kinds.reinforce_computer_d0.reset("reinforce", 0.9, 1)
             self.player_kinds.alphazero_computer_d0.reset("alphazero_9")
         player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
         player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
