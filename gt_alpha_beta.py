@@ -56,10 +56,11 @@ class GTValue:
 	def evaluate_black(self, board : Board):
 		#石の数の評価
 		value_black = 0
-		for i in board.black_positions:
-			value_black += self.get_board_value(i)
-		for i in board.white_positions:
-			value_black -= self.get_board_value(i)
+		for i in range(board.action_size):
+			if (board.stone_black >> i) & 1:
+				value_black += self.get_board_value(i)
+			elif (board.stone_white >> i) & 1:
+				value_black -= self.get_board_value(i)
 	
 		#置ける場所の数の評価
 		tmp_turn = board.turn
