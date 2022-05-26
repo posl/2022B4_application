@@ -739,10 +739,10 @@ class PlayerKinds:
         self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
-        # self.kinds_name.append("原始MC探索+nega_alpha")
-        # self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
-        # self.kinds_difficulty.append(4)
-        # self.kinds_turn_diff.append(False)
+        self.kinds_name.append("原始MC探索+nega_alpha")
+        self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
+        self.kinds_difficulty.append(4)
+        self.kinds_turn_diff.append(False)
 
         self.alphabeta_d0t0 = AlphaBeta(0)
         self.alphabeta_d0t1 = AlphaBeta(1)
@@ -771,13 +771,13 @@ class PlayerKinds:
             self.kinds_difficulty.append(1)
             self.kinds_turn_diff.append(True)
 
-        if False:
+        if 1:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
-            self.alphazero_computer_d0.reset("alphazero_9")
+            self.alphazero_computer_d0.reset("alphazero_weights")
             self.kinds_name.append("Alphazero")
             self.kinds_func.append([ self.alphazero_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(True)
+            self.kinds_turn_diff.append(False)
 
         
 
