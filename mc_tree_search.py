@@ -40,7 +40,8 @@ class MonteCarloTreeSearch:
     # 優先度（utcによる）の高い子孫を選ぶ（複数ある場合ランダム）
     def select_child(self, node : Node):
         ucts = [child.uct(self.root.visits) for child in node.children]
-        max_index = [i for i, u in enumerate(ucts) if u == max(ucts)]
+        max_ucts = max(ucts)
+        max_index = [i for i, u in enumerate(ucts) if u == max_ucts]
         return node.children[choice(max_index)]
 
     # 未試行の手をランダムに選ぶ
@@ -161,7 +162,7 @@ if __name__ == "__main__":
     pr.enable()
 
     mcts = MonteCarloTreeSearch()
-    abmcts = ABMonteCarloTreeSearch()
+    abmcts = NAMonteCarloTreeSearch()
     board = Board()
     board.debug_game(abmcts, mcts)
 

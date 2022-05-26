@@ -15,12 +15,12 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        self.cnn = SimpleCNN()
+        # self.cnn = SimpleCNN()
         self.l1 = dzl.Affine(512)
         self.l2 = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = flatten(self.cnn(x))
+        # x = flatten(self.cnn(x))
         x = relu(self.l1(x))
         return self.l2(x)
 
@@ -64,7 +64,7 @@ class ReinforceAgent:
             placable = board.list_placable()
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp)
+        state = board.get_state_ndarray(xp, True)
         policy = self.pi(state[None, :])
         probs = softmax(policy[:, np.array(placable)])
 
@@ -139,14 +139,14 @@ def fit_reinforce_agent(episodes = 100000, restart = False):
 
     # 自己対戦
     self_match = Reinforce(board, agent)
-    self_match.fit(3, episodes, restart, "reinforce")
+    self_match.fit(3, episodes, restart, "reinforce-fcn")
 
 
 
 
 # 実際にコンピュータとして使われるクラス
 class ReinforceComputer:
-    def __init__(self, action_size, file_name = "reinforce", to_gpu = False):
+    def __init__(self, action_size, file_name = "reinforce-fcn", to_gpu = False):
         file_path = Reinforce.get_path(file_name).format("parameters")
         each_pi = []
         use_gpu = to_gpu and cuda.gpu_enable
@@ -169,7 +169,7 @@ class ReinforceComputer:
             return placable[0]
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_state_ndarray(xp)[None, :]
+        state = board.get_state_ndarray(xp, True)[None, :]
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
         with no_grad():
@@ -186,4 +186,4 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(restart = True)
+    fit_reinforce_agent(restart = False)
