@@ -397,7 +397,7 @@ class AlphaZero:
         self.use_gpu = to_gpu and cuda.gpu_enable
 
 
-    def fit(self, updates = 300, episodes = 100, epochs = 5, simulations = 50, restart = False):
+    def fit(self, updates = 500, episodes = 100, epochs = 5, simulations = 300, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -422,16 +422,16 @@ class AlphaZero:
                 network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
 
             restart = 1
-            history = np.zeros((2, 30), dtype = np.int32)
+            history = np.zeros((2, 100), dtype = np.int32)
 
         # 画面表示
         print("\033[92m=== Winning Percentage ===\033[0m")
-        print("step || first | second")
+        print("progress || first | second")
         print("=======================")
 
         # 変数定義
-        assert not updates % 30
-        eval_interval = updates // 30
+        assert not updates % 100
+        eval_interval = updates // 100
         start_time = time()
 
 
@@ -503,16 +503,16 @@ class AlphaZero:
 
                 eval_q, eval_r = divmod(step, eval_interval)
                 if not eval_r:
-                    save_q, save_r = divmod(eval_q, 3)
+                    save_q, save_r = divmod(eval_q, 10)
 
                     # パラメータの保存 (合計 10 回)
                     if not save_r:
                         network.save_weights(params_path + "-{}.npz".format(save_q - 1))
 
-                    # エージェントの評価 (合計 30 回)
+                    # エージェントの評価 (合計 100 回)
                     win_rates = self.eval(weights, simulations)
                     history[:, eval_q - 1] = win_rates
-                    print("{:>4} || {:>3} % | {:>3} %".format(step, *win_rates), end = "   ")
+                    print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
 
                     # 累計経過時間の表示
                     print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
@@ -525,13 +525,13 @@ class AlphaZero:
 
         finally:
             # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
-            x = np.arange(1, 31) * eval_interval
+            x = np.arange(1, 101) * eval_interval
             plt.plot(x, history[0], label = "first")
             plt.plot(x, history[1], label = "second")
             plt.legend()
 
             plt.ylim(-5, 105)
-            plt.xlabel("Steps")
+            plt.xlabel("Progress Rate")
             plt.ylabel("Winning Percentage")
             plt.savefig(graphs_path)
             plt.clf()
@@ -539,11 +539,11 @@ class AlphaZero:
 
     @staticmethod
     def eval(weights, simulations, enemy = corners_plan):
-        with tqdm(desc = "now evaluating", total = 200, leave = False) as pbar:
+        with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
             win_rates = []
 
             for turn in (1, 0):
-                remains = [alphazero_test.remote(weights, simulations, turn, enemy) for __ in range(100)]
+                remains = [alphazero_test.remote(weights, simulations, turn, enemy) for __ in range(20)]
 
                 # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
                 win_count = 0
@@ -552,7 +552,7 @@ class AlphaZero:
                     win_count += ray.get(finished[0])
                     pbar.update(1)
 
-                win_rates.append(win_count)
+                win_rates.append(win_count * 5)
         return win_rates
 
 
@@ -618,7 +618,7 @@ def vs_alphazero_computer(file_name):
     # 対戦する相手の設定
     enemys = []
     enemys.append(("MCTS", MonteCarloTreeSearch()))
-    enemys.append(("Primitive MC", PrimitiveMonteCarlo()))
+    enemys.append(("Primitive MC", PrimitiveMonteCarlo(3200)))
 
     # 画面表示
     print("\033[92m=== Winning Percentage ===\033[0m")
@@ -641,6 +641,7 @@ def vs_alphazero_computer(file_name):
             name, enemy = enemys.pop()
         except IndexError:
             fig.delaxes(ax)
+            continue
 
         win_rates = AlphaZero.eval(weights, 800, enemy)
         print(" {:} || {:>3} % | {:>3} %".format(i, *win_rates))
@@ -668,4 +669,4 @@ if __name__ == "__main__":
     arena.fit(restart = False)
 
     # 評価用コード
-    # eval_alphazero_computer(file_name = "alphazero-0")
+    # vs_alphazero_computer(file_name = "alphazero-9")

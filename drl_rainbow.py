@@ -649,15 +649,15 @@ class Rainbow(SelfMatch):
                 break
 
 
-def fit_rainbow_agent(episodes = 3000000, restart = False):
+def fit_rainbow_agent(episodes = 500000, restart = False):
     # ハイパーパラメータ設定
-    buffer_size = 1000000
+    buffer_size = 250000
     prioritized = True
     compress = False
     step_num = 3
     gamma = 0.90
     batch_size = 32
-    quantiles_num = 200
+    quantiles_num = 50
     lr = 0.00025
     to_gpu = True
 
