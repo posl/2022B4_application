@@ -268,6 +268,8 @@ class SelfMatch:
                                 np.save(f"{is_yet_path}_history.npy", history)
                                 self.save(is_yet_path)
 
+                                pbar.set_description(f"run {run}")
+
                             # エージェントの評価 (合計 100 回)
                             win_rates = self.eval()
                             pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))

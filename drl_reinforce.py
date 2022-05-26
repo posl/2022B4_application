@@ -64,7 +64,7 @@ class ReinforceAgent:
             placable = board.list_placable()
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp, True)
+        state = board.get_img(xp)
         policy = self.pi(state[None, :])
         probs = softmax(policy[:, np.array(placable)])
 
@@ -126,8 +126,8 @@ class Reinforce(SelfMatch):
 
 def fit_reinforce_agent(episodes = 200000, restart = False):
     # ハイパーパラメータ設定
-    gamma = 0.95
-    lr = 0.0001
+    gamma = 0.92
+    lr = 0.000025
     to_gpu = False
 
     # 環境
@@ -168,7 +168,7 @@ class ReinforceComputer:
             return placable[0]
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp, True)[None, :]
+        state = board.get_img(xp)[None, :]
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
         with no_grad():

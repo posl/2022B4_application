@@ -131,21 +131,6 @@ class Board:
         self.set_state(self.log_state.pop())
 
 
-    # オセロ盤の状態情報である２つの整数を 8 bit 区切りで ndarray に格納して、それを出力する
-    def get_state_ndarray(self, xp = np, invert_flag = False):
-        size = ceil(Board.action_size / 8)
-        box = xp.empty(size * 2, dtype = np.float32)
-        left_s, right_s = (self.players_board) if invert_flag else (self.stone_black, self.stone_white)
-
-        for i in range(size):
-            n = i * 8
-            box[i] = (left_s >> n) % 256
-            box[i + size] = (right_s >> n) % 256
-
-        # 正規化してから出力する
-        return box / 255.
-
-
     # オセロ盤の状態を画像データとして取得する (形状は (2, height, width))
     def get_img(self, xp = np):
         img = get_board_img(*self.players_board, self.height, self.width)
