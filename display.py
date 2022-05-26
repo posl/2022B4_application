@@ -894,6 +894,11 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
+        self.player_kinds.rainbow_computer_d0t0.reset("rainbow", 1)
+        self.player_kinds.rainbow_computer_d0t1.reset("rainbow", 0)
+        self.player_kinds.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
+        self.player_kinds.reinforce_computer_d0t1.reset("reinforce", 0.9, 0)
+        self.player_kinds.alphazero_computer_d0.reset("alphazero_9")
         player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
         player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
         self.set_plan(player1_plan, player2_plan)
