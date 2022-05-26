@@ -763,7 +763,7 @@ class PlayerKinds:
             self.kinds_name.append("Reinforce")
             self.kinds_func.append([ self.reinforce_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(True)
+            self.kinds_turn_diff.append(False)
 
         if 1:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
