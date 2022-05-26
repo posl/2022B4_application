@@ -1,26 +1,28 @@
 from math import sqrt
 from functools import cache
 from collections import deque
+from bz2 import BZ2File
 import pickle
 import zlib
 
 import numpy as np
-from tqdm import tqdm
 
-from inada_framework import Layer, Parameter, cuda, Model, no_grad, Function, optimizers
-from drl_utilities import preprocess_to_gpu, SelfMatch
-import inada_framework.functions as dzf
+from inada_framework import Layer, Parameter, Model, no_train, Function, optimizers
+from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
+from inada_framework.functions import affine, relu, broadcast_to, sum_to
+from drl_utilities import SimpleCNN, preprocess_to_gpu, SelfMatch
 from inada_framework.utilities import reshape_for_broadcast
 from board import Board
+
+from speedup import get_qmax_action, update_sumtree, weighted_sampling
 
 
 
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
 class NoisyAffine(Layer):
-    def __init__(self, out_size, transfer = False, activation = None, use_gpu = False):
+    def __init__(self, out_size, activation = None):
         super().__init__()
         self.out_size = out_size
-        self.transfer = transfer
         self.activation = activation
 
         # 重みは学習が開始したときに動的に生成する
@@ -29,37 +31,33 @@ class NoisyAffine(Layer):
         self.b_mu = Parameter(None, name = "b_mu")
         self.b_sigma = Parameter(None, name = "b_sigma")
 
-        self.use_gpu = use_gpu
-        xp = cuda.cp if use_gpu else np
-        self.rng = xp.random.default_rng()
-
     # 通常の Affine レイヤのパラメータが正規分布に従う乱数であるかのような実装
     def forward(self, x):
+        xp = get_array_module(x)
         in_size = x.shape[1]
         out_size = self.out_size
-        if self.W_mu.data is None:
-            self.init_params(in_size, out_size)
 
-        # GPU メモリへの転送が必要な場合は、cuda の DMA を用いて非同期で行う
-        transfer = self.transfer
-        if transfer:
-            x, source, stream = preprocess_to_gpu(x)
-            x.set(source, stream = stream)
+        # 乱数ジェネレータの取得
+        try:
+            rng = getattr(self, "rng")
+        except AttributeError:
+            rng = xp.random.default_rng()
+            self.rng = rng
+
+        # 重みの初期化
+        if self.W_mu.data is None:
+            self.init_params(xp, in_size, out_size)
 
         # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
-        epsilon_in = self.noise_f(self.rng.standard_normal(size = (in_size, 1), dtype = np.float32))
-        epsilon_out = self.noise_f(self.rng.standard_normal(size = (1, out_size), dtype = np.float32))
+        epsilon_in = self.noise_f(rng.standard_normal(size = (in_size, 1), dtype = np.float32), xp)
+        epsilon_out = self.noise_f(rng.standard_normal(size = (1, out_size), dtype = np.float32), xp)
         W_epsilon = epsilon_in.dot(epsilon_out)
         b_epsilon = epsilon_out
 
         # 本当はパラメータが従う正規分布の平均・分散を学習したいが、それだと逆伝播ができないので、再パラメータ化を用いる
         W = self.W_mu + self.W_sigma * W_epsilon
         b = self.b_mu + self.b_sigma * b_epsilon
-
-        # ストリームを使い、非同期でメモリ転送を行なっていた場合は、その処理と同期させる
-        if transfer:
-            stream.synchronize()
-        x = dzf.affine(x, W, b)
+        x = affine(x, W, b)
 
         # 活性化関数を挟む場合は、その関数を経由する
         activation = self.activation
@@ -69,9 +67,7 @@ class NoisyAffine(Layer):
         return x
 
     # 重みの初期化方法はオリジナルの Rainbow のものを採用する
-    def init_params(self, in_size, out_size):
-        xp = cuda.cp if self.use_gpu else np
-
+    def init_params(self, xp, in_size, out_size):
         stdv = 1. / sqrt(in_size)
         self.W_mu.data = xp.random.uniform(-stdv, stdv, size = (in_size, out_size)).astype(np.float32)
         self.b_mu.data = xp.random.uniform(-stdv, stdv, size = (1, out_size)).astype(np.float32)
@@ -81,8 +77,7 @@ class NoisyAffine(Layer):
         self.b_sigma.data = xp.full((1, out_size), initial_sigma, dtype = np.float32)
 
     @staticmethod
-    def noise_f(x):
-        xp = cuda.get_array_module(x)
+    def noise_f(x, xp):
         return xp.sign(x) * xp.sqrt(xp.abs(x))
 
 
@@ -92,24 +87,29 @@ class NoisyAffine(Layer):
 class RainbowNet(Model):
     def __init__(self, action_size, quantiles_num, use_gpu = False):
         super().__init__()
-        self.sizes = action_size, quantiles_num
 
-        first_noisy_args = 512, use_gpu, dzf.relu, use_gpu
-        a_out = action_size * quantiles_num
-        v_out = quantiles_num
+        self.sizes = action_size, quantiles_num
+        self.use_gpu = use_gpu
+
+        # 全結合層への入力形式を学習する、畳み込み層
+        self.cnn = SimpleCNN()
 
         # 行動価値関数をアドバンテージ分布と状態価値分布に分けて学習する (Dueling DQN)
-        self.a1 = NoisyAffine(*first_noisy_args)
-        self.a2 = NoisyAffine(a_out, use_gpu = use_gpu)
+        self.a1 = NoisyAffine(512, relu)
+        self.a2 = NoisyAffine(action_size * quantiles_num)
 
-        self.v1 = NoisyAffine(*first_noisy_args)
-        self.v2 = NoisyAffine(v_out, use_gpu = use_gpu)
+        self.v1 = NoisyAffine(512, relu)
+        self.v2 = NoisyAffine(quantiles_num)
 
     def forward(self, x):
         batch_size = len(x)
         action_size, quantiles_num = self.sizes
 
-        # 学習の円滑化のためにアドバンテージ分布はスケーリングする
+        if self.use_gpu:
+            x = as_cupy(x)
+        x = self.cnn(x)
+
+        # 学習の円滑化のためにアドバンテージ分布は中心化する
         advantages = self.a2(self.a1(x))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
@@ -125,39 +125,15 @@ class RainbowNet(Model):
 
         # 分位点が等間隔であることを想定しているので、確率変数の期待値は分位点の単純平均に一致する
         qs = quantile_values.mean(axis = 2)
+        qs = as_numpy(qs)
 
-        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した state, １次元リストの placable とする
+        # エピソード中の行動選択時での引数の渡し方は、バッチ軸を追加した states, １次元リストの placables とする
         if len(qs) == 1:
-            return placables[ int( qs[0, np.array(placables)].argmax() ) ]
-
-        # エピソード終了後は置ける箇所がないが、その部分の TD ターゲットは報酬しか使わないので、適当に０を設定する
-        actions = [pl[ int( q[pl].argmax() ) ] if pl.size else 0 for q, pl in zip(qs, placables)]
+            return get_qmax_action(qs[0], placables)
 
         # インデックスとして使うので、高速化のために np.ndarray に変換する
+        actions = [get_qmax_action(q, placable) for q, placable in zip(qs, placables)]
         return np.array(actions)
-
-    # アドバンテージ関数のみを取り出すことができる (ベースライン付き REINFORCE の重みとして使える)
-    def get_advantages(self, states, actions):
-        batch_size = len(states)
-        action_size, quantiles_num = self.sizes
-
-        with no_grad():
-            advantages = self.a2(self.a1(states))
-            advantages = advantages.data
-
-        advantages = advantages.reshape((batch_size, action_size, quantiles_num))
-        advantages = advantages.mean(axis = 2)
-        advantages =  advantages[np.arange(batch_size), actions]
-        return advantages if batch_size > 1 else advantages[0]
-
-    # 状態価値関数のみを取り出すことができる
-    def get_values(self, states):
-        with no_grad():
-            values = self.v2(self.v1(states))
-            values = values.data
-
-        values = values.mean(axis = 1)
-        return values if len(states) > 1 else values[0]
 
 
 
@@ -170,7 +146,7 @@ class QuantileHuberLoss(Function):
         self.N = quantiles_num
 
     def forward(self, x):
-        xp = cuda.get_array_module(x)
+        xp = get_array_module(x)
 
         #  TD 誤差の形状は、(batch_size, quantiles_num, quantiles_num)
         td_error = self.t - x
@@ -197,7 +173,7 @@ class QuantileHuberLoss(Function):
         gy /= self.N
         td_error_shape = td_error.shape
         gy = reshape_for_broadcast(gy, td_error_shape, axis = (1, 2), keepdims = False)
-        gy = dzf.broadcast_to(gy, td_error_shape)
+        gy = broadcast_to(gy, td_error_shape)
 
         # Huber 誤差の逆伝播
         gy *= abs(self.quantiles - td_indicator)
@@ -206,28 +182,31 @@ class QuantileHuberLoss(Function):
         mask[abs_indicator] = td_error[abs_indicator]
         gy *= mask
 
-        return -dzf.sum_to(gy, x.shape)
+        return -sum_to(gy, x.shape)
 
 
 # 一度計算したら、引数が変わらない限り、キャッシュにあるデータを即座に返すようになる
 @cache
 def quantiles(quantiles_num, use_gpu = False):
-    xp = cuda.cp if use_gpu else np
     step = 1 / quantiles_num
     start = step / 2.
-    return xp.array([start + i * step for i in range(quantiles_num)], dtype = np.float32)
+    a = np.array([start + i * step for i in range(quantiles_num)], dtype = np.float32)
+
+    if use_gpu:
+        a = as_cupy(a)
+    return a
 
 
 
 
 # ランダムサンプリングを高速化するためのセグメントツリー
 class SumTree:
-    def __init__(self, capacity: int):
+    def __init__(self, capacity):
         self.capacity = self.__get_capacity(capacity)
 
     # 引数以上の数で最小の２のべき乗を取得する (容量は必ず２のべき乗であるものとする)
     @staticmethod
-    def __get_capacity(capacity):
+    def __get_capacity(capacity: int):
         if capacity > 0:
             # 指定された値が２のべき乗でない場合は目的の出力を作成する
             if capacity & (capacity - 1):
@@ -252,42 +231,11 @@ class SumTree:
 
     # セグメントツリーの更新は１つずつのみとする (技巧的な方法と比べてもこれが一番速かった)
     def __setitem__(self, index, value):
-        tree = self.tree
-        index += self.capacity
-        tree[index] = value
-
-        # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
-        while index > 1:
-            index >>= 1
-            left_child = index * 2
-            tree[index] = tree[left_child] + tree[left_child + 1]
-
+        update_sumtree(self.tree, index, value)
 
     # 優先度付きランダムサンプリングを行う (重複なしではない)
     def sample(self, batch_size):
-        zs = self.rng.uniform(0, self.sum, batch_size)
-        indices = [self.__sample(zs[i]) for i in range(batch_size)]
-        return np.array(indices)
-
-    def __sample(self, z):
-        capacity = self.capacity
-        tree = self.tree
-        current_index = 1
-
-        # 実際の優先度データが格納されているインデックスに行き着くまでループを続ける
-        while current_index < capacity:
-            left_child = current_index << 1
-
-            # 乱数 z が左子ノードより大きい場合は、z を左部分木にある全要素の和の分減じてから、右子ノードに進む
-            left_value = tree[left_child]
-            if z > left_value:
-                current_index = left_child + 1
-                z -= left_value
-            else:
-                current_index = left_child
-
-        # 見かけ上のインデックスに変換してから返す
-        return current_index - capacity
+        return weighted_sampling(self.tree, self.rng.uniform(0, self.sum, batch_size))
 
     # 全優先度データを確率形式で返す
     @property
@@ -303,7 +251,7 @@ class SumTree:
 
 # 学習に使う経験データ間の相関を弱め、また経験データを繰り返し使うためのバッファ (経験再生)
 class ReplayBuffer:
-    def __init__(self, buffer_size, prioritized = True, compress = False, step_num = 3, gamma = 0.99):
+    def __init__(self, buffer_size, prioritized = True, compress = False, step_num = 3, gamma = 0.9):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -312,7 +260,8 @@ class ReplayBuffer:
 
         # Multi-step Q Learning を実現するためのバッファ
         self.step_num = step_num
-        self.tmp_buffer = deque(maxlen = step_num)
+        self.tmp_buffer1 = deque(maxlen = step_num)
+        self.tmp_buffer0 = deque(maxlen = step_num)
         self.gamma = gamma
 
         # 優先度付き経験再生のハイパーパラメータは、オリジナルの Rainbow のものを採用する
@@ -326,7 +275,8 @@ class ReplayBuffer:
     # 使用する前に呼ぶ必要がある
     def reset(self):
         self.buffer.clear()
-        self.tmp_buffer.clear()
+        self.tmp_buffer1.clear()
+        self.tmp_buffer0.clear()
         self.count = 0
 
         if self.prioritized:
@@ -343,13 +293,21 @@ class ReplayBuffer:
             self.priorities.save(file_path)
             save_data.append(self.max_priority)
 
-        with open(file_path + "_buffer.pkl", "wb") as f:
-            pickle.dump(save_data, f)
+        fout = BZ2File(file_path + "_buffer.bz2", "wb", compresslevel = 9)
+        try:
+            save_data = pickle.dumps(save_data)
+            fout.write(save_data)
+        finally:
+            fout.close()
 
     # 学習の途中からの再開によってあり得ない遷移が学習されないように、tmp_buffer は前回のものを引き継がない
     def load(self, file_path):
-        with open(file_path + "_buffer.pkl", "rb") as f:
-            load_data = pickle.load(f)
+        fin = BZ2File(file_path + "_buffer.bz2", "rb")
+        try:
+            load_data = fin.read()
+            load_data = pickle.loads(load_data)
+        finally:
+            fin.close()
 
         if self.prioritized:
             self.priorities.load(file_path)
@@ -362,8 +320,8 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-    def add(self, data):
-        tmp_buffer = self.tmp_buffer
+    def add(self, data, turn):
+        tmp_buffer = getattr(self, f"tmp_buffer{turn}")
         tmp_buffer.append(data)
         if len(tmp_buffer) < self.step_num:
             return
@@ -385,7 +343,7 @@ class ReplayBuffer:
 
         # next_placable はモデルの出力を合法手のものに絞るために使うので、高速化のために np.ndarray に変換する
         state, action = tmp_buffer[0][:2]
-        nstep_data = state, action, nstep_reward, nstep_gamma, next_state, np.array(next_placable)
+        nstep_data = state, action, nstep_reward, nstep_gamma, next_state, next_placable
 
         # 経験データ数がバッファサイズを超えたら、古いものから上書きしていく
         count = self.count
@@ -421,7 +379,7 @@ class ReplayBuffer:
             indices = priorities.sample(batch_size)
 
             # 重みは等確率でサンプリングした時との確率の比の β 乗で、最大値が１になるように変換したものを使用する
-            weights = (priorities.probs[indices] * len(buffer)) ** (-1 * self.beta(progress))
+            weights = (priorities.probs[np.array(indices)] * len(buffer)) ** (-1 * self.beta(progress))
             weights /= weights.max()
         else:
             # ジェネレータによる重複なしランダムサンプリング
@@ -473,7 +431,7 @@ class RainbowAgent:
         self.action_size = action_size
         self.quantiles_num = quantiles_num
         self.lr = lr / 4. if replay_buffer.prioritized else lr
-        self.use_gpu = to_gpu and cuda.gpu_enable
+        self.use_gpu = to_gpu and gpu_enable
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
@@ -521,17 +479,16 @@ class RainbowAgent:
         if placable is None:
             placable = board.list_placable()
 
-        with no_grad():
-            state = board.get_state_ndarray()
+        with no_train():
+            state = board.get_img()
             action = self.qnet.get_actions(state[None, :], placable)
             return action, state
 
 
-    def update(self, data, progress):
+    def update(self, data, turn, progress):
         total_steps = self.total_steps
-        self.total_steps = total_steps + 1
         replay_buffer = self.replay_buffer
-        replay_buffer.add(data)
+        replay_buffer.add(data, turn)
 
         # 各種インターバルや開始タイミングは、おおよそオリジナルのものに従う
         if total_steps % 4 or total_steps < 65536:
@@ -557,7 +514,7 @@ class RainbowAgent:
             weights.set(source, stream = weights_stream)
 
         # 誤差を含む出力に max 演算子を使うことで過大評価を起こさないように、行動はオンライン分布から取る (Double DQN)
-        with no_grad():
+        with no_train():
             sequence = np.arange(batch_size)
             next_actions = self.qnet.get_actions(next_states, next_placables)
 
@@ -598,27 +555,27 @@ class RainbowAgent:
         loss.backward()
         self.optimizer.update()
 
+        # ステップ数の更新は最後に行う
+        self.total_steps = total_steps + 1
 
 
 
-# Rainbow エージェント同士で対戦を行うためのクラス (自己対戦)
+
 class Rainbow(SelfMatch):
     def fit_episode(self, progress):
         board = self.board
-        agents = self.agents
+        agent = self.agent
         transition_infos = deque(), deque()
 
         board.reset()
         placable = board.list_placable()
 
         while placable:
-            turn = board.turn
-            agent = agents[turn]
-
             action, state = agent.get_action(board, placable)
             board.put_stone(action)
 
             # 遷移情報を一時バッファに格納する
+            turn = board.turn
             buffer = transition_infos[turn]
             buffer.append((placable, state, action))
 
@@ -628,25 +585,21 @@ class Rainbow(SelfMatch):
                 next_placable, next_state, __ = buffer[0]
 
                 # 報酬はゲーム終了まで出ない
-                agent.update((state, action, 0, next_state, next_placable), progress)
+                agent.update((state, action, 0, next_state, next_placable), turn, progress)
 
             placable = board.can_continue_placable()
 
         reward = board.reward
-        next_state = board.get_state_ndarray()
+        next_state = board.get_img()
 
-        # 遷移情報のバッファが先攻・後攻とも空になったらエピソード終了
-        while True:
-            __, state, action = buffer.popleft()
-            agent.update((state, action, reward, next_state, placable), progress)
+        # 遷移情報のバッファを先攻・後攻とも空にしたらエピソード終了
+        __, state, action = buffer.popleft()
+        agent.update((state, action, reward, next_state, placable), turn, progress)
 
-            if turn == board.turn:
-                turn ^= 1
-                buffer = transition_infos[turn]
-                agent = agents[turn]
-                reward = -reward
-            else:
-                break
+        turn ^= 1
+        buffer = transition_infos[turn]
+        __, state, action = buffer.popleft()
+        agent.update((state, action, -reward, next_state, placable), turn, progress)
 
 
 def fit_rainbow_agent(episodes = 500000, restart = False):
@@ -655,7 +608,7 @@ def fit_rainbow_agent(episodes = 500000, restart = False):
     prioritized = True
     compress = False
     step_num = 3
-    gamma = 0.90
+    gamma = 0.95
     batch_size = 32
     quantiles_num = 50
     lr = 0.00025
@@ -665,70 +618,33 @@ def fit_rainbow_agent(episodes = 500000, restart = False):
     board = Board()
 
     # 経験再生バッファ
-    replay_buffer_args = buffer_size, prioritized, compress, step_num, gamma
-    replay_buffer0 = ReplayBuffer(*replay_buffer_args)
-    replay_buffer1 = ReplayBuffer(*replay_buffer_args)
+    replay_buffer = ReplayBuffer(buffer_size, prioritized, compress, step_num, gamma)
 
     # エージェント
-    agent_args = batch_size, board.action_size, quantiles_num, lr, to_gpu
-    first_agent = RainbowAgent(replay_buffer0, *agent_args)
-    second_agent = RainbowAgent(replay_buffer1, *agent_args)
+    agent = RainbowAgent(replay_buffer, batch_size, board.action_size, quantiles_num, lr, to_gpu)
 
     # 自己対戦
-    self_match = Rainbow(board, first_agent, second_agent)
-    self_match.fit(1, episodes, restart, file_name = "rainbow")
+    self_match = Rainbow(board, agent)
+    self_match.fit(3, episodes, restart, file_name = "rainbow")
 
 
 
 
 # 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
 class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size, to_gpu = False):
-        self.action_size = action_size
-        self.use_gpu = to_gpu and cuda.gpu_enable
-
-    # どれだけの分位点数で行動価値分布を近似するニューラルネットワークであるかによって、難易度を変えることができる
-    def reset(self, file_name, turn, quantiles_num = 200):
-        qnet = RainbowNet(self.action_size, quantiles_num)
+    def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow-0", to_gpu = False):
+        use_gpu = to_gpu and gpu_enable
+        qnet = RainbowNet(action_size, quantiles_num, use_gpu)
         self.qnet = qnet
 
         file_path = Rainbow.get_path(file_name).format("parameters")
-        file_path += f"_{turn}0.npz"
-        qnet.load_weights(file_path)
-        if self.use_gpu:
+        qnet.load_weights(file_path + ".npz")
+        if use_gpu:
             qnet.to_gpu()
-
-
-def eval_rainbow_computer():
-    # 環境
-    board = Board()
-
-    # コンピュータ
-    computer = RainbowComputer(board.action_size, to_gpu = True)
-
-    # 対戦場
-    self_match = SelfMatch(board, computer, computer)
-
-    # コンピュータの評価を合計 20 回行い、その平均をグラフに描画する勝率とする
-    print("\nnow evaluating")
-    for turn in (1, 0):
-        computer.reset("rainbow", turn)
-        target = f"turn {turn}"
-
-        win_rate = 0
-        for __ in tqdm(range(20), desc = target, leave = False):
-            win_rate += self_match.eval(turn)
-
-        win_rate /= 20
-        print(f"{target}: {win_rate:.5g} %")
-    print("done!")
 
 
 
 
 if __name__ == "__main__":
-    # 学習用コード (CPU : 3.80 s / iter,  GPU : 0.54 s / iter)
+    # 学習用コード
     fit_rainbow_agent(restart = False)
-
-    # 評価用コード
-    eval_rainbow_computer()

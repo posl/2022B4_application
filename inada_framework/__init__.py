@@ -1,4 +1,4 @@
-from inada_framework.core import Config, using_config, no_grad, test_mode
+from inada_framework.core import Config, using_config, no_grad, no_train
 from inada_framework.core import Variable, Parameter, Function
 from inada_framework.core import as_array, as_variable, setup
 from inada_framework.layers import Layer, Model

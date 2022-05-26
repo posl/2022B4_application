@@ -1,7 +1,7 @@
-# distutils: language=c++
+# distutils: language = c++
 # distutils: extra_compile_args = ["-O3"]
-# cython: language_level=3, boundscheck=False, wraparound=False
-# cython: cdivision=True
+# cython: language_level = 3, boundscheck = False, wraparound = False
+# cython: cdivision = True
 
 from libcpp.vector cimport vector
 from libc.time cimport time, time_t
@@ -14,9 +14,14 @@ from cython import boundscheck, wraparound
 
 ctypedef unsigned long long uint
 
-ctypedef cnp.float32_t DTYPE_t
+ctypedef cnp.float32_t F32
+ctypedef cnp.float64_t F64
 
 
+
+# =============================================================================
+# オセロボードの機能の高速化
+# =============================================================================
 
 # 合法手の箇所だけ１が立った、ボードを表す 64 bit 符号無し整数を返す (ブラックボックス化するため、反復処理は展開している)
 # 引数は手番または、相手プレイヤーの石が置かれた箇所だけ１が立った、ボードを表す 64 bit 符号無し整数
@@ -138,7 +143,7 @@ cdef inline uint search_lower(uint tmp, int n, uint mask):
 
 
 # １が立っているビット位置のリストを取得する
-cdef vector[int] __get_stand_bits(uint x):
+cdef inline vector[int] __get_stand_bits(uint x):
     cdef:
         int n = 0
         vector[int] l
@@ -189,7 +194,10 @@ def count_stand_bits(uint n):
 
 
 
-# nega_max + 枝刈り
+# =============================================================================
+# nega_alpha (nega_max + 枝刈り)
+# =============================================================================
+
 # flag -1:初回呼び出し、0:正常、１:パスした
 cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag, time_t limit_time):
     cdef:
@@ -235,18 +243,88 @@ def nega_alpha(uint move_player, uint opposition_player, time_t limit_time):
 
 
 
-cpdef inline cnp.ndarray[DTYPE_t, ndim = 3] get_board_img(uint move, uint opposition, int h, int w):
+# =============================================================================
+# 深層強化学習で使用する関数・メソッドの高速化
+# =============================================================================
+
+cpdef inline cnp.ndarray[F32, ndim = 3] get_board_img(uint move, uint opposition, int height, int width):
     cdef:
-        cnp.ndarray[DTYPE_t, ndim = 3] A
+        cnp.ndarray[F32, ndim = 3] A
         int i, j, n
 
     with boundscheck(False), wraparound(False):
-        A = np.empty((2, h, w), dtype = np.float32)
+        A = np.empty((2, height, width), dtype = np.float32)
 
-        for i in range(h):
-            for j in range(w):
-                n = w * i + j
+        for i in range(height):
+            for j in range(width):
+                n = width * i + j
                 A[0, i, j] = (move >> n) & 1
                 A[1, i, j] = (opposition >> n) & 1
 
     return A
+
+
+
+
+cpdef inline int get_qmax_action(cnp.ndarray[F32, ndim = 1] qs, vector[int] placable):
+    cdef:
+        float q, qmax
+        int action, qmax_action
+
+    qmax = -float("inf")
+    qmax_action = 0
+
+    with boundscheck(False), wraparound(False):
+        for action in placable:
+            q = qs[action]
+            if qmax < q:
+                qmax = q
+                qmax_action = action
+
+    return qmax_action
+
+
+
+
+cpdef inline void update_sumtree(cnp.ndarray[F64, ndim = 1] tree, int index, float value):
+    cdef int left_child
+
+    with boundscheck(False), wraparound(False):
+        index += len(tree) >> 1
+        tree[index] = value
+
+        # 親ノードに２つの子ノードの和が格納されている状態を保つように更新する (インデックス１が最上位の親ノード)
+        while index > 1:
+            index >>= 1
+            left_child = index << 1
+            tree[index] = tree[left_child] + tree[left_child + 1]
+
+
+
+
+cpdef inline vector[int] weighted_sampling(cnp.ndarray[F64, ndim = 1] tree, cnp.ndarray[F64, ndim = 1] zs):
+    cdef:
+        int capacity, i, index, left_child
+        float z, left_value
+        vector[int] l
+
+    capacity = len(tree) >> 1
+
+    with boundscheck(False), wraparound(False):
+        for i in range(len(zs)):
+            index = 1
+            z = zs[i]
+
+            while index < capacity:
+                left_child = index << 1
+
+                left_value = tree[left_child]
+                if z > left_value:
+                    index = left_child + 1
+                    z -= left_value
+                else:
+                    index = left_child
+
+            l.push_back(index)
+
+    return l

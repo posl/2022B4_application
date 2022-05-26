@@ -34,9 +34,9 @@ def no_grad():
     return using_config("enable_backprop", False)
 
 
-# テストモードの時は計算グラフを作る必要もないので、新たな関数として test_mode を定義する
+# テストモードの時は計算グラフを作る必要もないので、新たな関数として no_train を定義する
 @contextmanager
-def test_mode():
+def no_train():
     setattr(Config, "enable_backprop", False)
     setattr(Config, "train_flag", False)
     try:

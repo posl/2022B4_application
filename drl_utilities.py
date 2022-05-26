@@ -1,7 +1,6 @@
 import random
 from os.path import join, dirname
 from time import time
-from math import ceil
 
 import numpy as np
 from tqdm import tqdm
@@ -9,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from inada_framework import Layer, cuda
 import inada_framework.layers as dzl
-from inada_framework.functions import relu
+from inada_framework.functions import relu, flatten
 
 
 
@@ -18,20 +17,32 @@ from inada_framework.functions import relu
 # =============================================================================
 
 class SimpleCNN(Layer):
-    def __init__(self):
+    def __init__(self, use_batch_norm = True):
         super().__init__()
 
-        self.conv1 = dzl.Conv2d(32, 3, 1, 1)
-        self.conv2 = dzl.Conv2d(32, 3, 1, 1)
-        self.conv3 = dzl.Conv2d(64, 3, 1, 0)
-        self.conv4 = dzl.Conv2d(64, 3, 1, 0)
+        conv_layer = BatchNormConv2d if use_batch_norm else dzl.Conv2d
+        self.conv1 = conv_layer(32, 3, 1, 1)
+        self.conv2 = conv_layer(32, 3, 1, 1)
+        self.conv3 = conv_layer(64, 3, 1, 0)
+        self.conv4 = conv_layer(64, 3, 1, 0)
 
     def forward(self, x):
         x = relu(self.conv1(x))
         x = relu(self.conv2(x))
         x = relu(self.conv3(x))
         x = relu(self.conv4(x))
-        return x
+        return flatten(x)
+
+
+class BatchNormConv2d(Layer):
+    def __init__(self, out_channels, filter_size, stride, padding):
+        super().__init__()
+
+        self.conv = dzl.Conv2d(out_channels, filter_size, stride, padding)
+        self.bn = dzl.BatchNorm()
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
 
 
 
@@ -240,42 +251,46 @@ class SelfMatch:
 
         try:
             for run in range(run, runs + 1):
-                index = ceil(restart / eval_interval) - 1
-
                 with tqdm(range(restart, episodes + 1), desc = f"run {run}", leave = False) as pbar:
                     for episode in pbar:
                         self.fit_episode(progress = episode / episodes)
 
-                        # 定期的に現在の方策を評価し、現在の勝率をプログレスバーの後ろに出力して、描画用配列に追加する
-                        if not episode % eval_interval:
+                        eval_q, eval_r = divmod(episode, eval_interval)
+                        if not eval_r:
+                            save_q, save_r = divmod(eval_q, 10)
+
+                            # 学習再開に必要な情報の暫定保存 (合計 10 回)
+                            if not save_r:
+                                pbar.set_description(f"now saving checkpoint {save_q}")
+                                pbar.set_postfix("Don't suspend right now, please.")
+
+                                history[:, -1] = run, episode
+                                np.save(f"{is_yet_path}_history.npy", history)
+                                self.save(is_yet_path)
+
+                            # エージェントの評価 (合計 100 回)
                             win_rates = self.eval()
                             pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
+                            history[:, eval_q - 1] += win_rates
 
-                            # 学習の中断によって描画用配列の整合性を損なうことがないように、ここの反映はまとめて行う
-                            history[:, index] += win_rates
-                            index += 1
-
-                # パラメータの保存・画面表示
+                # パラメータの保存
                 self.save(params_path, run - 1)
+
+                # 画面表示
                 print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
                 print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
                 restart = 1
 
+
         finally:
-            # 配列に学習を途中再開するために必要な情報も入れる
-            history[:, -1] = run, episode
-
-            np.save(f"{is_yet_path}_history.npy", history)
-            self.save(is_yet_path)
-
-
             # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
             x = np.arange(1, 101)
             y = np.empty((2, 100))
             y[...] = history[:, :-1]
 
             if run > 1:
+                index = eval_q - 1
                 y[:, :index] /= run
                 y[:, index:] /= run - 1
 

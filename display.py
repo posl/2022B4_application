@@ -8,13 +8,14 @@ import random
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-from board import Board
 from mc_tree_search import MonteCarloTreeSearch, NAMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
+
+from board import Board
 from speedup import get_stand_bits
 
 

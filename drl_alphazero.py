@@ -1,8 +1,8 @@
 from math import log, sqrt, ceil
 from random import choices, choice
 from collections import deque
-import pickle
 from bz2 import BZ2File
+import pickle
 from time import time
 
 import numpy as np
@@ -10,10 +10,11 @@ import ray
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from inada_framework import Model, Function, cuda, test_mode
+from inada_framework import Model, Function, no_train
 from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu, corners_plan
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, tanh
+from inada_framework.cuda import get_array_module, gpu_enable, as_cupy
 from board import Board
 from inada_framework.optimizers import Adam, WeightDecay
 
@@ -66,7 +67,7 @@ class AlphaZeroLoss(Function):
         self.rewards = rewards
 
     def forward(self, score, value):
-        xp = cuda.get_array_module(score)
+        xp = get_array_module(score)
         policy = softmax(score, xp)
 
         # ソフトマックス関数の出力を使うと逆伝播が簡単になるので、インスタンス変数として保存しておく
@@ -127,7 +128,7 @@ class AlphaZeroAgent:
 
 
     def __call__(self, board):
-        with test_mode():
+        with no_train():
             return self.get_action(board)
 
     def get_action(self, board, count = None):
@@ -394,7 +395,7 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(decay))
 
         # 学習部分は GPU による高速化の余地がある
-        self.use_gpu = to_gpu and cuda.gpu_enable
+        self.use_gpu = to_gpu and gpu_enable
 
 
     def fit(self, updates = 500, episodes = 100, epochs = 5, simulations = 300, restart = False):
@@ -416,9 +417,12 @@ class AlphaZero:
             restart = buffer.load(f"{is_yet_path}_buffer.bz2")
             history = np.load(f"{is_yet_path}_history.npy")
 
+            if restart > 300:
+                optimizer.lr /= 10.
+
         else:
             # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
-            with test_mode():
+            with no_train():
                 network(np.zeros((1, 2, Board.height, Board.width), dtype = np.float32))
 
             restart = 1
@@ -444,7 +448,7 @@ class AlphaZero:
 
             for step in range(restart, updates + 1):
                 with tqdm(desc = f"step {step}", total = episodes, leave = False) as pbar:
-                    with test_mode():
+                    with no_train():
                         # まだ完遂していないタスクがリストの中に残るようになる
                         remains = [alphazero_play.remote(weights, simulations) for __ in range(episodes)]
 
@@ -476,7 +480,7 @@ class AlphaZero:
                                 rewards.set(source, stream = stream_r)
 
                                 # すぐに使うデータに非同期転送は使わない
-                                states = cuda.as_cupy(states)
+                                states = as_cupy(states)
 
                             score, value = network(states)
 
@@ -497,6 +501,9 @@ class AlphaZero:
                     if use_gpu:
                         # GPU を使った場合は、モデルの重みを CPU 対応に戻す
                         network.to_cpu()
+
+                if step == 300:
+                    optimizer.lr /= 10.
 
                 # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
                 weights = ray.put(network.get_weights())

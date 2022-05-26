@@ -5,7 +5,7 @@ import numpy as np
 from inada_framework import Model, cuda, optimizers, no_grad
 from drl_utilities import SimpleCNN, SelfMatch
 import inada_framework.layers as dzl
-from inada_framework.functions import flatten, relu, softmax, log
+from inada_framework.functions import relu, softmax, log
 from board import Board
 
 
@@ -15,12 +15,12 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        self.cnn = SimpleCNN()
+        self.cnn = SimpleCNN(use_batch_norm = False)
         self.l1 = dzl.Affine(512)
         self.l2 = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = flatten(self.cnn(x))
+        x = self.cnn(x)
         x = relu(self.l1(x))
         return self.l2(x)
 
@@ -29,7 +29,7 @@ class PolicyNet(Model):
 
 # モンテカルロ法でパラメータを修正する方策ベースのエージェント
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.9, lr = 0.0005, to_gpu = False):
+    def __init__(self, action_size, gamma = 0.88, lr = 0.000025, to_gpu = False):
         self.memory1 = []
         self.memory0 = []
 
@@ -124,10 +124,10 @@ class Reinforce(SelfMatch):
         agent.update(board.reward, board.turn)
 
 
-def fit_reinforce_agent(episodes = 100000, restart = False):
+def fit_reinforce_agent(episodes = 200000, restart = False):
     # ハイパーパラメータ設定
-    gamma = 0.88
-    lr = 0.000025
+    gamma = 0.95
+    lr = 0.0001
     to_gpu = False
 
     # 環境
