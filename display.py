@@ -15,7 +15,7 @@ from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
-from board_speedup import get_stand_bits
+from speedup import get_stand_bits
 
 
 class Page(tk.Frame):

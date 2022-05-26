@@ -1,7 +1,7 @@
 from random import choice
 
 from board import Board
-from board_speedup import nega_alpha, count_stand_bits
+from speedup import nega_alpha, count_stand_bits
 
 
 class PrimitiveMonteCarlo:
@@ -78,7 +78,7 @@ class NAPrimitiveMonteCarlo(PrimitiveMonteCarlo):
     def __init__(self, max_try = 6400, limit_time = 10):
         self.max_try = max_try
         self.limit_time = limit_time
-    
+
     def __call__(self, board : Board):
         placable = board.list_placable()
         if len(placable) == 1:
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
 
     pMC = PrimitiveMonteCarlo()
-    abpmc = ABPrimitiveMonteCarlo()
+    abpmc = NAPrimitiveMonteCarlo()
     board = Board()
     board.debug_game(abpmc, pMC)
 

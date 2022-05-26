@@ -4,7 +4,7 @@ from math import ceil
 
 import numpy as np
 
-from board_speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
+from speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
 
 
 

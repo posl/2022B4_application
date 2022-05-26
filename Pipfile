@@ -5,13 +5,16 @@ name = "pypi"
 
 [packages]
 numpy = "*"
-pygame = "*"
 matplotlib = "*"
-ray = "*"
 tqdm = "*"
+ray = "*"
 cython = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.9"
+python_version = "3.10"
+
+[scripts]
+main = "python -m cProfile -o profiling.prof"
+cython = "python setup.py build_ext --inplace"

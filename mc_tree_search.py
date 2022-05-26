@@ -2,7 +2,7 @@ from math import sqrt, log
 from random import choice
 
 from board import Board
-from board_speedup import nega_alpha, count_stand_bits
+from speedup import nega_alpha, count_stand_bits
 
 
 
@@ -16,7 +16,7 @@ class Node:
         self.wins = 0   # 記録されているターンプレイヤーの勝ち数でないことに注意
         self.visits = 0
         self.untried_move = board.list_placable()
-        
+
 
     def uct(self, total_visits):
         return self.wins / self.visits + sqrt(log(total_visits) / self.visits)
@@ -84,7 +84,7 @@ class MonteCarloTreeSearch:
         board.set_plan(self.random_action, self.random_action)
 
         # 木を生成
-        self.root = Node(board, None, None)  
+        self.root = Node(board, None, None)
 
         # 試行回数分繰り返す
         for _ in range(self.max_tries):
@@ -96,7 +96,7 @@ class MonteCarloTreeSearch:
 
             # 盤面をセット
             board.set_state(node.state)
-            
+
             # シミュレーションする手を決定し、木を拡張
             if node.untried_move:
                 node, continuable_flag = self.expand_child(board, node)
@@ -105,10 +105,10 @@ class MonteCarloTreeSearch:
             if continuable_flag:
                 continuable_flag = 0
                 board.game()
-            
+
             # プレイアウトの結果を伝播
             self.back_propagate(board, node)
-        
+
         # 原状回復
         board.set_state(original_state)
         board.set_plan(*original_plans)
@@ -129,7 +129,7 @@ class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
     def __init__(self, max_tries = 65536, limit_time = 10):
         self.max_tries = max_tries
         self.limit_time = limit_time
-    
+
     def __call__(self, board : Board):
         placable = board.list_placable()
         if len(placable) == 1:
@@ -140,7 +140,7 @@ class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
             if move in placable:
                 print("checkmate")
                 return move
-        
+
         return self.monte_carlo_tree_search(board)
 
 
