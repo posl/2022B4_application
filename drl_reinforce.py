@@ -128,7 +128,7 @@ def fit_reinforce_agent(episodes = 200000, restart = False):
     # ハイパーパラメータ設定
     gamma = 0.92
     lr = 0.000025
-    to_gpu = False
+    to_gpu = True
 
     # 環境
     board = Board()
@@ -151,7 +151,7 @@ class ReinforceComputer:
         use_gpu = to_gpu and cuda.gpu_enable
 
         # 同じ条件で学習した３人のエージェントの中から、２人だけ、ランダムに選ぶ
-        for i in random.sample(range(2), 2):
+        for i in random.sample(range(3), 2):
             pi = PolicyNet(action_size)
             each_pi.append(pi)
 

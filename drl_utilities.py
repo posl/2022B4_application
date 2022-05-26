@@ -221,22 +221,25 @@ class SelfMatch:
         graphs_path = file_path.format("graphs")
         del file_path
 
+        # エージェントの初期化
+        self.agent.reset()
+
         if restart:
             # 学習を途中再開する場合は、描画用配列と開始番号も引き継ぐ
             history = np.load(f"{is_yet_path}_history.npy")
             run, restart = history[:, -1].astype(int)
 
-            # 前回保存した学習途中のデータを読み込むために、エージェントの初期化も行う
-            self.agent.reset()
-            self.agent.load_to_restart(is_yet_path)
+            # 前回の run が終わった直後か否かで学習を途中再開するかどうかが決まる
+            if restart != episodes:
+                self.agent.load_to_restart(is_yet_path)
+            else:
+                restart = 1
 
         else:
             # 勝率の推移を描画するための配列 (最後の列は学習再開に使う変数を記録するための領域)
             history = np.zeros((2, 101), dtype = np.int32)
             run, restart = 1, 1
 
-            # エージェントの初期化
-            self.agent.reset()
 
         # 画面表示
         print("\033[92m=== Winning Percentage ===\033[0m")
@@ -248,7 +251,6 @@ class SelfMatch:
         eval_interval = episodes // 100
         start_time = time()
 
-
         try:
             for run in range(run, runs + 1):
                 with tqdm(range(restart, episodes + 1), desc = f"run {run}", leave = False) as pbar:
@@ -257,23 +259,24 @@ class SelfMatch:
 
                         eval_q, eval_r = divmod(episode, eval_interval)
                         if not eval_r:
-                            save_q, save_r = divmod(eval_q, 10)
+                            pbar.set_description("now evaluating")
+                            pbar.set_postfix(dict(caution = "Don't suspend right now, please."))
+
+                            # エージェントの評価 (合計 100 回)
+                            win_rates = self.eval()
+                            history[:, eval_q - 1] += win_rates
 
                             # 学習再開に必要な情報の暫定保存 (合計 10 回)
+                            save_q, save_r = divmod(eval_q, 10)
                             if not save_r:
                                 pbar.set_description(f"now saving checkpoint {save_q}")
-                                pbar.set_postfix("Don't suspend right now, please.")
 
                                 history[:, -1] = run, episode
                                 np.save(f"{is_yet_path}_history.npy", history)
                                 self.save(is_yet_path)
 
-                                pbar.set_description(f"run {run}")
-
-                            # エージェントの評価 (合計 100 回)
-                            win_rates = self.eval()
+                            pbar.set_description(f"run {run}")
                             pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
-                            history[:, eval_q - 1] += win_rates
 
                 # パラメータの保存
                 self.save(params_path, run - 1)
@@ -281,8 +284,6 @@ class SelfMatch:
                 # 画面表示
                 print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
                 print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
-
-                restart = 1
 
 
         finally:
