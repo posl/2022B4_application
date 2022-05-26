@@ -445,6 +445,10 @@ class RainbowAgent:
         self.replay_buffer.reset()
         self.total_steps = 0
 
+        if self.use_gpu:
+            self.qnet.to_gpu()
+            self.qnet_target.to_gpu()
+
     # キーボード例外で学習を中断した場合は、再開に必要な情報も保存する
     def save(self, file_path, is_yet = False):
         if is_yet:
