@@ -76,21 +76,21 @@ class OptionPage(Page):
         self.label3 = tk.Label(self, text="表示速度", fg="#999999")
         self.label3.place(x=10, y=150)
 
-        self.combobox3 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox3 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
         self.combobox3.place(x=330, y=30 )
         self.combobox3.current(0)
 
-        self.combobox4 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox4 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
         self.combobox4.place(x=330, y=90 )
         self.combobox4.current(0)
 
-        self.combobox1 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox1 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
         self.combobox1.place(x=100, y=30 )
         self.combobox1.current(0)
         self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
         
 
-        self.combobox2 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox2 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
         self.combobox2.place(x=100, y=90 )
         self.combobox2.current(0)
         self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
@@ -155,7 +155,7 @@ class OptionPage(Page):
 
         name1 = self.board.player_kinds.get_name(player1_id)
         name2 = self.board.player_kinds.get_name(player2_id)
-        self.par.title(name1 + "(黒) vs " + name2 + "(白)")
+        self.par.title(name1 + "Lv." + str(player1_diff+1) + "(黒) vs " + name2  + "Lv." + str(player2_diff+1) + "(白)")
         return
 
     def start_game(self):
@@ -739,10 +739,10 @@ class PlayerKinds:
         self.kinds_difficulty.append(4)
         self.kinds_turn_diff.append(False)
 
-        # self.kinds_name.append("原始MC探索+nega_alpha")
-        # self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
-        # self.kinds_difficulty.append(4)
-        # self.kinds_turn_diff.append(False)
+        self.kinds_name.append("原始MC探索+nega_alpha")
+        self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
+        self.kinds_difficulty.append(4)
+        self.kinds_turn_diff.append(False)
 
         self.alphabeta_d0t0 = AlphaBeta(0)
         self.alphabeta_d0t1 = AlphaBeta(1)
@@ -771,13 +771,13 @@ class PlayerKinds:
             self.kinds_difficulty.append(1)
             self.kinds_turn_diff.append(True)
 
-        if False:
+        if 1:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
-            self.alphazero_computer_d0.reset("alphazero_9")
+            self.alphazero_computer_d0.reset("alphazero_weights")
             self.kinds_name.append("Alphazero")
             self.kinds_func.append([ self.alphazero_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(True)
+            self.kinds_turn_diff.append(False)
 
         
 
@@ -894,11 +894,12 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        self.player_kinds.rainbow_computer_d0t0.reset("rainbow", 1)
-        self.player_kinds.rainbow_computer_d0t1.reset("rainbow", 0)
-        self.player_kinds.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
-        self.player_kinds.reinforce_computer_d0t1.reset("reinforce", 0.9, 0)
-        self.player_kinds.alphazero_computer_d0.reset("alphazero_9")
+        if False:
+            self.player_kinds.rainbow_computer_d0t0.reset("rainbow", 1)
+            self.player_kinds.rainbow_computer_d0t1.reset("rainbow", 0)
+            self.player_kinds.reinforce_computer_d0t0.reset("reinforce", 0.9, 1)
+            self.player_kinds.reinforce_computer_d0t1.reset("reinforce", 0.9, 0)
+            self.player_kinds.alphazero_computer_d0.reset("alphazero_9")
         player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
         player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
         self.set_plan(player1_plan, player2_plan)
