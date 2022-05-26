@@ -76,21 +76,21 @@ class OptionPage(Page):
         self.label3 = tk.Label(self, text="表示速度", fg="#999999")
         self.label3.place(x=10, y=150)
 
-        self.combobox3 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox3 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
         self.combobox3.place(x=330, y=30 )
         self.combobox3.current(0)
 
-        self.combobox4 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox4 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
         self.combobox4.place(x=330, y=90 )
         self.combobox4.current(0)
 
-        self.combobox1 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox1 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
         self.combobox1.place(x=100, y=30 )
         self.combobox1.current(0)
         self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
         
 
-        self.combobox2 = ttk.Combobox(self, height=3, values = self.combo_menus, state="readonly")
+        self.combobox2 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
         self.combobox2.place(x=100, y=90 )
         self.combobox2.current(0)
         self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
