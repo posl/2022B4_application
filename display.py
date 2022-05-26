@@ -443,7 +443,7 @@ class GamePage(Page):
         self.label1.place(x=1000)
         self.label1.configure(text="")
         print(self.board.play_log)
-        print(self.board.log_plans)
+
     
 
     def win_check(self):
