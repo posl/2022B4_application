@@ -702,33 +702,29 @@ class PlayerKinds:
         self.kinds_name = [] # 名前（人間、ランダムなど）
         self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
-        self.kinds_turn_diff = [] # 先攻、後攻で関数が変わるならTrue
 
         self.human = Human(par)
         self.kinds_name.append("人間")
         self.kinds_func.append([self.human.player])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("人間-チート1")
         self.kinds_func.append([self.human.cheat_player])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("ランダム")
         self.kinds_func.append([self.human.com_random])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("ランダム-チート1")
         self.kinds_func.append([self.human.com_cheater1])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(False)
+        
 
         self.kinds_name.append("MC木探索")
         self.kinds_func.append([MonteCarloTreeSearch(1024*1), MonteCarloTreeSearch(1024*4), MonteCarloTreeSearch(1024*16), MonteCarloTreeSearch(1024*64)])
         self.kinds_difficulty.append(4)
-        self.kinds_turn_diff.append(False)
+        
 
         # self.kinds_name.append("MC木探索+nega_alpha")
         # self.kinds_func.append([NAMonteCarloTreeSearch(1024*1, 2), NAMonteCarloTreeSearch(1024*4, 4), NAMonteCarloTreeSearch(1024*16, 8), NAMonteCarloTreeSearch(1024*64, 16)])
@@ -738,40 +734,39 @@ class PlayerKinds:
         self.kinds_name.append("原始MC探索")
         self.kinds_func.append([PrimitiveMonteCarlo(256*1), PrimitiveMonteCarlo(256*4), PrimitiveMonteCarlo(256*16), PrimitiveMonteCarlo(256*32)])
         self.kinds_difficulty.append(4)
-        self.kinds_turn_diff.append(False)
+        
 
         self.kinds_name.append("原始MC探索+nega_alpha")
         self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
         self.kinds_difficulty.append(4)
-        self.kinds_turn_diff.append(False)
+        
 
-        self.alphabeta_d0t0 = AlphaBeta(0)
-        self.alphabeta_d0t1 = AlphaBeta(1)
+
         self.kinds_name.append("Alpha Beta")
-        self.kinds_func.append([self.alphabeta_d0t0, self.alphabeta_d0t1])
+        self.kinds_func.append([AlphaBeta()])
         self.kinds_difficulty.append(1)
-        self.kinds_turn_diff.append(True)
+        
 
         if False:
             self.rainbow_computer_d0 = RainbowComputer(64)
             self.kinds_name.append("Rainbow")
             self.kinds_func.append([ self.rainbow_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(False)
+            
 
         if False:
             self.reinforce_computer_d0 = ReinforceComputer(64)
             self.kinds_name.append("Reinforce")
             self.kinds_func.append([ self.reinforce_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(False)
+            
 
         if 1:
             self.alphazero_computer_d0 = AlphaZeroComputer(64)
             self.kinds_name.append("Alphazero")
             self.kinds_func.append([ self.alphazero_computer_d0 ])
             self.kinds_difficulty.append(1)
-            self.kinds_turn_diff.append(False)
+            
 
         
 
@@ -785,17 +780,14 @@ class PlayerKinds:
             exit()
         return self.kinds_name[id]
 
-    def get_func(self, id, diff, turn):
+    def get_func(self, id, diff):
         if id<0 or id>=len(self.kinds_func):
             print("範囲外のIDが指定されました")
             exit()
         if diff<0 or diff>=len(self.kinds_difficulty):
             print("範囲外のIDが指定されました")
             exit()
-        if self.kinds_turn_diff[id]:
-            return self.kinds_func[id][2*diff+turn]
-        else:
-            return self.kinds_func[id][diff]
+        return self.kinds_func[id][diff]
 
     def get_difficulty(self, id):
         if id<0 or id>=len(self.kinds_difficulty):
@@ -803,11 +795,6 @@ class PlayerKinds:
             exit()
         return self.kinds_difficulty[id]
 
-    def get_turn_diff(self, id):
-        if id<0 or id>=len(self.kinds_turn_diff):
-            print("範囲外のIDが指定されました")
-            exit()
-        return self.kinds_turn_diff[id]
 
 
 
@@ -888,12 +875,9 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        if False:
-            self.player_kinds.rainbow_computer_d0.reset("rainbow", 1)
-            self.player_kinds.reinforce_computer_d0.reset("reinforce", 0.9, 1)
-            self.player_kinds.alphazero_computer_d0.reset("alphazero_9")
-        player1_plan = self.player_kinds.get_func(player1id, player1diff, 0)
-        player2_plan = self.player_kinds.get_func(player2id, player2diff, 1)
+        self.player_kinds.alphazero_computer_d0.reset("alphazero_weights")
+        player1_plan = self.player_kinds.get_func(player1id, player1diff)
+        player2_plan = self.player_kinds.get_func(player2id, player2diff)
         self.set_plan(player1_plan, player2_plan)
 
     def render(self, mask, flag, n = 999):
