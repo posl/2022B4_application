@@ -47,7 +47,7 @@ class BatchNormConv2d(Layer):
 
 
 
-# Residual Networks (残余ネットワーク : 前のレイヤが学習しきれなかった残余を次の層に渡すという工程を繰り返す)
+# 前のレイヤが学習しきれなかった残余を次の層に渡すという工程を繰り返すネットワーク (Residual Networks)
 class ResNet50(Layer):
     def __init__(self):
         super().__init__()
@@ -70,7 +70,7 @@ class ResNet50(Layer):
         return x
 
 
-# bottleneck building block : 通常の building block と同等の計算量で、層をさらに深くできる残余ブロック
+# 通常の building block と同等の計算量で、層をさらに深くできる残余ブロック (bottleneck building block)
 class BuildingBlock(Layer):
     def __init__(self, n_layers, mid_channels, out_channels):
         super().__init__()
@@ -202,7 +202,6 @@ def corners_plan(board):
 # 自己対戦による学習の基底クラス
 # =============================================================================
 
-# 自己対戦で学習・評価を行うためのクラスの基底クラス
 class SelfMatch:
     def __init__(self, board, agent):
         self.board = board

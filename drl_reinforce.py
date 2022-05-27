@@ -10,7 +10,10 @@ from board import Board
 
 
 
-# 確率形式に変換する前の最適方策を出力するニューラルネットワーク
+# =============================================================================
+# 方策を近似するニューラルネットワーク
+# =============================================================================
+
 class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
@@ -27,7 +30,10 @@ class PolicyNet(Model):
 
 
 
-# モンテカルロ法でパラメータを修正する方策ベースのエージェント
+# =============================================================================
+# モンテカルロ法・方策ベースでパラメータを学習するエージェント
+# =============================================================================
+
 class ReinforceAgent:
     def __init__(self, action_size, gamma = 0.88, lr = 0.000025, to_gpu = False):
         self.memory1 = []
@@ -54,7 +60,6 @@ class ReinforceAgent:
             self.pi.to_gpu()
 
 
-    # エージェントを関数形式で使うとその方策に従った行動が得られる
     def __call__(self, board):
         action, __ = self.get_action(board)
         return action
@@ -104,6 +109,10 @@ class ReinforceAgent:
 
 
 
+# =============================================================================
+# 自己対戦による学習
+# =============================================================================
+
 class Reinforce(SelfMatch):
     def fit_episode(self, progress = None):
         board = self.board
@@ -143,7 +152,10 @@ def fit_reinforce_agent(episodes = 200000, restart = False):
 
 
 
-# 実際にコンピュータとして使われるクラス
+# =============================================================================
+# 実際に使われることを想定したコンピュータ
+# =============================================================================
+
 class ReinforceComputer:
     def __init__(self, action_size, file_name = "reinforce", to_gpu = False):
         file_path = Reinforce.get_path(file_name).format("parameters")

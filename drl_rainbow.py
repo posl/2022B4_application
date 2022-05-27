@@ -18,6 +18,10 @@ from speedup import get_qmax_action, update_sumtree, weighted_sampling
 
 
 
+# =============================================================================
+# 行動価値関数を近似するニューラルネットワーク
+# =============================================================================
+
 # 強化学習の探索に必要なランダム性をネットワークに持たせるためのレイヤ (Noisy Network)
 class NoisyAffine(Layer):
     def __init__(self, out_size, activation = None):
@@ -48,7 +52,7 @@ class NoisyAffine(Layer):
         if self.W_mu.data is None:
             self.init_params(xp, in_size, out_size)
 
-        # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使っている
+        # Factorized Gaussian Noise (正規分布からのサンプリング数を減らす工夫) を使用
         epsilon_in = self.noise_f(rng.standard_normal(size = (in_size, 1), dtype = np.float32), xp)
         epsilon_out = self.noise_f(rng.standard_normal(size = (1, out_size), dtype = np.float32), xp)
         W_epsilon = epsilon_in.dot(epsilon_out)
@@ -83,7 +87,7 @@ class NoisyAffine(Layer):
 
 
 
-# 分位点数を指定して、行動価値分布に対応する累積分布関数の逆関数を近似する (QR-DQN (分位点回帰による分布強化学習))
+# 分位点数を指定して、行動価値分布に対応する累積分布関数の逆関数を近似する (QR-DQN)
 class RainbowNet(Model):
     def __init__(self, action_size, quantiles_num, use_gpu = False):
         super().__init__()
@@ -118,7 +122,7 @@ class RainbowNet(Model):
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
 
-    # 合法手の中から Q 関数が最大の行動を選択する
+    # 合法手の中から行動価値関数が最大の行動を選択する
     def get_actions(self, states, placables):
         quantile_values = self(states)
         quantile_values = quantile_values.data
@@ -138,7 +142,10 @@ class RainbowNet(Model):
 
 
 
-# 重み付きの分位点 Huber 誤差
+# =============================================================================
+# 重み付きの分位点 Huber 誤差 (損失関数)
+# =============================================================================
+
 class QuantileHuberLoss(Function):
     def __init__(self, t, quantiles_num, use_gpu = False):
         self.t = t
@@ -185,7 +192,6 @@ class QuantileHuberLoss(Function):
         return -sum_to(gy, x.shape)
 
 
-# 一度計算したら、引数が変わらない限り、キャッシュにあるデータを即座に返すようになる
 @cache
 def quantiles(quantiles_num, use_gpu = False):
     step = 1 / quantiles_num
@@ -199,7 +205,10 @@ def quantiles(quantiles_num, use_gpu = False):
 
 
 
+# =============================================================================
 # ランダムサンプリングを高速化するためのセグメントツリー
+# =============================================================================
+
 class SumTree:
     def __init__(self, capacity):
         self.capacity = self.__get_capacity(capacity)
@@ -248,6 +257,10 @@ class SumTree:
 
 
 
+
+# =============================================================================
+# （優先度付き) 経験再生バッファ
+# =============================================================================
 
 # 学習に使う経験データ間の相関を弱め、また経験データを繰り返し使うためのバッファ (経験再生)
 class ReplayBuffer:
@@ -348,7 +361,6 @@ class ReplayBuffer:
             count = 0
 
         if self.compress:
-            # pickle.dump : ファイルに書き込む, pickle.dumps : 戻り値として返す
             nstep_data = zlib.compress(pickle.dumps(nstep_data))
 
         try:
@@ -356,18 +368,18 @@ class ReplayBuffer:
         except IndexError:
             self.buffer.append(nstep_data)
 
+        # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
         if self.prioritized:
-            # 少なくとも１回は学習に使われてほしいので、優先度の初期値は今までで最大のものとする
             self.priorities[count] = self.max_priority
 
         self.count = count + 1
+
 
     def get_batch(self, batch_size, progress):
         priorities = self.priorities
         buffer = self.buffer
 
         if self.prioritized:
-            # 重複なしではないが処理上問題はなく、buffer_size >> batch_size なので大丈夫
             indices = priorities.sample(batch_size)
 
             # 重みは等確率でサンプリングした時との確率の比の β 乗で、最大値が１になるように変換したものを使用する
@@ -379,7 +391,6 @@ class ReplayBuffer:
             weights = None
 
         if self.compress:
-            # pickle.load : ファイルから読み込む, pickle.loads : 引数を使う
             selected = [pickle.loads(zlib.decompress(buffer[i])) for i in indices]
         else:
             selected = [buffer[i] for i in indices]
@@ -400,6 +411,7 @@ class ReplayBuffer:
 
         return (states, actions, rewards, gammas, next_states, next_placables), indices, weights
 
+
     def update_priorities(self, deltas, indices):
         if self.prioritized:
             # 優先度 = (|TD 誤差| + ε) ^ α
@@ -413,7 +425,10 @@ class ReplayBuffer:
 
 
 
-# TD 法の Q 学習でパラメータを修正する価値ベースのエージェント
+# =============================================================================
+# TD 法・価値ベースでパラメータを学習するエージェント
+# =============================================================================
+
 class RainbowAgent:
     def __init__(self, replay_buffer, batch_size, action_size, quantiles_num, lr, to_gpu = False):
         assert isinstance(replay_buffer, ReplayBuffer)
@@ -555,6 +570,10 @@ class RainbowAgent:
 
 
 
+# =============================================================================
+# 自己対戦による学習
+# =============================================================================
+
 class Rainbow(SelfMatch):
     def fit_episode(self, progress):
         board = self.board
@@ -573,7 +592,7 @@ class Rainbow(SelfMatch):
             buffer = transition_infos[turn]
             buffer.append((placable, state, action))
 
-            # 遷移情報２つセットで１回の update メソッドが呼べる
+            # 遷移情報２つセットで１回の update メソッドを呼ぶ
             if len(buffer) == 2:
                 __, state, action = buffer.popleft()
                 next_placable, next_state, __ = buffer[0]
@@ -624,7 +643,10 @@ def fit_rainbow_agent(episodes = 500000, restart = False):
 
 
 
-# 実際にコンピュータとして使われるクラス (__call__(), get_action() は親クラスのものを使う)
+# =============================================================================
+# 実際に使われることを想定したコンピュータ
+# =============================================================================
+
 class RainbowComputer(RainbowAgent):
     def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow-0", to_gpu = False):
         use_gpu = to_gpu and gpu_enable

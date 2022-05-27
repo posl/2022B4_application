@@ -26,7 +26,10 @@ from drl_rainbow import RainbowComputer
 
 
 
+# =============================================================================
 # PV-MCTS での過去の探索状況を近似するニューラルネットワーク
+# =============================================================================
+
 class PolicyValueNet(Model):
     def __init__(self, action_size):
         super().__init__()
@@ -51,7 +54,6 @@ class PolicyValueNet(Model):
         return score, tanh(value)
 
 
-# ニューラルネットワークの出力を確率形式に変換するための関数
 def softmax(score, xp = np):
     # オーバーフロー対策に最大要素との差を取る
     score -= score.max(axis = 1, keepdims = True)
@@ -63,7 +65,10 @@ def softmax(score, xp = np):
 
 
 
-# ニューラルネットワークの出力が過去の探索結果を近似するように学習するための損失関数
+# =============================================================================
+# SoftmaxWith CrossEntropyError  +  MeanSquaredError  (損失関数)
+# =============================================================================
+
 class AlphaZeroLoss(Function):
     def __init__(self, mcts_policys, rewards):
         self.mcts_policys = mcts_policys
@@ -104,7 +109,10 @@ class AlphaZeroLoss(Function):
 
 
 
-# モンテカルロ木探索の要領で、深層強化学習を駆使し、行動選択をするエージェント (コンピュータとしても使う)
+# =============================================================================
+# PV-MCTS に基づいて行動選択をするエージェント
+# =============================================================================
+
 class AlphaZeroAgent:
     def __init__(self, action_size, sampling_limits = 15, c_base = 19652, c_init = 1.25):
         self.network = PolicyValueNet(action_size)
@@ -113,7 +121,7 @@ class AlphaZeroAgent:
         self.sampling_limits = sampling_limits
         self.c_puct = lambda T: (log(1 + (1 + T) / c_base) + c_init) * sqrt(T)
 
-    # 引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
+    # 第１引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
     def reset(self, arg, simulations = 800):
         self.load(arg)
         self.simulations = simulations
@@ -149,7 +157,7 @@ class AlphaZeroAgent:
             action = placable[action_index]
 
         if selfplay_flag:
-            # 方策の形状をニューラルネットワークのものと合わせる
+            # 方策の形状をニューラルネットワークの出力と合わせる
             mcts_policy = np.zeros(board.action_size, dtype = np.float32)
             mcts_policy[np.array(placable)] = policy
             return action, board_img, mcts_policy
@@ -262,7 +270,10 @@ class AlphaZeroAgent:
 
 
 
-# 実際にコンピュータとして使われるクラス (上のエージェントをそのまま使っても良い)
+# =============================================================================
+# 実際に使われることを想定したコンピュータ
+# =============================================================================
+
 class AlphaZeroComputer(AlphaZeroAgent):
     def load(self, file_name):
         self.network.load_weights(SelfMatch.get_path(file_name + ".npz").format("parameters"))
@@ -270,7 +281,10 @@ class AlphaZeroComputer(AlphaZeroAgent):
 
 
 
-# 過去の探索の記録を残し、それらを順に取り出すことのできるイテラブル
+# =============================================================================
+# 経験再生バッファ
+# =============================================================================
+
 class ReplayBuffer:
     def __init__(self, buffer_size, batch_size):
         self.buffer = deque(maxlen = buffer_size)
@@ -332,6 +346,10 @@ class ReplayBuffer:
 
 
 
+# =============================================================================
+# 並列実行により、自己対戦・エージェントの評価を高速化するための関数
+# =============================================================================
+
 @ray.remote(num_cpus = 1, num_gpus = 0)
 def alphazero_play(weights, simulations):
     # 環境
@@ -384,6 +402,10 @@ def alphazero_test(weights, simulations, turn, enemy):
 
 
 
+
+# =============================================================================
+# 自己対戦・探索状況の反映・エージェントの評価を繰り返すための闘技場
+# =============================================================================
 
 class AlphaZero:
     def __init__(self, buffer_size = 60000, batch_size = 128, lr = 0.0005, decay = 0.001, to_gpu = True):
@@ -568,6 +590,10 @@ class AlphaZero:
 
 
 
+
+# =============================================================================
+# エージェントの最終評価を行う関数
+# =============================================================================
 
 def eval_alphazero_computer(file_name):
     file_path = SelfMatch.get_path(file_name)
