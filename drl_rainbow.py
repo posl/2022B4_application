@@ -619,7 +619,7 @@ def fit_rainbow_agent(episodes = 500000, restart = False):
 
     # 自己対戦
     self_match = Rainbow(board, agent)
-    self_match.fit(3, episodes, restart, file_name = "rainbow")
+    self_match.fit(1, episodes, restart, file_name = "rainbow")
 
 
 
