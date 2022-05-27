@@ -1,6 +1,5 @@
 from functools import cache
 from contextlib import contextmanager
-from math import ceil
 
 import numpy as np
 
