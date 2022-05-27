@@ -230,10 +230,10 @@ class SelfMatch:
             run, restart = history[:, -1].astype(int)
 
             # 前回の run が終わった直後か否かで学習を途中再開するかどうかが決まる
-            if restart != episodes:
-                self.agent.load_to_restart(is_yet_path)
-            else:
+            if restart > episodes:
                 restart = 1
+            else:
+                self.agent.load_to_restart(is_yet_path)
 
         else:
             # 勝率の推移を描画するための配列 (最後の列は学習再開に使う変数を記録するための領域)
@@ -271,7 +271,7 @@ class SelfMatch:
                             if not save_r:
                                 pbar.set_description(f"now saving checkpoint {save_q}")
 
-                                history[:, -1] = run, episode
+                                history[:, -1] = run, (episode + 1)
                                 np.save(f"{is_yet_path}_history.npy", history)
                                 self.save(is_yet_path)
 
