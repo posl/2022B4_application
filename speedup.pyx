@@ -325,6 +325,6 @@ cpdef inline vector[int] weighted_sampling(cnp.ndarray[F64, ndim = 1] tree, cnp.
                 else:
                     index = left_child
 
-            l.push_back(index)
+            l.push_back(index - capacity)
 
     return l
