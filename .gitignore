@@ -1,7 +1,7 @@
+.DS_Store
 .venv/
-Pipfile*
 .vscode/
+Pipfile*
 profiling.*
 setup.py
-.DS_Store
 test.py
