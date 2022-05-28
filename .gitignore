@@ -2,5 +2,6 @@
 Pipfile*
 .vscode/
 profiling.*
-.DS_Store
 setup.py
+.DS_Store
+test.py
