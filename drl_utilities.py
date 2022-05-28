@@ -228,10 +228,11 @@ class SelfMatch:
             history = np.load(f"{is_yet_path}_history.npy")
             run, restart = history[:, -1].astype(int)
 
+            # チェックポイント時点の次のエピソードから学習を再開する
+            restart += 1
+
             # 前回の run が終わった直後か否かで学習を途中再開するかどうかが決まる
-            if restart > episodes:
-                restart = 1
-            else:
+            if restart <= episodes:
                 self.agent.load_to_restart(is_yet_path)
 
         else:
@@ -240,7 +241,12 @@ class SelfMatch:
             run, restart = 1, 1
 
 
-        # 画面表示
+        # GPU を使用するかどうかの表示
+        use_gpu = "Yes, it do." if self.agent.use_gpu else "No, it don't."
+        print(f"Q: Will this script use GPU?\nA: {use_gpu}\n")
+        del use_gpu
+
+        # 評価結果の表示
         print("\033[92m=== Winning Percentage ===\033[0m")
         print("run || first | second")
         print("======================")
@@ -265,24 +271,32 @@ class SelfMatch:
                             win_rates = self.eval()
                             history[:, eval_q - 1] += win_rates
 
-                            # 学習再開に必要な情報の暫定保存 (合計 10 回)
                             save_q, save_r = divmod(eval_q, 10)
                             if not save_r:
-                                pbar.set_description(f"now saving checkpoint {save_q}")
+                                pbar.set_description(f"now saving")
 
-                                history[:, -1] = run, (episode + 1)
+                                # パラメータの最終保存 (合計 1 回)  or  学習再開に必要な情報の保存 (合計 9 回)
+                                if save_q == 10:
+                                    self.save(params_path, run - 1)
+                                else:
+                                    self.save(is_yet_path)
+
+                                # メタ情報の保存 (合計 10 回)
+                                history[:, -1] = run, episode
                                 np.save(f"{is_yet_path}_history.npy", history)
-                                self.save(is_yet_path)
 
                             pbar.set_description(f"run {run}")
                             pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
 
-                # パラメータの保存
-                self.save(params_path, run - 1)
+                try:
+                    win_rates
+                except NameError:
+                    pass
+                else:
+                    print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
+                    print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
-                # 画面表示
-                print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
-                print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
+                restart = 1
 
 
         finally:

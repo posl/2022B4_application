@@ -1,8 +1,9 @@
 import random
+from math import ceil
 
 import numpy as np
 
-from inada_framework import Model, cuda, optimizers, no_grad
+from inada_framework import Model, cuda, optimizers, no_train
 from drl_utilities import SimpleCNN, SelfMatch
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, softmax, log
@@ -41,13 +42,13 @@ class ReinforceAgent:
 
         self.action_size = action_size
         self.gamma = gamma
-        self.lr = lr
+        self.lrs = {i : (lr / i) for i in range(1, 11)}
         self.use_gpu = to_gpu and cuda.gpu_enable
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
         self.pi = PolicyNet(self.action_size)
-        self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
+        self.optimizer = optimizers.Adam().setup(self.pi)
         if self.use_gpu:
             self.pi.to_gpu()
 
@@ -88,7 +89,11 @@ class ReinforceAgent:
         memory.append(prob)
 
     # ニューラルネットワークで近似したある方策に従った時の収益の期待値の勾配を求め、パラメータを更新する
-    def update(self, reward, final_turn):
+    def update(self, progress, reward, final_turn):
+        # 進捗率に基づいて、学習率を減衰させる
+        optimizer = self.optimizer
+        optimizer.lr = self.lrs[ceil(progress * 10)]
+
         loss, gamma = 0, self.gamma
 
         for turn in range(2):
@@ -104,7 +109,7 @@ class ReinforceAgent:
 
         self.pi.clear_grads()
         loss.backward()
-        self.optimizer.update()
+        optimizer.update()
 
 
 
@@ -114,7 +119,7 @@ class ReinforceAgent:
 # =============================================================================
 
 class Reinforce(SelfMatch):
-    def fit_episode(self, progress = None):
+    def fit_episode(self, progress):
         board = self.board
         agent = self.agent
 
@@ -130,12 +135,12 @@ class Reinforce(SelfMatch):
             placable = board.can_continue_placable()
 
         # エージェントの学習はエピソードごとに行う
-        agent.update(board.reward, board.turn)
+        agent.update(progress, board.reward, board.turn)
 
 
-def fit_reinforce_agent(episodes = 200000, restart = False):
+def fit_reinforce_agent(episodes = 100000, restart = False):
     # ハイパーパラメータ設定
-    gamma = 0.92
+    gamma = 0.95
     lr = 0.000025
     to_gpu = True
 
@@ -183,7 +188,7 @@ class ReinforceComputer:
         state = board.get_img(xp)[None, :]
 
         # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
-        with no_grad():
+        with no_train():
             pi0, pi1 = self.each_pi
             policy = pi0(state).data + pi1(state).data
 
@@ -197,4 +202,4 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(restart = True)
+    fit_reinforce_agent(restart = False)

@@ -453,7 +453,12 @@ class AlphaZero:
             restart = 1
             history = np.zeros((2, 100), dtype = np.int32)
 
-        # 画面表示
+        # GPU を使用するかどうかの表示
+        use_gpu = "Yes, it do." if self.use_gpu else "No, it don't."
+        print(f"Q: Will this script use GPU?\nA: {use_gpu}\n")
+        del use_gpu
+
+        # 評価結果の表示
         print("\033[92m=== Winning Percentage ===\033[0m")
         print("progress || first | second")
         print("===========================")
