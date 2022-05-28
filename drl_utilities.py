@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from inada_framework import Layer, cuda
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten
+from inada_framework.utilities import make_dir_exist
 
 
 
@@ -219,6 +220,10 @@ class SelfMatch:
         params_path = file_path.format("parameters")
         graphs_path = file_path.format("graphs")
         del file_path
+
+        # ディレクトリが存在しなければ作る
+        make_dir_exist(is_yet_path)
+        make_dir_exist(graphs_path)
 
         # エージェントの初期化
         self.agent.reset()

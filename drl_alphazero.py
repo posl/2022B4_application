@@ -11,12 +11,13 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from inada_framework import Model, Function, no_train
-from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu, corners_plan
+from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, tanh
 from inada_framework.cuda import get_array_module, gpu_enable, as_cupy
 from board import Board
 from inada_framework.optimizers import Adam, WeightDecay
+from inada_framework.utilities import make_dir_exist
 
 from mc_tree_search import MonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo
@@ -436,6 +437,10 @@ class AlphaZero:
         graphs_path = file_path.format("graphs")
         del file_path
 
+        # ディレクトリが存在しなければ作る
+        make_dir_exist(is_yet_path)
+        make_dir_exist(graphs_path)
+
         if restart:
             # 学習の途中再開に必要なデータをファイルから読み込む
             network.load_weights(f"{is_yet_path}_weights.npz")
@@ -630,7 +635,10 @@ def eval_alphazero_computer(file_name):
     plt.xlabel("The Number of Simulations")
     plt.ylabel("Winning Percentage")
     plt.title("AlphaZero")
-    plt.savefig(file_path.format("graphs") + "_bar")
+
+    graphs_path = file_path.format("graphs")
+    make_dir_exist(graphs_path)
+    plt.savefig(f"{graphs_path}_bar")
     plt.clf()
 
 
@@ -680,7 +688,10 @@ def vs_alphazero_computer(file_name, simulations = 800):
     labels = ["AlphaZero Win  (Black)", "AlphaZero Win  (White)", "Draw or Lose"]
     fig.legend(labels, loc = (0.65, 0.2), fontsize = 10)
     fig.suptitle(f"AlphaZero's Winning Percentage (Simulations = {simulations})", fontsize = 14)
-    fig.savefig(file_path.format("graphs") + f"-{simulations}_vs")
+
+    graphs_path = file_path.format("graphs")
+    make_dir_exist(graphs_path)
+    fig.savefig(f"{graphs_path}-{simulations}_vs")
     fig.clf()
 
 
@@ -708,9 +719,9 @@ def __eval_preprocess(file_path, key_str):
 
 if __name__ == "__main__":
     # 学習用コード
-    arena = AlphaZero()
-    arena.fit(restart = False)
+    # arena = AlphaZero()
+    # arena.fit(restart = False)
 
     # 評価用コード
-    # eval_alphazero_computer(file_name = "alphazero-9")
-    # vs_alphazero_computer(file_name = "alphazero-9", simulations = 800)
+    eval_alphazero_computer(file_name = "alphazero-9")
+    vs_alphazero_computer(file_name = "alphazero-9", simulations = 800)

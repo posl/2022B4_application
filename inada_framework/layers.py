@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 from inada_framework import Parameter, cuda
-from inada_framework.utilities import make_data_dir, pair
+from inada_framework.utilities import make_dir_exist, pair
 import inada_framework.functions as dzf
 
 
@@ -79,7 +79,7 @@ class Layer:
                         if param.data is not None}
 
         try:
-            make_data_dir(file_path)
+            make_dir_exist(file_path)
             np.savez_compressed(file_path, **arrays_dict)
 
         except (Exception, KeyboardInterrupt):

@@ -7,7 +7,7 @@ import os
 # =============================================================================
 
 # 指定したファイルが属するデータディレクトリが存在しない場合に、新しく作成する関数
-def make_data_dir(file_path):
+def make_dir_exist(file_path):
     file_dir = os.path.dirname(file_path)
     if not os.path.exists(file_dir):
         data_dir = os.path.dirname(file_dir)
