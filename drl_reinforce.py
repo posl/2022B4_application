@@ -4,9 +4,9 @@ from math import ceil
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_train
-from drl_utilities import SimpleCNN, SelfMatch
+from drl_utilities import ResNet50, SelfMatch
 import inada_framework.layers as dzl
-from inada_framework.functions import relu, softmax, log
+from inada_framework.functions import flatten, relu, softmax, log
 from board import Board
 
 
@@ -19,14 +19,14 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        self.cnn = SimpleCNN(use_batch_norm = False)
-        self.l1 = dzl.Affine(512)
-        self.l2 = dzl.Affine(action_size)
+        self.cnn = ResNet50()
+        self.conv = dzl.Conv2d1x1(2)
+        self.bn = dzl.BatchNorm()
+        self.fc = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = self.cnn(x)
-        x = relu(self.l1(x))
-        return self.l2(x)
+        x = self.bn(self.conv(self.cnn(x)))
+        return self.fc(flatten(relu(x)))
 
 
 

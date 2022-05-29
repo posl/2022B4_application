@@ -311,8 +311,13 @@ class SelfMatch:
             y[...] = history[:, :-1]
 
             if run > 1:
-                y[:, :eval_q] /= run
-                y[:, eval_q:] /= run - 1
+                try:
+                    index = eval_q
+                except NameError:
+                    index = 100
+
+                y[:, :index] /= run
+                y[:, index:] /= run - 1
 
             plt.plot(x, y[0], label = "first")
             plt.plot(x, y[1], label = "second")
