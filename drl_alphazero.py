@@ -448,6 +448,7 @@ class AlphaZero:
             restart = buffer.load(f"{is_yet_path}_buffer.bz2")
             history = np.load(f"{is_yet_path}_history.npy")
 
+            restart += 1
             if restart > 300:
                 optimizer.lr /= 10.
 
@@ -460,16 +461,16 @@ class AlphaZero:
             history = np.zeros((2, 100), dtype = np.int32)
 
 
-        # GPU を使用するかどうかの表示
-        use_gpu = "Yes, it do." if self.use_gpu else "No, it don't."
-        print(f"Q: Will this script use GPU?\nA: {use_gpu}\n")
-        del use_gpu
-
         # 並列実行を行うための初期設定
         ray.init()
 
         # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
         weights = ray.put(network.get_weights())
+
+        # GPU を使用するかどうかの表示
+        answer = "Yes, it do." if self.use_gpu else "No, it don't."
+        print(f"\nQ: Will this script use GPU?\nA: {answer}\n")
+        del answer
 
 
         # 評価結果の表示
@@ -496,73 +497,70 @@ class AlphaZero:
                             buffer.add(ray.get(finished[0]))
                             pbar.update(1)
 
-                if step < 5:
-                    continue
+                if step >= 5:
+                    # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
+                    with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
+                        if use_gpu:
+                            # GPU を使う場合は、モデルの重みをそれ対応にする
+                            network.to_gpu()
+
+                        for epoch in range(1, epochs + 1):
+                            pbar.set_description(f"fit {step}, epoch {epoch}")
+
+                            for states, mcts_policys, rewards in buffer:
+                                if use_gpu:
+                                    # GPU を使う場合は、そのメモリへデータを非同期転送する
+                                    mcts_policys, source, stream_m = preprocess_to_gpu(mcts_policys)
+                                    mcts_policys.set(source, stream = stream_m)
+
+                                    rewards, source, stream_r = preprocess_to_gpu(rewards)
+                                    rewards.set(source, stream = stream_r)
+
+                                    # すぐに使うデータに非同期転送は使わない
+                                    states = as_cupy(states)
+
+                                score, value = network(states)
+
+                                if use_gpu:
+                                    # データを使う前に非同期の転送処理と実行スクリプトを同期させる
+                                    stream_m.synchronize()
+                                    stream_r.synchronize()
+
+                                loss = AlphaZeroLoss(mcts_policys, rewards)(score, value)
+
+                                # 勾配が加算されていかないように、先にリセットしてから逆伝播を行う
+                                network.clear_grads()
+                                loss.backward()
+                                optimizer.update()
+
+                                pbar.update(1)
+
+                        if use_gpu:
+                            # GPU を使った場合は、モデルの重みを CPU 対応に戻す
+                            network.to_cpu()
+
+                    if step == 300:
+                        optimizer.lr /= 10.
 
 
-                # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
-                with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
-                    if use_gpu:
-                        # GPU を使う場合は、モデルの重みをそれ対応にする
-                        network.to_gpu()
+                    # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
+                    weights = ray.put(network.get_weights())
 
-                    for epoch in range(1, epochs + 1):
-                        pbar.set_description(f"fit {step}, epoch {epoch}")
+                    eval_q, eval_r = divmod(step, eval_interval)
+                    if not eval_r:
+                        save_q, save_r = divmod(eval_q, 10)
 
-                        for states, mcts_policys, rewards in buffer:
-                            if use_gpu:
-                                # GPU を使う場合は、そのメモリへデータを非同期転送する
-                                mcts_policys, source, stream_m = preprocess_to_gpu(mcts_policys)
-                                mcts_policys.set(source, stream = stream_m)
+                        # パラメータの保存 (合計 10 回)
+                        if not save_r:
+                            network.save_weights(params_path + "-{}.npz".format(save_q - 1))
 
-                                rewards, source, stream_r = preprocess_to_gpu(rewards)
-                                rewards.set(source, stream = stream_r)
+                        # エージェントの評価 (合計 100 回)
+                        win_rates = self.eval(weights, simulations)
+                        history[:, eval_q - 1] = win_rates
+                        print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
 
-                                # すぐに使うデータに非同期転送は使わない
-                                states = as_cupy(states)
-
-                            score, value = network(states)
-
-                            if use_gpu:
-                                # データを使う前に非同期の転送処理と実行スクリプトを同期させる
-                                stream_m.synchronize()
-                                stream_r.synchronize()
-
-                            loss = AlphaZeroLoss(mcts_policys, rewards)(score, value)
-
-                            # 勾配が加算されていかないように、先にリセットしてから逆伝播を行う
-                            network.clear_grads()
-                            loss.backward()
-                            optimizer.update()
-
-                            pbar.update(1)
-
-                    if use_gpu:
-                        # GPU を使った場合は、モデルの重みを CPU 対応に戻す
-                        network.to_cpu()
-
-                if step == 300:
-                    optimizer.lr /= 10.
-
-
-                # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
-                weights = ray.put(network.get_weights())
-
-                eval_q, eval_r = divmod(step, eval_interval)
-                if not eval_r:
-                    save_q, save_r = divmod(eval_q, 10)
-
-                    # パラメータの保存 (合計 10 回)
-                    if not save_r:
-                        network.save_weights(params_path + "-{}.npz".format(save_q - 1))
-
-                    # エージェントの評価 (合計 100 回)
-                    win_rates = self.eval(weights, simulations)
-                    history[:, eval_q - 1] = win_rates
-                    print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
-
-                    # 累計経過時間の表示
-                    print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
+                        # 累計経過時間の表示
+                        print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
 
                 # 途中再開に必要な暫定の情報を上書きする
