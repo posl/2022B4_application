@@ -409,7 +409,7 @@ def alphazero_test(weights, simulations, turn, enemy):
 # =============================================================================
 
 class AlphaZero:
-    def __init__(self, buffer_size = 60000, batch_size = 128, lr = 0.0005, decay = 0.001, to_gpu = True):
+    def __init__(self, buffer_size = 76800, batch_size = 128, lr = 0.0005, decay = 0.001, to_gpu = True):
         # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
 
@@ -424,7 +424,7 @@ class AlphaZero:
         self.use_gpu = to_gpu and gpu_enable
 
 
-    def fit(self, updates = 500, episodes = 100, epochs = 5, simulations = 300, restart = False):
+    def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 300, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -440,6 +440,7 @@ class AlphaZero:
         # ディレクトリが存在しなければ作る
         make_dir_exist(is_yet_path)
         make_dir_exist(graphs_path)
+
 
         if restart:
             # 学習の途中再開に必要なデータをファイルから読み込む
@@ -458,10 +459,18 @@ class AlphaZero:
             restart = 1
             history = np.zeros((2, 100), dtype = np.int32)
 
+
         # GPU を使用するかどうかの表示
         use_gpu = "Yes, it do." if self.use_gpu else "No, it don't."
         print(f"Q: Will this script use GPU?\nA: {use_gpu}\n")
         del use_gpu
+
+        # 並列実行を行うための初期設定
+        ray.init()
+
+        # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
+        weights = ray.put(network.get_weights())
+
 
         # 評価結果の表示
         print("\033[92m=== Winning Percentage ===\033[0m")
@@ -475,12 +484,6 @@ class AlphaZero:
 
 
         try:
-            # 並列実行を行うための初期設定
-            ray.init()
-
-            # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
-            weights = ray.put(network.get_weights())
-
             for step in range(restart, updates + 1):
                 with tqdm(desc = f"step {step}", total = episodes, leave = False) as pbar:
                     with no_train():
@@ -495,6 +498,7 @@ class AlphaZero:
 
                 if step < 5:
                     continue
+
 
                 # episodes だけゲームをこなすごとに、epochs で指定したエポック数だけ、パラメータを学習する
                 with tqdm(total = epochs * buffer.max_iter, leave = False) as pbar:
@@ -539,6 +543,7 @@ class AlphaZero:
 
                 if step == 300:
                     optimizer.lr /= 10.
+
 
                 # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
                 weights = ray.put(network.get_weights())
@@ -612,7 +617,7 @@ def eval_alphazero_computer(file_name):
     # 描画用配列
     length = 6
     simulations_array = 25 * (2 ** np.arange(length))
-    win_rates = np.empty((2, length))
+    win_rates = np.empty((2, length), dtype = np.int32)
 
     # 行動選択時のシミュレーション回数を推移させながら、コンピュータを評価する
     for i, simulations in enumerate(simulations_array):
@@ -677,7 +682,7 @@ def vs_alphazero_computer(file_name, simulations = 800):
         win_rates = AlphaZero.eval(weights, simulations, enemy)
         print("{:>2}  || {:>3} % | {:>3} %".format(i, *win_rates))
 
-        record = np.zeros(3)
+        record = np.zeros(3, dtype = np.int32)
         record[:-1] = win_rates
         record[-1] = 200 - record.sum()
 
@@ -719,8 +724,8 @@ def __eval_preprocess(file_path, key_str):
 
 if __name__ == "__main__":
     # 学習用コード
-    # arena = AlphaZero()
-    # arena.fit(restart = False)
+    arena = AlphaZero()
+    arena.fit(restart = False)
 
     # 評価用コード
     eval_alphazero_computer(file_name = "alphazero-9")

@@ -202,4 +202,4 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(restart = False)
+    fit_reinforce_agent(restart = True)
