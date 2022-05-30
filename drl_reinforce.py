@@ -1,5 +1,4 @@
 import random
-from math import ceil
 
 import numpy as np
 
@@ -42,13 +41,13 @@ class ReinforceAgent:
 
         self.action_size = action_size
         self.gamma = gamma
-        self.lrs = {i : (lr / i) for i in range(1, 11)}
+        self.lr = lr
         self.use_gpu = to_gpu and cuda.gpu_enable
 
     # エージェントを動かす前に呼ぶ必要がある
     def reset(self):
         self.pi = PolicyNet(self.action_size)
-        self.optimizer = optimizers.Adam().setup(self.pi)
+        self.optimizer = optimizers.Adam(self.lr).setup(self.pi)
         if self.use_gpu:
             self.pi.to_gpu()
 
@@ -62,7 +61,8 @@ class ReinforceAgent:
 
 
     def __call__(self, board):
-        action, __ = self.get_action(board)
+        with no_train():
+            action, __ = self.get_action(board)
         return action
 
     def get_action(self, board, placable = None):
@@ -89,11 +89,7 @@ class ReinforceAgent:
         memory.append(prob)
 
     # ニューラルネットワークで近似したある方策に従った時の収益の期待値の勾配を求め、パラメータを更新する
-    def update(self, progress, reward, final_turn):
-        # 進捗率に基づいて、学習率を減衰させる
-        optimizer = self.optimizer
-        optimizer.lr = self.lrs[ceil(progress * 10)]
-
+    def update(self, reward, final_turn):
         loss, gamma = 0, self.gamma
 
         for turn in range(2):
@@ -109,7 +105,7 @@ class ReinforceAgent:
 
         self.pi.clear_grads()
         loss.backward()
-        optimizer.update()
+        self.optimizer.update()
 
 
 
@@ -135,7 +131,7 @@ class Reinforce(SelfMatch):
             placable = board.can_continue_placable()
 
         # エージェントの学習はエピソードごとに行う
-        agent.update(progress, board.reward, board.turn)
+        agent.update(board.reward, board.turn)
 
 
 def fit_reinforce_agent(episodes = 100000, restart = False):

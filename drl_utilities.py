@@ -247,9 +247,9 @@ class SelfMatch:
 
 
         # GPU を使用するかどうかの表示
-        use_gpu = "Yes, it do." if self.agent.use_gpu else "No, it don't."
-        print(f"Q: Will this script use GPU?\nA: {use_gpu}\n")
-        del use_gpu
+        answer = "Yes, it do." if self.agent.use_gpu else "No, it don't."
+        print(f"Q: Will this script use GPU?\nA: {answer}\n")
+        del answer
 
         # 評価結果の表示
         print("\033[92m=== Winning Percentage ===\033[0m")
@@ -307,8 +307,7 @@ class SelfMatch:
         finally:
             # 学習の進捗を x 軸、その時の勝率の平均を y 軸とするグラフを描画し、画像保存する
             x = np.arange(1, 101)
-            y = np.empty((2, 100))
-            y[...] = history[:, :-1]
+            y = history[:, :-1].astype(np.float64)
 
             if run > 1:
                 try:
