@@ -40,8 +40,8 @@ class GTValue:
 	#盤面の指定されたのマスの評価値を返す
 	def get_board_value(self, board_index):
 		x, y = divmod(board_index, Board.width)
-		x = min(x, Board.height - x)
-		y = min(y, Board.width - y)
+		x = min(x, Board.height - x - 1)
+		y = min(y, Board.width - y - 1)
 		if x == 0  and y == 0:
 			return self.corner
 		if x + y == 1:
@@ -117,8 +117,6 @@ class AlphaBeta:
 				board.put_stone(i)
 				flag = board.can_continue()
 				tmp_value = self.__node(board, 1, alpha, beta)
-			if tmp_value >= beta:
-				return tmp_value
 			if tmp_value > alpha:
 				alpha = tmp_value
 				place_max = i
