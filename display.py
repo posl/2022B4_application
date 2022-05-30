@@ -685,16 +685,19 @@ class Human:
         t = board.turn
         bplace = board.black_positions
         wplace = board.white_positions
+        ret = random.choice(board.list_placable())
         if len(bplace)+len(wplace)>4:
             if t==1:
                 p = random.choice(wplace)
-                board.stone_white = board.stone_white ^ (1<<p)
-                board.stone_black = board.stone_black ^ (1<<p)
+                if p!=ret:
+                    board.stone_white = board.stone_white ^ (1<<p)
+                    board.stone_black = board.stone_black ^ (1<<p)
             else:
                 p = random.choice(bplace)
-                board.stone_black = board.stone_black ^ (1<<p)
-                board.stone_white = board.stone_white ^ (1<<p)
-        return random.choice(board.list_placable())
+                if p!=ret:
+                    board.stone_black = board.stone_black ^ (1<<p)
+                    board.stone_white = board.stone_white ^ (1<<p)
+        return ret
 
 
 

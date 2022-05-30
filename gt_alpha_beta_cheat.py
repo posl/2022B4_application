@@ -108,13 +108,23 @@ class AlphaBetaCheat:
 			if t==1:
 				#p = random.choice(wplace)
 				p = int(self.__first_max_node_cheat(board, self.__min_value, self.__max_value))
-				board.stone_white = board.stone_white ^ (1<<p)
-				board.stone_black = board.stone_black ^ (1<<p)
+				if p in bplace:
+					pass
+				elif p in wplace:
+					board.stone_white = board.stone_white ^ (1<<p)
+					board.stone_black = board.stone_black ^ (1<<p)
+				else:
+					board.stone_black = board.stone_black ^ (1<<p)
 			else:
 				#p = random.choice(bplace)
 				p = int(self.__first_max_node_cheat(board, self.__min_value, self.__max_value))
-				board.stone_black = board.stone_black ^ (1<<p)
-				board.stone_white = board.stone_white ^ (1<<p)
+				if p in bplace:
+					board.stone_white = board.stone_white ^ (1<<p)
+					board.stone_black = board.stone_black ^ (1<<p)
+				elif p in wplace:
+					pass
+				else:
+					board.stone_white = board.stone_white ^ (1<<p)
 		
 
 	# 評価関数
@@ -149,9 +159,16 @@ class AlphaBetaCheat:
 	
 
 	def __first_max_node_cheat(self, board : Board, alpha , beta):
+		t = board.turn
+		bplace = board.black_positions
+		wplace = board.white_positions
 		value = self.__min_value
 		place_list = [ ]
 		for i in range(64):
+			if t==1 and (i in bplace):
+				continue
+			if t==0 and (i in wplace):
+				continue
 			place_list.append(i)
 		if not place_list:
 			print("error")
