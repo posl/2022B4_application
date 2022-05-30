@@ -109,9 +109,7 @@ class AlphaBeta:
 
 		value = self.__min_value
 		place_list = board.list_placable()
-		if not place_list:
-			print("error")
-			return -1
+
 		place_max = place_list[0]
 
 		for i in place_list:
