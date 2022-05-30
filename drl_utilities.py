@@ -251,7 +251,7 @@ class SelfMatch:
         print(f"Q: Will this script use GPU?\nA: {answer}\n")
         del answer
 
-        # 評価結果の表示
+        # 画面表示
         print("\033[92m=== Winning Percentage ===\033[0m")
         print("run || first | second")
         print("======================")
@@ -276,28 +276,18 @@ class SelfMatch:
                             win_rates = self.eval()
                             history[:, eval_q - 1] += win_rates
 
-                            save_q, save_r = divmod(eval_q, 10)
-                            if not save_r:
-                                pbar.set_description(f"now saving")
-
-                                # パラメータの最終保存 (合計 1 回)  or  学習再開に必要な情報の保存 (合計 9 回)
-                                if save_q == 10:
-                                    self.save(params_path, run - 1)
-                                else:
-                                    self.save(is_yet_path)
-
-                                # メタ情報の保存 (合計 10 回)
-                                history[:, -1] = run, episode
-                                np.save(f"{is_yet_path}_history.npy", history)
+                            # 学習再開に必要な情報の保存 (合計 100 回)
+                            pbar.set_description(f"now saving")
+                            self.save(is_yet_path)
+                            history[:, -1] = run, episode
+                            np.save(f"{is_yet_path}_history.npy", history)
 
                             pbar.set_description(f"run {run}")
                             pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
 
-                try:
-                    win_rates
-                except NameError:
-                    pass
-                else:
+                # パラメータの最終保存・評価結果の表示
+                if restart <= episodes:
+                    self.save(params_path, run - 1)
                     print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
                     print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
