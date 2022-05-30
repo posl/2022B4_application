@@ -19,7 +19,7 @@ class Node:
 
 
     def uct(self, total_visits):
-        return self.wins / self.visits + sqrt(log(total_visits) / self.visits)
+        return self.wins / self.visits + sqrt(2 * log(total_visits) / self.visits)
 
 
 class MonteCarloTreeSearch:
