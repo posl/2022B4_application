@@ -448,9 +448,12 @@ class AlphaZero:
             restart = buffer.load(f"{is_yet_path}_buffer.bz2")
             history = np.load(f"{is_yet_path}_history.npy")
 
+            # 学習率を進捗に応じて変更する
+            if restart >= 150:
+                optimizer.lr /= 2. ** (restart // 150)
+
+            # 次のステップから学習を再開する
             restart += 1
-            if restart > 300:
-                optimizer.lr /= 10.
 
         else:
             # 学習開始前にダミーの入力をニューラルネットワークに流して、初期の重みを確定する
@@ -539,8 +542,8 @@ class AlphaZero:
                             # GPU を使った場合は、モデルの重みを CPU 対応に戻す
                             network.to_cpu()
 
-                    if step == 300:
-                        optimizer.lr /= 10.
+                    if not step % 150:
+                        optimizer.lr /= 2.
 
 
                     # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする

@@ -6,12 +6,14 @@ class AlphaBeta:
     def __init__(self, depth = 6):
         self.__max_depth = depth
 
-        # 学習済みパラメータ
-        self.corner = 0.6576514321742223
-        self.around_corner = 0.4757884128809289
-        self.edge = 0.5309212414274704
-        self.around_edge = 0.13153629267654865
-        self.others = -0.2540768710622537
+        # 学習済みのマスの評価点
+        corner = 0.6576514321742223
+        around_corner = 0.4757884128809289
+        edge = 0.5309212414274704
+        around_edge = 0.13153629267654865
+        others = -0.2540768710622537
+
+        # 置ける場所の数による評価点にかかる係数
         self.place = 0.42422219310905573
 
         # 各マスの評価点を表現する辞書
@@ -24,19 +26,19 @@ class AlphaBeta:
 
             if not (x or y):
                 # ４隅の評価点
-                block_point = self.corner
+                block_point = corner
             elif x + y == 1:
                 # ４隅と隣接する８マスの評価点
-                block_point = self.around_corner
+                block_point = around_corner
             elif not (x and y):
                 # ボードの辺の評価点
-                block_point = self.edge
+                block_point = edge
             elif x == 1 or y == 1:
                 # ボードの中辺の評価点
-                block_point = self.around_edge
+                block_point = around_edge
             else:
                 # それ以外 (中央の 4x4 マス) の評価値
-                block_point = self.others
+                block_point = others
 
             block_points[i] = block_point
 
