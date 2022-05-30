@@ -11,6 +11,7 @@ import pygame
 from mc_tree_search import MonteCarloTreeSearch, NAMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
+from gt_alpha_beta_cheat import AlphaBetaCheat
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
@@ -684,16 +685,19 @@ class Human:
         t = board.turn
         bplace = board.black_positions
         wplace = board.white_positions
+        ret = random.choice(board.list_placable())
         if len(bplace)+len(wplace)>4:
             if t==1:
                 p = random.choice(wplace)
-                board.stone_white = board.stone_white ^ (1<<p)
-                board.stone_black = board.stone_black ^ (1<<p)
+                if p!=ret:
+                    board.stone_white = board.stone_white ^ (1<<p)
+                    board.stone_black = board.stone_black ^ (1<<p)
             else:
                 p = random.choice(bplace)
-                board.stone_black = board.stone_black ^ (1<<p)
-                board.stone_white = board.stone_white ^ (1<<p)
-        return random.choice(board.list_placable())
+                if p!=ret:
+                    board.stone_black = board.stone_black ^ (1<<p)
+                    board.stone_white = board.stone_white ^ (1<<p)
+        return ret
 
 
 
@@ -744,6 +748,10 @@ class PlayerKinds:
 
         self.kinds_name.append("Alpha Beta")
         self.kinds_func.append([AlphaBeta()])
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("Alpha Beta-Cheat")
+        self.kinds_func.append([AlphaBetaCheat()])
         self.kinds_difficulty.append(1)
         
 

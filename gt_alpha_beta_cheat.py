@@ -1,6 +1,7 @@
 from matplotlib.pyplot import get
 from board import Board
 import numpy as np
+import random
 
 class GTValue:
 	def __init__(self, select_value = 0):
@@ -72,7 +73,7 @@ class GTValue:
 		return value_black
 
 
-class AlphaBeta:
+class AlphaBetaCheat:
 	def __init__(self, select_value = 0):
 		if type(select_value) == type(int()):
 			self.value = GTValue(0)
@@ -95,7 +96,36 @@ class AlphaBeta:
 	# 次の手を示す
 	def get_next_move(self, board : Board):
 		self.turn = board.turn
-		return int(self.__first_max_node(board, self.__min_value, self.__max_value))
+		ret = int(self.__first_max_node(board, self.__min_value, self.__max_value))
+		self.cheat(board)
+		return ret
+	
+	def cheat(self, board : Board):
+		t = board.turn
+		bplace = board.black_positions
+		wplace = board.white_positions
+		if len(bplace)+len(wplace)>4:
+			if t==1:
+				#p = random.choice(wplace)
+				p = int(self.__first_max_node_cheat(board, self.__min_value, self.__max_value))
+				if p in bplace:
+					pass
+				elif p in wplace:
+					board.stone_white = board.stone_white ^ (1<<p)
+					board.stone_black = board.stone_black ^ (1<<p)
+				else:
+					board.stone_black = board.stone_black ^ (1<<p)
+			else:
+				#p = random.choice(bplace)
+				p = int(self.__first_max_node_cheat(board, self.__min_value, self.__max_value))
+				if p in bplace:
+					board.stone_white = board.stone_white ^ (1<<p)
+					board.stone_black = board.stone_black ^ (1<<p)
+				elif p in wplace:
+					pass
+				else:
+					board.stone_white = board.stone_white ^ (1<<p)
+		
 
 	# 評価関数
 	def __evaluate(self, board : Board):
@@ -109,7 +139,40 @@ class AlphaBeta:
 
 		value = self.__min_value
 		place_list = board.list_placable()
+		if not place_list:
+			print("error")
+			return -1
+		place_max = place_list[0]
 
+		for i in place_list:
+			with board.log_runtime():
+				board.put_stone(i)
+				flag = board.can_continue()
+				tmp_value = self.__node(board, 1, alpha, beta)
+			if tmp_value >= beta:
+				return tmp_value
+			if tmp_value > alpha:
+				alpha = tmp_value
+				place_max = i
+
+		return place_max
+	
+
+	def __first_max_node_cheat(self, board : Board, alpha , beta):
+		t = board.turn
+		bplace = board.black_positions
+		wplace = board.white_positions
+		value = self.__min_value
+		place_list = [ ]
+		for i in range(64):
+			if t==1 and (i in bplace):
+				continue
+			if t==0 and (i in wplace):
+				continue
+			place_list.append(i)
+		if not place_list:
+			print("error")
+			return -1
 		place_max = place_list[0]
 
 		for i in place_list:
