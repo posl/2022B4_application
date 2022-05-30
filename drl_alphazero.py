@@ -705,6 +705,7 @@ def __eval_preprocess(file_path, key_str):
     network.load_weights(file_path.format("parameters") + ".npz")
 
     # 並列実行を行うための前処理
+    ray.shutdown()
     ray.init()
     weights = ray.put(network.get_weights())
     del network
@@ -722,8 +723,8 @@ def __eval_preprocess(file_path, key_str):
 
 if __name__ == "__main__":
     # 学習用コード
-    arena = AlphaZero()
-    arena.fit(restart = False)
+    # arena = AlphaZero()
+    # arena.fit(restart = False)
 
     # 評価用コード
     eval_alphazero_computer(file_name = "alphazero-9")
