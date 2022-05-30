@@ -11,6 +11,7 @@ import pygame
 from mc_tree_search import MonteCarloTreeSearch, NAMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
+from gt_alpha_beta_cheat import AlphaBetaCheat
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
@@ -744,6 +745,10 @@ class PlayerKinds:
 
         self.kinds_name.append("Alpha Beta")
         self.kinds_func.append([AlphaBeta()])
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("Alpha Beta-Cheat")
+        self.kinds_func.append([AlphaBetaCheat()])
         self.kinds_difficulty.append(1)
         
 
