@@ -13,7 +13,12 @@ class GTValue:
 
 		self.set_block_points()
 
-		self.set_data_dir("./data/gt/")
+		if False:
+			self.set_data_dir("./data/gt/current/")
+
+		if True:
+			self.set_data_dir("./data/gt/valid/")
+
 		if select_value == 0:
 			self.reset()
 
@@ -50,19 +55,19 @@ class GTValue:
 		self.set_raw_value_list(tmp_value_list)
 	
 	#盤面の指定されたのマスの評価値を返す
-	def get_board_value(self, board_index):
-		x, y = divmod(board_index, Board.width)
-		x = min(x, Board.height - x - 1)
-		y = min(y, Board.width - y - 1)
-		if x == 0  and y == 0:
-			return self.corner
-		if x + y == 1:
-			return self.around_corner
-		if x == 0 or y == 0:
-			return self.edge
-		if x == 1 or y == 1:
-			return self.around_edge
-		return self.others
+	# def get_board_value(self, board_index):
+	# 	x, y = divmod(board_index, Board.width)
+	# 	x = min(x, Board.height - x - 1)
+	# 	y = min(y, Board.width - y - 1)
+	# 	if x == 0  and y == 0:
+	# 		return self.corner
+	# 	if x + y == 1:
+	# 		return self.around_corner
+	# 	if x == 0 or y == 0:
+	# 		return self.edge
+	# 	if x == 1 or y == 1:
+	# 		return self.around_edge
+	# 	return self.others
 
 	def set_block_points(self):
 		block_points = {}
@@ -88,23 +93,58 @@ class GTValue:
 
 
 	#黒側の評価値を返す
-	def evaluate_black(self, board : Board):
+	def evaluate_black(self, board : Board, flag):
 		#石の数の評価
 		value_black = 0
 		for i in range(board.action_size):
 			if (board.stone_black >> i) & 1:
-				value_black += self.get_board_value(i)
+				value_black += self.block_points[i]
 			elif (board.stone_white >> i) & 1:
-				value_black -= self.get_board_value(i)
+				value_black -= self.block_points[i]
 	
 		#置ける場所の数の評価
-		tmp_turn = board.turn
-		board.turn = 1
-		value_black += self.place * len(board.list_placable())
-		board.turn = 0
-		value_black -= self.place * len(board.list_placable())
-		board.turn = tmp_turn
+		if False:
+			value_black += (board.turn - (not board.turn)) * self.__eval_current_place(board)
+		if True:
+			if flag:
+				flag = 2
+			value_black += (board.turn - (not board.turn)) * self.__eval_valid_actions(board, flag)
+
 		return value_black
+
+	def __eval_current_place(self, board : Board):
+		value = self.place * len(board.list_placable())
+		board.turn = not board.turn
+		value -= self.place * len(board.list_placable())
+		board.turn = not board.turn
+		return value
+
+	# 置けるマスの数による評価
+	def __eval_valid_actions(self, board: Board, flag = 2):
+		# ゲームが終了した場合、置けるマスは０
+		if not flag:
+			return 0
+
+		p_list = board.list_placable()
+		p_length = len(p_list)
+
+		# 手番が交代した場合は、相手の置けるマスの数にマイナスを掛けたものを評価点に使う
+		if flag == 1:
+			return -p_length
+
+		p_value = 0
+		for i in p_list:
+			with board.log_runtime():
+				board.put_stone(i)
+				flag = board.can_continue()
+				p_value += self.__eval_valid_actions(board, flag)
+
+		# 置けるマスの数を評価点とし、実際に石を置いた後の、置けるマスの数による評価点の平均をそれに加算して、出力とする
+		if p_length:
+			p_length += p_value / p_length
+
+		return p_length
+
 
 
 class AlphaBeta:
@@ -133,11 +173,11 @@ class AlphaBeta:
 		return int(self.__first_max_node(board, self.__min_value, self.__max_value))
 
 	# 評価関数
-	def __evaluate(self, board : Board):
+	def __evaluate(self, board : Board, flag):
 		if self.turn == 1:
-			return self.value.evaluate_black(board)
+			return self.value.evaluate_black(board, flag)
 		else:
-			return - self.value.evaluate_black(board)
+			return - self.value.evaluate_black(board, flag)
 
 	# 評価が最大値となる場所を求める
 	def __first_max_node(self, board : Board, alpha , beta):
@@ -159,13 +199,12 @@ class AlphaBeta:
 		return place_max
 
 	# 評価を求める
-	#　動作未確認
-	def __node(self, board : Board, depth, alpha, beta, can_continue_flag = 1):
+	def __node(self, board : Board, depth, alpha, beta, flag = 1):
 		if depth == self.__max_depth:
-			return self.__evaluate(board)
+			return self.__evaluate(board, flag)
 
-		if can_continue_flag == 0:
-			return self.__evaluate(board)
+		if flag == 0:
+			return self.__evaluate(board, flag)
 
 		# 求める評価値が最大か最小か決定する
 		ismax = not (self.turn ^ board.turn)
@@ -220,8 +259,8 @@ if __name__ == "__main__":
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
 	# ab0.value.read_value_list("./data/gt/self_match2")
-	ab0.value.read_value_list("./data/gt/default_data")
-	ab1.value.read_value_list("./data/gt/past_data")
+	ab0.value.read_value_list("default_data")
+	ab1.value.read_value_list("past_data")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
