@@ -107,8 +107,7 @@ class GTValue:
 			value_black += (board.turn - (not board.turn)) * self.__eval_current_place(board)
 		if True:
 			if flag:
-				flag = 2
-			value_black += (board.turn - (not board.turn)) * self.__eval_valid_actions(board, flag)
+				value_black += (board.turn - (not board.turn)) * self.__eval_valid_actions(board)
 
 		return value_black
 
