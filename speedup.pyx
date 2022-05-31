@@ -198,7 +198,7 @@ def count_stand_bits(uint n):
 # nega_alpha (nega_max + 枝刈り)
 # =============================================================================
 
-# flag -1:初回呼び出し、0:正常、１:パスした
+# flag -1: 初回呼び出し、0: 正常、１: パスした
 cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag, time_t limit_time):
     cdef:
         uint mask, legal_board, put
