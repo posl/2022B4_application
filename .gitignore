@@ -1,7 +1,7 @@
 .DS_Store
 .venv/
 .vscode/
+__pycache__
 Pipfile*
 profiling.*
 setup.py
-test.py

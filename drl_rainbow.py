@@ -622,16 +622,16 @@ class Rainbow(SelfMatch):
         agent.update((state, action, -reward, next_state, placable), turn, progress)
 
 
-def fit_rainbow_agent(episodes = 500000, restart = False):
+def fit_rainbow_agent(episodes = 150000, restart = False):
     # ハイパーパラメータ設定
-    buffer_size = 250000
+    buffer_size = 100000
     prioritized = True
     compress = False
     step_num = 3
     gamma = 0.95
     batch_size = 32
     quantiles_num = 50
-    lr = 0.00025
+    lr = 0.0005
     to_gpu = True
 
     # 環境
