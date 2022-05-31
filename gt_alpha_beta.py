@@ -10,7 +10,9 @@ class GTValue:
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
-		
+
+		self.set_block_points()
+
 		self.set_data_dir("./data/gt/")
 		if select_value == 0:
 			self.reset()
@@ -27,6 +29,7 @@ class GTValue:
 		try:
 			self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
 			= value_list
+			self.set_block_points()
 		except:
 			pass
 
@@ -60,6 +63,29 @@ class GTValue:
 		if x == 1 or y == 1:
 			return self.around_edge
 		return self.others
+
+	def set_block_points(self):
+		block_points = {}
+		self.block_points = block_points
+
+		for i in range(Board.action_size):
+			x, y = divmod(i, Board.width)
+			x = min(x, Board.height - x - 1)
+			y = min(y, Board.width - y - 1)
+
+			if x == 0  and y == 0:
+				block_point = self.corner
+			elif x + y == 1:
+				block_point = self.around_corner
+			elif x == 0 or y == 0:
+				block_point = self.edge
+			elif x == 1 or y == 1:
+				block_point = self.around_edge
+			else:
+				block_point = self.others
+
+			block_points[i] = block_point
+
 
 	#黒側の評価値を返す
 	def evaluate_black(self, board : Board):
@@ -195,7 +221,7 @@ if __name__ == "__main__":
 	ab1 = AlphaBeta(1)
 	# ab0.value.read_value_list("./data/gt/self_match2")
 	ab0.value.read_value_list("./data/gt/default_data")
-	ab1.value.read_value_list("./data/gt/self_ave")
+	ab1.value.read_value_list("./data/gt/past_data")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
