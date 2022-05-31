@@ -69,6 +69,27 @@ class GTReinforce:
 
             self.agent.update(-reward)
             sum_reward += -reward
+
+            board.reset()
+            agent_alphabeta = AlphaBeta(self.agent.new_data)
+            agent_alphabeta.set_depth(self.depth)
+            board.set_plan(agent_alphabeta.get_next_move, self.player1)
+            board.game()
+            diff = board.black_num - board.white_num
+            if diff:
+                if (diff > 0):
+                  reward =  1
+                else:
+                    reward = -1
+            else:
+                reward = 0
+
+            self.agent.update(reward)
+            sum_reward += reward
+
+
+
+
         print(sum_reward)
         return self.agent.get_data()
 
@@ -101,6 +122,8 @@ if __name__ == "__main__":
     gtr2.agent.data.read_value_list("./data/gt/self_match2")
     gtr2.agent.update(0)
     gtr2_file_path = "./data/gt/self_match2"
+
+    
     while 1:
         tmp_gtr2_ab = AlphaBeta(gtr2.agent.data)
         tmp_gtr2_ab.set_depth(6)
