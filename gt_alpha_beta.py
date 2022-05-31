@@ -10,6 +10,7 @@ class GTValue:
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
+		self.set_data_dir("./data/gt/")
 		if select_value == 0:
 			self.reset()
 
@@ -28,12 +29,19 @@ class GTValue:
 		except:
 			pass
 
-	def write_value_list(self, filename = "./data/gt/data"):
-		with open(filename, mode = "w") as f:
+	def set_data_dir(self, dir_name):
+		self.dir_name = dir_name
+
+	def write_value_list(self, file_name = "tmp_data"):
+		if not "/" in file_name:
+			file_name = self.dir_name + file_name
+		with open(file_name, mode = "w") as f:
 			f.write(" ".join(map(str, self.get_raw_value_list())))
 
-	def read_value_list(self, filename = "./data/gt/data"):
-		with open(filename, mode = "r") as f:
+	def read_value_list(self, file_name = "default_data"):
+		if not "/" in file_name:
+			file_name = self.dir_name + file_name
+		with open(file_name, mode = "r") as f:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 	

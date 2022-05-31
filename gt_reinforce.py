@@ -15,7 +15,7 @@ class GTTDAgent:
         self.__creat_new_data()
 
     def __creat_new_data(self):
-        self.new_data.set_raw_value_list([i + min(0.3 , 1 - i, i - (-1)) * (np.random.random() * 2 - 1) for i in self.data.get_raw_value_list()])
+        self.new_data.set_raw_value_list([i + min(0.5 , 1 - i, i - (-1)) * (np.random.random() * 2 - 1) for i in self.data.get_raw_value_list()])
 
     def reset(self):
         self.data.reset()
@@ -113,15 +113,15 @@ if __name__ == "__main__":
     gtr1 = GTReinforce()
     gtr1.reset()
     gtr1.set_depth(6)
-    gtr1.agent.data.read_value_list("./data/gt/self_match1")
+    gtr1.agent.data.read_value_list("self_match1")
     gtr1.agent.update(0)
-    gtr1_file_path = "./data/gt/self_match1"
+    gtr1_file_path = "self_match1"
     gtr2 = GTReinforce()
     gtr2.reset()
     gtr2.set_depth(6)
-    gtr2.agent.data.read_value_list("./data/gt/self_match2")
+    gtr2.agent.data.read_value_list("self_match2")
     gtr2.agent.update(0)
-    gtr2_file_path = "./data/gt/self_match2"
+    gtr2_file_path = "self_match2"
 
     
     while 1:
