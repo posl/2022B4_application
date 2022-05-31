@@ -10,12 +10,13 @@ class GTValue:
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
+		
 		self.set_data_dir("./data/gt/")
 		if select_value == 0:
 			self.reset()
 
 	def reset(self):
-		self.read_value_list("./data/gt/default_data")
+		self.read_value_list("default_data")
 
 	#評価に必要とする変数をリストとして返す
 	def get_raw_value_list(self):
