@@ -10,11 +10,15 @@ class GTValue:
 		self.around_edge = select_value
 		self.others = select_value
 		self.place = select_value
+
+		self.set_block_points()
+
+		self.set_data_dir("./data/gt/")
 		if select_value == 0:
 			self.reset()
 
 	def reset(self):
-		self.read_value_list("./data/gt/default_data")
+		self.read_value_list("default_data")
 
 	#評価に必要とする変数をリストとして返す
 	def get_raw_value_list(self):
@@ -25,23 +29,31 @@ class GTValue:
 		try:
 			self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
 			= value_list
+			self.set_block_points()
 		except:
 			pass
 
-	def write_value_list(self, filename = "./data/gt/data"):
-		with open(filename, mode = "w") as f:
+	def set_data_dir(self, dir_name):
+		self.dir_name = dir_name
+
+	def write_value_list(self, file_name = "tmp_data"):
+		if not "/" in file_name:
+			file_name = self.dir_name + file_name
+		with open(file_name, mode = "w") as f:
 			f.write(" ".join(map(str, self.get_raw_value_list())))
 
-	def read_value_list(self, filename = "./data/gt/data"):
-		with open(filename, mode = "r") as f:
+	def read_value_list(self, file_name = "default_data"):
+		if not "/" in file_name:
+			file_name = self.dir_name + file_name
+		with open(file_name, mode = "r") as f:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 	
 	#盤面の指定されたのマスの評価値を返す
 	def get_board_value(self, board_index):
 		x, y = divmod(board_index, Board.width)
-		x = min(x, Board.height - x)
-		y = min(y, Board.width - y)
+		x = min(x, Board.height - x - 1)
+		y = min(y, Board.width - y - 1)
 		if x == 0  and y == 0:
 			return self.corner
 		if x + y == 1:
@@ -51,6 +63,29 @@ class GTValue:
 		if x == 1 or y == 1:
 			return self.around_edge
 		return self.others
+
+	def set_block_points(self):
+		block_points = {}
+		self.block_points = block_points
+
+		for i in range(Board.action_size):
+			x, y = divmod(i, Board.width)
+			x = min(x, Board.height - x - 1)
+			y = min(y, Board.width - y - 1)
+
+			if x == 0  and y == 0:
+				block_point = self.corner
+			elif x + y == 1:
+				block_point = self.around_corner
+			elif x == 0 or y == 0:
+				block_point = self.edge
+			elif x == 1 or y == 1:
+				block_point = self.around_edge
+			else:
+				block_point = self.others
+
+			block_points[i] = block_point
+
 
 	#黒側の評価値を返す
 	def evaluate_black(self, board : Board):
@@ -117,8 +152,6 @@ class AlphaBeta:
 				board.put_stone(i)
 				flag = board.can_continue()
 				tmp_value = self.__node(board, 1, alpha, beta)
-			if tmp_value >= beta:
-				return tmp_value
 			if tmp_value > alpha:
 				alpha = tmp_value
 				place_max = i
@@ -186,6 +219,9 @@ if __name__ == "__main__":
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
 	ab1 = AlphaBeta(1)
+	# ab0.value.read_value_list("./data/gt/self_match2")
+	ab0.value.read_value_list("./data/gt/default_data")
+	ab1.value.read_value_list("./data/gt/past_data")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
