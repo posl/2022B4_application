@@ -1,9 +1,9 @@
-import random
+from random import choices
 
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_train
-from drl_utilities import ResNet50, SelfMatch
+from drl_utilities import ResNet50, SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.functions import flatten, relu, softmax, log
 from board import Board
@@ -77,7 +77,7 @@ class ReinforceAgent:
         if len(placable) == 1:
             action_index = 0
         else:
-            action_index = random.choices(range(len(placable)), probs.data[0])[0]
+            action_index = choices(range(len(placable)), probs.data[0])[0]
 
         # 行動が選ばれる確率も一緒に出力する
         return placable[action_index], probs[0, action_index]
@@ -158,22 +158,15 @@ def fit_reinforce_agent(episodes = 100000, restart = False):
 # =============================================================================
 
 class ReinforceComputer:
-    def __init__(self, action_size, file_name = "reinforce", to_gpu = False):
+    def __init__(self, action_size, file_name = "reinforce-0", to_gpu = False):
+        self.use_gpu = to_gpu and cuda.gpu_enable
+        pi = PolicyNet(action_size)
+        self.pi = pi
+
         file_path = Reinforce.get_path(file_name).format("parameters")
-        each_pi = []
-        use_gpu = to_gpu and cuda.gpu_enable
-
-        # 同じ条件で学習した３人のエージェントの中から、２人だけ、ランダムに選ぶ
-        for i in random.sample(range(3), 2):
-            pi = PolicyNet(action_size)
-            each_pi.append(pi)
-
-            pi.load_weights(file_path + f"-{i}.npz")
-            if use_gpu:
-                pi.to_gpu()
-
-        self.each_pi = each_pi
-        self.use_gpu = use_gpu
+        pi.load_weights(file_path + ".npz")
+        if self.use_gpu:
+            pi.to_gpu()
 
     def __call__(self, board):
         placable = board.list_placable()
@@ -181,17 +174,13 @@ class ReinforceComputer:
             return placable[0]
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp)[None, :]
-
-        # 学習済みのパラメータを使うだけなので、動的に計算グラフを構築する必要はない
+        state = board.get_img(xp)
         with no_train():
-            pi0, pi1 = self.each_pi
-            policy = pi0(state).data + pi1(state).data
+            policy = self.pi(state[None, :])
 
-        # 各エージェントが提案するスコア値の和をとり、それを元にした重み付きランダムサンプリングで行動を選択する
-        policy = policy[0, np.array(placable)]
+        policy = policy.data[0, np.array(placable)]
         policy -= policy.max()
-        return random.choices(placable, xp.exp(policy))[0]
+        return choices(placable, xp.exp(policy))[0]
 
 
 
@@ -199,3 +188,6 @@ class ReinforceComputer:
 if __name__ == "__main__":
     # 学習用コード
     fit_reinforce_agent(restart = True)
+
+    # 評価用コード
+    eval_computer(ReinforceComputer, "REINFORCE", 0)

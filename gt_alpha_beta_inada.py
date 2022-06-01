@@ -7,14 +7,14 @@ class AlphaBeta:
         self.__max_depth = depth
 
         # 学習済みのマスの評価点
-        corner = 0.6576514321742223
-        around_corner = 0.4757884128809289
-        edge = 0.5309212414274704
-        around_edge = 0.13153629267654865
-        others = -0.2540768710622537
+        corner = 0.6799049534960244
+        around_corner = 0.5004023729821491
+        edge = 0.5544923898781453
+        around_edge = -0.11575315250855303
+        others = 0.06616793321648566
 
         # 置ける場所の数による評価点にかかる係数
-        self.place = 0.42422219310905573
+        self.place = 0.5390611408271047
 
         # 各マスの評価点を表現する辞書
         block_points = {}
@@ -42,65 +42,48 @@ class AlphaBeta:
 
             block_points[i] = block_point
 
+
     # 評価値を返す
     def __eval_board(self, board):
         value = self.__eval_exist_stones(board)
-        value += self.place * self.__eval_valid_actions()
+        value += self.place * self.__eval_valid_actions(board)
         return value
 
     # 既に置かれた石による評価
     def __eval_exist_stones(self, board: Board):
+        stone_black, stone_white = board.stone_black, board.stone_white
         block_points = self.block_points
         black_value = 0
 
         for i in range(board.action_size):
-            block_point = block_points[i]
-            if (board.stone_black >> i) & 1:
-                black_value += block_point
-            elif (board.stone_white >> i) & 1:
-                black_value -= block_point
+            if (stone_black >> i) & 1:
+                black_value += block_points[i]
+            elif (stone_white >> i) & 1:
+                black_value -= block_points[i]
 
         return black_value if board.turn else -black_value
 
     # 置けるマスの数による評価
     def __eval_valid_actions(self, board: Board, flag = 2):
-        # ゲームが終了した場合、置けるマスは０
-        if not flag:
-            return 0
-
-        p_list = board.list_placable()
-        p_length = len(p_list)
-
-        # 手番が交代した場合は、相手の置けるマスの数にマイナスを掛けたものを評価点に使う
-        if flag == 1:
-            return -p_length
-
-        p_value = 0
-        for i in p_list:
-            with board.log_runtime():
-                board.put_stone(i)
-                flag = board.can_continue()
-                p_value += self.__eval_valid_actions(board, flag)
-
-        # 置けるマスの数を評価点とし、実際に石を置いた後の、置けるマスの数による評価点の平均をそれに加算して、出力とする
-        p_length += p_value / p_length
-        return p_length
+        turn = board.turn
+        board.turn = 1
+        black_value = len(board.list_placable())
+        board.turn = 0
+        black_value -= len(board.list_placable())
+        board.turn = turn
+        return black_value if turn else -black_value
 
 
     def __call__(self, board):
         return self.get_next_move(board)
 
-    # 次の手を示す
-    def get_next_move(self, board):
-        self.turn = board.turn
-        return int(self.__first_max_node(board, -999, 999))
-
     # 評価が最大値となる場所を求める
-    def __first_max_node(self, board: Board, alpha, beta):
-        p_list = board.list_placable()
-        place_max = p_list[0]
+    def get_next_move(self, board: Board, alpha = -999, beta = 999):
+        self.turn = board.turn
+        place_list = board.list_placable()
+        place_max = place_list[0]
 
-        for i in p_list:
+        for i in place_list:
             with board.log_runtime():
                 board.put_stone(i)
                 board.can_continue()

@@ -1,6 +1,7 @@
-import random
+from random import random, choice
 from os.path import join, dirname
 from time import time
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 from tqdm import tqdm
@@ -10,6 +11,11 @@ from inada_framework import Layer, cuda
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten
 from inada_framework.utilities import make_dir_exist
+from board import Board
+
+from mc_primitive import PrimitiveMonteCarlo
+from mc_tree_search import MonteCarloTreeSearch
+from gt_alpha_beta import AlphaBeta
 
 
 
@@ -169,17 +175,17 @@ def simple_plan(board, placable = None):
         placable = board.list_placable()
 
     # 30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
-    if random.random() < 0.3:
+    if random() < 0.3:
         if len(placable) == 1:
             return placable[0]
-        return random.choice(placable)
+        return choice(placable)
 
     current_stone_num = board.get_stone_num()
     flip_nums = np.array([board.get_next_stone_num(n) - current_stone_num for n in placable])
 
     # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出した最大手であるインデックスからランダムに選ぶ
     indices = np.where(flip_nums == flip_nums.max())[0]
-    action_index = indices[0] if len(indices) == 1 else random.choice(indices)
+    action_index = indices[0] if len(indices) == 1 else choice(indices)
     return placable[action_index]
 
 
@@ -301,12 +307,12 @@ class SelfMatch:
 
             if run > 1:
                 try:
-                    index = eval_q
+                    com_index = eval_q
                 except NameError:
-                    index = 100
+                    com_index = 100
 
-                y[:, :index] /= run
-                y[:, index:] /= run - 1
+                y[:, :com_index] /= run
+                y[:, com_index:] /= run - 1
 
             plt.plot(x, y[0], label = "first")
             plt.plot(x, y[1], label = "second")
@@ -324,7 +330,7 @@ class SelfMatch:
 
 
     # エージェントを指定した敵と 100 回戦わせた時の勝利数を取得する
-    def eval(self, enemy = corners_plan):
+    def eval(self, enemy = corners_plan, in_progress = True):
         board = self.board
         agent = self.agent
         win_rates = []
@@ -333,23 +339,83 @@ class SelfMatch:
             plans = (agent, enemy) if turn else (enemy, agent)
             board.set_plan(*plans)
 
+            if in_progress:
+                n_gen = range(100)
+            else:
+                n_gen = tqdm(range(20), desc = "first" if turn else "second", leave = False)
+
             win_count = 0
-            for __ in range(100):
+            for __ in n_gen:
                 board.reset()
                 board.game()
 
                 result = board.black_num - board.white_num
                 win_count += (result > 0) if turn else (result < 0)
 
+            if not in_progress:
+                win_count *= 5
             win_rates.append(win_count)
         return win_rates
 
 
-    def save(self, file_path, index = None):
-        if index is None:
+    def save(self, file_path, com_index = None):
+        if com_index is None:
             self.agent.save(file_path, is_yet = True)
         else:
             # パラメータの最終保存を行う場合は、その後エージェントの初期化も行う
             agent = self.agent
-            agent.save(file_path + f"-{index}")
+            agent.save(file_path + f"-{com_index}")
             agent.reset()
+
+
+
+
+# =============================================================================
+# コンピュータの評価
+# =============================================================================
+
+def eval_computer(com_class, com_name: str, com_index: int, enemys: list = []):
+    name = com_name.lower()
+    file_path = SelfMatch.get_path(f"{name}.md").format("graphs")
+    make_dir_exist(file_path)
+
+    # 環境
+    board = Board()
+
+    # コンピュータ
+    computer = com_class(board.action_size, file_name = "{}-{}".format(name, com_index))
+
+    # 対戦場
+    arena = SelfMatch(board, computer)
+
+    # 対戦相手
+    enemys.append(("Alpha Beta", AlphaBeta()))
+    enemys.append(("MCTS", MonteCarloTreeSearch()))
+    enemys.append(("Primitive MC", PrimitiveMonteCarlo()))
+    enemys.append(("Corners Plan", corners_plan))
+    enemys.append(("Simple Plan", simple_plan))\
+
+    # 評価結果はマークダウンの表形式でファイルに出力する
+    with open(file_path, "a+") as f:
+        print(f"# {com_name}", file = f)
+        print("| Opponent | ~ | Black | White |", file = f)
+        print("| :-: | -: | :-: | :-: |", file = f)
+
+        start = time()
+        for __ in range(len(enemys)):
+            name, enemy = enemys.pop()
+            print(f"vs. {name}")
+
+            win_rates = arena.eval(enemy, in_progress = False)
+            print("| {} | ~ | {} % | {} % |".format(name, *win_rates), file = f)
+
+            # かかった時間の画面表示
+            finish = time()
+            print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
+            start = finish
+
+        # タイムスタンプの追加
+        JST = timezone(timedelta(hours = 9))
+        now = datetime.now(tz = JST)
+        print("- " + now.strftime("%Y / %m / %d / %H: %M: %S"), file = f)
+        print("<br>\n<br>\n", file = f)

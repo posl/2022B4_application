@@ -10,7 +10,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, Model, Function, optimizers, no_train
 from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
 from inada_framework.functions import affine, relu, flatten, broadcast_to, sum_to
-from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch
+from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.utilities import reshape_for_broadcast
 from board import Board
@@ -119,13 +119,13 @@ class RainbowNet(Model):
         x = self.cnn(x)
 
         # 学習の円滑化のためにアドバンテージ分布は中心化する
-        advantages = relu(self.bn_a(self.conv_a(x)))
-        advantages = self.a2(self.a1(flatten(x)))
+        advantages = flatten(relu(self.bn_a(self.conv_a(x))))
+        advantages = self.a2(self.a1(x))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
 
-        values = relu(self.bn_v(self.conv_v(x)))
-        values = self.v2(self.v1(flatten(x)))
+        values = flatten(relu(self.bn_v(self.conv_v(x))))
+        values = self.v2(self.v1(x))
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
 
@@ -487,12 +487,10 @@ class RainbowAgent:
         self.qnet_target.copy_weights(self.qnet)
 
 
-    # エージェントを関数形式で使うとその方策に従った行動が得られる
     def __call__(self, board):
         action, __ = self.get_action(board)
         return action
 
-    # ニューラルネットワーク内のランダム要素が探索の役割を果たす
     def get_action(self, board, placable = None):
         if placable is None:
             placable = board.list_placable()
@@ -670,4 +668,7 @@ class RainbowComputer(RainbowAgent):
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_rainbow_agent(restart = False)
+    # fit_rainbow_agent(restart = False)
+
+    # 評価用コード
+    eval_computer(RainbowComputer, "Rainbow", 0)

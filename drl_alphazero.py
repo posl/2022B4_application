@@ -19,8 +19,8 @@ from board import Board
 from inada_framework.optimizers import Adam, WeightDecay
 from inada_framework.utilities import make_dir_exist
 
-from mc_tree_search import MonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo
+from mc_tree_search import MonteCarloTreeSearch
 from gt_alpha_beta import AlphaBeta
 from drl_reinforce import ReinforceComputer
 from drl_rainbow import RainbowComputer
@@ -132,8 +132,8 @@ class AlphaZeroAgent:
         self.W = {}
         self.N = {}
 
+        # board.list_placable() の再計算を無くすための辞書
         self.placable_dict = {}
-        self.rng = np.random.default_rng()
 
     def load(self, weights):
         self.network.set_weights(weights)
@@ -177,7 +177,7 @@ class AlphaZeroAgent:
         # 自己対戦時の探索初期状態では、ランダムな手が選ばれやすくなるように、ノイズをかける
         if selfplay_flag:
             P = self.P[root_state]
-            self.P[root_state] = 0.75 * P + 0.25 * self.rng.dirichlet(alpha = np.full(len(P), 0.35))
+            self.P[root_state] = 0.75 * P + 0.25 * np.random.dirichlet(alpha = np.full(len(P), 0.35))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations):
@@ -255,8 +255,6 @@ class AlphaZeroAgent:
         else:
             return self.board_can_continue(board, True)
 
-
-    # 木の構築と探索がボトルネックなので、それを解消するように board.list_placable() の再計算を無くすためのメソッド
     def __get_placable(self, board):
         placable_dict = self.placable_dict
         state = board.state
@@ -582,7 +580,9 @@ class AlphaZero:
             plt.ylim(-5, 105)
             plt.xlabel("Progress Rate")
             plt.ylabel("Winning Percentage")
-            plt.savefig(graphs_path)
+            plt.title("AlphaZero's Changes")
+
+            plt.savefig(f"{graphs_path}_plot")
             plt.clf()
 
 
@@ -618,12 +618,13 @@ def eval_alphazero_computer(file_name):
     # 描画用配列
     length = 6
     simulations_array = 25 * (2 ** np.arange(length))
-    win_rates = np.empty((2, length), dtype = np.int32)
+    record = np.empty((2, length), dtype = np.int32)
 
     # 行動選択時のシミュレーション回数を推移させながら、コンピュータを評価する
     for i, simulations in enumerate(simulations_array):
-        win_rates[:, i] = AlphaZero.eval(weights, simulations)
-        print("{:>4} || {:>3} % | {:>3} %".format(simulations, *win_rates[:, i]))
+        win_rates = AlphaZero.eval(weights, simulations)
+        record[:, i] = win_rates
+        print("{:>4} || {:>3} % | {:>3} %".format(simulations, *win_rates))
 
 
     # グラフの目盛り位置を設定するための変数
@@ -632,15 +633,15 @@ def eval_alphazero_computer(file_name):
     center = left + width
 
     # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
-    plt.bar(left, win_rates[0], width = width, align = "edge", label = "first")
-    plt.bar(center, win_rates[1], width = width, align = "edge", label = "second")
+    plt.bar(left, record[0], width = width, align = "edge", label = "first")
+    plt.bar(center, record[1], width = width, align = "edge", label = "second")
     plt.xticks(ticks = center, labels = simulations_array)
     plt.legend()
 
     plt.ylim(-5, 105)
     plt.xlabel("The Number of Simulations")
     plt.ylabel("Winning Percentage")
-    plt.title("AlphaZero")
+    plt.title("AlphaZero vs. Primitive MC")
 
     graphs_path = file_path.format("graphs")
     make_dir_exist(graphs_path)
@@ -697,7 +698,7 @@ def vs_alphazero_computer(file_name, simulations = 800):
 
     graphs_path = file_path.format("graphs")
     make_dir_exist(graphs_path)
-    fig.savefig(f"{graphs_path}-{simulations}_vs")
+    fig.savefig(f"{graphs_path}_pie")
     fig.clf()
 
 
@@ -730,5 +731,5 @@ if __name__ == "__main__":
     # arena.fit(restart = False)
 
     # 評価用コード
-    eval_alphazero_computer(file_name = "alphazero-9")
-    vs_alphazero_computer(file_name = "alphazero-9", simulations = 800)
+    eval_alphazero_computer(file_name = "alphazero-3")
+    vs_alphazero_computer(file_name = "alphazero-3", simulations = 800)
