@@ -1,7 +1,7 @@
 from random import random, choice
 from os.path import join, dirname
 from time import time
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone, datetime
 
 import numpy as np
 from tqdm import tqdm
