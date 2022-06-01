@@ -6,10 +6,10 @@ class GTValue:
 	def __init__(self, select_place_func = 0):
 		#置けるマスの評価方法を決定する
 		if select_place_func == 0:
-			self.__eval__actions = self.__eval_current_actions
+			self.__eval_actions = self.__eval_current_actions
 			self.set_data_dir("./data/gt/current/")
 		else:
-			self.__eval__actions = self.__eval_valid_actions
+			self.__eval_actions = self.__eval_valid_actions
 			self.set_data_dir("./data/gt/valid/")
 
 		self.reset()
@@ -81,7 +81,7 @@ class GTValue:
 	
 		#置ける場所の数の評価
 		if flag:
-			value_black += (board.turn - (not board.turn)) * self.place * self.__eval__actions(board)
+			value_black += (board.turn - (not board.turn)) * self.place * self.__eval_actions(board)
 
 		return value_black
 
@@ -124,7 +124,7 @@ class GTValue:
 class AlphaBeta:
 	def __init__(self, select_place_func = 0, value = 0):
 		#評価関数を決定する.指定がない場合はdefault_dataを使用する
-		if not value:
+		if value == 0:
 			self.value = GTValue(select_place_func)
 		else:
 			self.value = value
@@ -229,11 +229,13 @@ if __name__ == "__main__":
 	board = Board()
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
-	ab0 = AlphaBeta(0)
+	ab0 = AlphaBeta(1)
 	ab0.set_depth(6)
 	ab1 = AlphaBeta(1)
-	# ab0.value.read_value_list("./data/gt/self_match2")
+	ab0.value.read_value_list("self_match1")
+	ab1.value.read_value_list("self_match2")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
 	board.debug_game(ab0, ab1)
+	board.print_state()
