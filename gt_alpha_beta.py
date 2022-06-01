@@ -3,24 +3,16 @@ from board import Board
 import numpy as np
 
 class GTValue:
-	def __init__(self, select_value = 0):
-		self.corner = select_value
-		self.around_corner = select_value
-		self.edge = select_value
-		self.around_edge = select_value
-		self.others = select_value
-		self.place = select_value
-
-		self.set_block_points()
-
-		if False:
+	def __init__(self, select_place_func = 0):
+		#置けるマスの評価方法を決定する
+		if select_place_func == 0:
+			self.__eval__actions = self.__eval_current_actions
 			self.set_data_dir("./data/gt/current/")
-
-		if True:
+		else:
+			self.__eval__actions = self.__eval_valid_actions
 			self.set_data_dir("./data/gt/valid/")
 
-		if select_value == 0:
-			self.reset()
+		self.reset()
 
 	def reset(self):
 		self.read_value_list("default_data")
@@ -54,21 +46,6 @@ class GTValue:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 	
-	#盤面の指定されたのマスの評価値を返す
-	# def get_board_value(self, board_index):
-	# 	x, y = divmod(board_index, Board.width)
-	# 	x = min(x, Board.height - x - 1)
-	# 	y = min(y, Board.width - y - 1)
-	# 	if x == 0  and y == 0:
-	# 		return self.corner
-	# 	if x + y == 1:
-	# 		return self.around_corner
-	# 	if x == 0 or y == 0:
-	# 		return self.edge
-	# 	if x == 1 or y == 1:
-	# 		return self.around_edge
-	# 	return self.others
-
 	def set_block_points(self):
 		block_points = {}
 		self.block_points = block_points
@@ -103,15 +80,13 @@ class GTValue:
 				value_black -= self.block_points[i]
 	
 		#置ける場所の数の評価
-		if False:
-			value_black += (board.turn - (not board.turn)) * self.place * self.__eval_current_place(board)
-		if True:
-			if flag:
-				value_black += (board.turn - (not board.turn)) * self.place * self.__eval_valid_actions(board)
+		if flag:
+			value_black += (board.turn - (not board.turn)) * self.place * self.__eval__actions(board)
 
 		return value_black
 
-	def __eval_current_place(self, board : Board):
+	# 置けるマスの数による評価
+	def __eval_current_actions(self, board : Board):
 		value = self.place * len(board.list_placable())
 		board.turn = not board.turn
 		value -= self.place * len(board.list_placable())
@@ -147,11 +122,13 @@ class GTValue:
 
 
 class AlphaBeta:
-	def __init__(self, select_value = 0):
-		if type(select_value) == type(int()):
-			self.value = GTValue(0)
+	def __init__(self, select_place_func = 0, value = 0):
+		#評価関数を決定する.指定がない場合はdefault_dataを使用する
+		if not value:
+			self.value = GTValue(select_place_func)
 		else:
-			self.value = select_value
+			self.value = value
+		
 		self.__min_value = -999
 		self.__max_value = 999
 		self.set_depth(6)
@@ -238,9 +215,6 @@ class AlphaBeta:
 
 		return value
 
-
-
-
 if __name__ == "__main__":
 	def player(board):
 		while 1:
@@ -256,10 +230,9 @@ if __name__ == "__main__":
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
+	ab0.set_depth(6)
 	ab1 = AlphaBeta(1)
 	# ab0.value.read_value_list("./data/gt/self_match2")
-	ab0.value.read_value_list("default_data")
-	ab1.value.read_value_list("past_data")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
