@@ -104,10 +104,10 @@ class GTValue:
 	
 		#置ける場所の数の評価
 		if False:
-			value_black += (board.turn - (not board.turn)) * self.__eval_current_place(board)
+			value_black += (board.turn - (not board.turn)) * self.place * self.__eval_current_place(board)
 		if True:
 			if flag:
-				value_black += (board.turn - (not board.turn)) * self.__eval_valid_actions(board)
+				value_black += (board.turn - (not board.turn)) * self.place * self.__eval_valid_actions(board)
 
 		return value_black
 
