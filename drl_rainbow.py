@@ -10,7 +10,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, Model, Function, optimizers, no_train
 from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
 from inada_framework.functions import affine, relu, flatten, broadcast_to, sum_to
-from drl_utilities import SimpleCNN, preprocess_to_gpu, SelfMatch, eval_computer
+from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.utilities import reshape_for_broadcast
 from board import Board
@@ -97,17 +97,16 @@ class RainbowNet(Model):
         self.use_gpu = use_gpu
 
         # 全結合層への入力形式を学習する、畳み込み層
-        self.cnn = SimpleCNN()
-        ##self.cnn = ResNet50()
+        self.cnn = ResNet50()
 
         # 行動価値関数をアドバンテージ分布と状態価値分布に分けて学習する (Dueling DQN)
-        ##self.conv_a = dzl.Conv2d1x1(16)
-        ##self.bn_a = dzl.BatchNorm()
+        self.conv_a = dzl.Conv2d1x1(16)
+        self.bn_a = dzl.BatchNorm()
         self.a1 = NoisyAffine(512, relu)
         self.a2 = NoisyAffine(action_size * quantiles_num)
 
-        ##self.conv_v = dzl.Conv2d1x1(8)
-        ##self.bn_v = dzl.BatchNorm()
+        self.conv_v = dzl.Conv2d1x1(8)
+        self.bn_v = dzl.BatchNorm()
         self.v1 = NoisyAffine(512, relu)
         self.v2 = NoisyAffine(quantiles_num)
 
@@ -120,12 +119,12 @@ class RainbowNet(Model):
         x = self.cnn(x)
 
         # 学習の円滑化のためにアドバンテージ分布は中心化する
-        ##advantages = flatten(relu(self.bn_a(self.conv_a(x))))
+        advantages = flatten(relu(self.bn_a(self.conv_a(x))))
         advantages = self.a2(self.a1(x))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
 
-        ##values = flatten(relu(self.bn_v(self.conv_v(x))))
+        values = flatten(relu(self.bn_v(self.conv_v(x))))
         values = self.v2(self.v1(x))
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages

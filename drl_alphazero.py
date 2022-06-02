@@ -416,6 +416,26 @@ def alphazero_test(weights, simulations, turn, enemy):
     return (result > 0) if turn else (result < 0)
 
 
+@ray.remote(num_cpus = 1, num_gpus = 0)
+def alphazero_valid(weights1, weights0, simulations):
+    # 環境
+    board = Board()
+    board.reset()
+
+    # エージェント
+    agent1 = AlphaZeroAgent(board.action_size)
+    agent1.reset(weights1, simulations)
+    agent0 = AlphaZeroAgent(board.action_size)
+    agent0.reset(weights0, simulations)
+
+    # 方策の設定・１ゲーム勝負
+    board.set_plan(agent1, agent0)
+    board.game()
+
+    # 先攻が勝利したか否かをを取得
+    return ((board.black_num - board.white_num) > 0)
+
+
 
 
 # =============================================================================
@@ -423,7 +443,7 @@ def alphazero_test(weights, simulations, turn, enemy):
 # =============================================================================
 
 class AlphaZero:
-    def __init__(self, buffer_size = 76800, batch_size = 128, lr = 0.0005, decay = 0.0001, to_gpu = True):
+    def __init__(self, buffer_size = 76800, batch_size = 128, lr = 0.001, decay = 0.0001, to_gpu = True):
         # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
 
@@ -601,12 +621,12 @@ class AlphaZero:
             plt.ylabel("Winning Percentage")
             plt.title("AlphaZero's Changes")
 
-            plt.savefig(f"{graphs_path}_plot")
+            plt.savefig(graphs_path)
             plt.clf()
 
 
     @staticmethod
-    def eval(weights, simulations = 800, enemy = PrimitiveMonteCarlo(2048)):
+    def eval(weights, simulations = 800, enemy = AlphaBeta()):
         with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
             win_rates = []
 
@@ -631,114 +651,111 @@ class AlphaZero:
 # =============================================================================
 
 def eval_alphazero_computer(index = None):
-    file_path = AlphaZeroComputer.get_trained_path(index)
-    weights = __eval_preprocess(file_path, "sim.")
+    # ファイルのパス
+    params_path = AlphaZeroComputer.get_trained_path(index)
+    graphs_path = params_path.replace("parameters", "graphs")[:-6]
 
-    # 描画用配列
-    length = 6
-    simulations_array = 25 * (2 ** np.arange(length))
-    record = np.empty((2, length), dtype = np.int32)
+    # 並列実行を行うための初期化
+    ray.shutdown()
+    ray.init()
 
-    # 行動選択時のシミュレーション回数を推移させながら、コンピュータを評価する
-    for i, simulations in enumerate(simulations_array):
-        win_rates = AlphaZero.eval(weights, simulations)
-        record[:, i] = win_rates
-        print("{:>4} || {:>3} % | {:>3} %".format(simulations, *win_rates))
+    # パラメータを共有メモリにコピー
+    network = PolicyValueNet(Board.action_size)
+    network.load_weights(params_path)
+    weights = ray.put(network.get_weights())
+    del network
 
-
-    # グラフの目盛り位置を設定するための変数
-    width = 1 / 3
-    left = np.arange(length)
-    center = left + width
-
-    # 左が先攻、右が後攻の勝率となるような棒グラフを画像保存する
-    plt.bar(left, record[0], width = width, align = "edge", label = "first")
-    plt.bar(center, record[1], width = width, align = "edge", label = "second")
-    plt.xticks(ticks = center, labels = simulations_array)
-    plt.legend()
-
-    plt.ylim(-5, 105)
-    plt.xlabel("The Number of Simulations")
-    plt.ylabel("Winning Percentage")
-    plt.title("AlphaZero vs. Primitive MC")
-
-    graphs_path = file_path.replace("parameters", "graphs").removesuffix(".npz")
-    make_dir_exist(graphs_path)
-    plt.savefig(f"{graphs_path}_bar")
-    plt.clf()
-
-
-
-
-def vs_alphazero_computer(index = None, simulations = 800):
-    file_path = AlphaZeroComputer.get_trained_path(index)
-    weights = __eval_preprocess(file_path, "no.")
 
     # 対戦する相手の設定
     enemys = []
-    enemys.append(("Rainbow", RainbowComputer(Board.action_size)))
-    enemys.append(("REINFORCE", ReinforceComputer(Board.action_size)))
-    enemys.append(("Alpha Beta", AlphaBeta()))
-    enemys.append(("MCTS", MonteCarloTreeSearch()))
-    enemys.append(("Primitive MC", PrimitiveMonteCarlo()))
+    enemys.append(("Rainbow", "rain", RainbowComputer(Board.action_size)))
+    enemys.append(("REINFORCE", "rein", ReinforceComputer(Board.action_size)))
+    enemys.append(("Alpha Beta", "ab", AlphaBeta()))
+    enemys.append(("MCTS", "mcts", MonteCarloTreeSearch()))
+    enemys.append(("MC Primitive", "mcp", PrimitiveMonteCarlo()))
 
+    # 棒グラフの設定
+    bar_fig, bar_ax = plt.subplots(tight_layout = True)
 
-    # 図の生成
-    fig, axes = plt.subplots(2, 3, tight_layout = True)
+    bar_num = 3
+    sims_array = 50 * (4 ** np.arange(bar_num))
+    bar_record = np.empty((2, bar_num), dtype = np.int32)
 
-    # 各種設定
+    bar_width = 1 / 3
+    bar_left = np.arange(bar_num)
+    bar_center = bar_left + bar_width
+
+    # 円グラフの設定
+    pie_fig, pie_axes = plt.subplots(2, 3, tight_layout = True)
+
     pie_colors = ["orange", "greenyellow", "aqua"]
     edge_infos = {"linewidth" : 2, "edgecolor" : "white"}
-    pi_configs = {"startangle" : 90, "counterclock" : False, "wedgeprops" : edge_infos}
+    pie_configs = {"startangle" : 90, "counterclock" : False, "wedgeprops" : edge_infos}
 
-    # 行動選択時のシミュレーション回数を推移させながら、指定された方策でコンピュータを評価し、円グラフに描画する
+
+    # 対戦相手を変化させながら、コンピュータを評価する
+    start = time()
     for i in range(6):
-        ax = axes[divmod(i, 3)]
+        pie_ax = pie_axes[divmod(i, 3)]
         try:
-            name, enemy = enemys.pop()
+            name, alias, enemy = enemys.pop()
         except IndexError:
-            fig.delaxes(ax)
+            pie_fig.delaxes(pie_ax)
             continue
 
-        win_rates = AlphaZero.eval(weights, simulations, enemy)
-        print("{:>2}  || {:>3} % | {:>3} %".format(i, *win_rates))
+        # 評価部分
+        print(f"\n\033[92m>> vs. {name}\033[0m")
+        print("sims || first | second")
+        print("=======================")
 
-        record = np.zeros(3, dtype = np.int32)
-        record[:-1] = win_rates
-        record[-1] = 200 - record.sum()
+        for i, simulations in enumerate(sims_array):
+            win_rates = AlphaZero.eval(weights, simulations, enemy)
+            bar_record[:, i] = win_rates
+            print("{:>4} || {:>3} % | {:>3} %".format(simulations, *win_rates))
 
-        ax.pie(record, colors = pie_colors, autopct = "%.1f%%", **pi_configs)
-        ax.set_title(f"vs. {name}    ", fontsize = 12)
+        finish = time()
+        print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
+        start = finish
+
+
+        # シミュレーション回数を変動させた時の勝率を示す棒グラフを描画し、画像保存する
+        bar_ax.bar(bar_left, bar_record[0], width = bar_width, align = "edge", label = "first")
+        bar_ax.bar(bar_center, bar_record[1], width = bar_width, align = "edge", label = "second")
+        bar_ax.legend()
+
+        bar_ax.set_xticks(ticks = bar_center, labels = sims_array)
+        bar_ax.set_ylim(-5, 105)
+        bar_ax.set_xlabel("The Number of Simulations")
+        bar_ax.set_ylabel("Winning Percentage")
+        bar_ax.set_title(f"AlphaZero vs. {name}", fontsize = 14)
+
+        bar_fig.savefig(f"{graphs_path}_{alias}")
+        bar_ax.cla()
+
+
+        # 最大のシミュレーション回数での勝率を円グラフを描画する
+        pie_record = np.zeros(3, dtype = np.int32)
+        pie_record[:-1] = win_rates
+        pie_record[-1] = 200 - pie_record.sum()
+
+        pie_ax.pie(pie_record, colors = pie_colors, autopct = "%.1f%%", **pie_configs)
+        pie_ax.set_title(f"vs. {name}    ", fontsize = 12)
 
     # 凡例・タイトルを付け加えて、画像保存する
     labels = ["AlphaZero Win  (Black)", "AlphaZero Win  (White)", "Draw or Lose"]
-    fig.legend(labels, loc = (0.65, 0.2), fontsize = 10)
-    fig.suptitle(f"AlphaZero's Winning Percentage (Simulations = {simulations})", fontsize = 14)
-
-    graphs_path = file_path.replace("parameters", "graphs").removesuffix(".npz")
-    make_dir_exist(graphs_path)
-    fig.savefig(f"{graphs_path}_pie")
-    fig.clf()
+    pie_fig.legend(labels, loc = (0.65, 0.2), fontsize = 10)
+    pie_fig.suptitle("AlphaZero's Winning Percentage", fontsize = 14, color = "red")
+    pie_fig.savefig(f"{graphs_path}_vs")
 
 
+    # 図のクリア
+    bar_fig.clf()
+    pie_fig.clf()
 
 
-def __eval_preprocess(file_path, key_str):
-    network = PolicyValueNet(Board.action_size)
-    network.load_weights(file_path)
 
-    # 並列実行を行うための前処理
-    ray.shutdown()
-    ray.init()
-    weights = ray.put(network.get_weights())
 
-    # 画面表示
-    print("\033[92m=== Winning Percentage ===\033[0m")
-    output = key_str + " || first | second"
-    print(output)
-    print("=" * (len(output) + 1))
 
-    return weights
 
 
 
@@ -750,4 +767,3 @@ if __name__ == "__main__":
 
     # 評価用コード
     eval_alphazero_computer(index = None)
-    vs_alphazero_computer(index = None, simulations = 800)
