@@ -1,0 +1,237 @@
+import socket
+import threading
+import tkinter as tk
+import datetime
+from netifaces import interfaces, ifaddresses, AF_INET
+import time
+
+# -- 通信まわりの初期化
+IPADDR = "127.0.0.1"
+IPADDR = "192.168.35.85"
+PORT = 10100
+
+class Log:
+    def __init__(self):
+        now = datetime.datetime.now()
+        filename = "server_log_"
+        filename += str(now.year)
+        filename += "-"
+        filename += str(now.month)
+        filename += "-"
+        filename += str(now.day)
+        filename += "-"
+        filename += str(now.hour)
+        filename += "-"
+        filename += str(now.minute)
+        filename += "-"
+        filename += str(now.microsecond//1000)
+        filename += ".txt"
+        self.filename = filename
+        self.f = open(self.filename, 'a')
+        self.f.close()
+        
+    
+    def write(self, data):
+        self.f = open(self.filename, 'a')
+        self.f.write(data)
+        self.f.close()
+
+    def writeline(self, data):
+        self.f = open(self.filename, 'a')
+        self.f.write(data)
+        self.f.write("\n")
+        self.f.close()
+    
+    def close(self):
+        self.f.close()
+
+
+
+
+class Server:
+    def __init__(self):
+        # tupleを格納： id -> (id,IPアドレス,PORT)
+        self.client_map = {}
+        self.sock = None
+        self.client_id_curr = 0
+        self.recv_func = None
+        self.log = Log()
+        self.max_connection = 2
+        pass
+
+    # 通信を開始
+    def connect(self, port="8080"):
+        ip = self.get_self_ip_addr()
+        self.sock = socket.socket(socket.AF_INET)
+        self.sock.bind((ip, port))
+        self.sock.listen()
+        pass
+
+    # 特定のクライアントから受信 スレッドにより実行される
+    def recv_client(self, id, sock, addr):
+        while True:
+            try:
+                data = sock.recv(1024)
+                if data==b"":
+                    break
+                print( str(self.client_map[id]) ,"から受信された：", data.decode("utf-8")  )
+                self.log.writeline( str(self.client_map[id]) +  "から受信された：" + data.decode("utf-8")  )
+                self.recv_func( id, data.decode("utf-8") )
+            except ConnectionResetError:
+                break
+            except:
+                break
+        print("クライアントが退出:", self.client_map[id][0], self.client_map[id][2] )
+        self.log.writeline( "クライアントが退出:" + str(self.client_map[id])  )
+        del self.client_map[id]
+
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        sock.close()
+    
+    # 新たなクライアントがいる場合には、スレッドを立てて処理を任せる
+    def recv_loop(self):
+        while True:
+            sock_cl, addr = self.sock.accept()
+            while len(self.client_map)>=self.max_connection:
+                time.sleep(1.0)
+            self.client_map[self.client_id_curr] = (self.client_id_curr, sock_cl, addr )
+            id = self.client_id_curr
+            self.client_id_curr += 1
+            print("新しい人が参加した：", str( self.client_map[id][0] ), str( self.client_map[id][2] ) )
+            self.log.writeline(  "新しい人が参加した：" + str( self.client_map[id] )  )
+
+            thread = threading.Thread(target=self.recv_client, args=(id, sock_cl, addr))
+            thread.daemon = True
+            thread.start()
+
+            self.send(id, "SET ID "+str(id) )
+
+
+    # 
+    def send(self, id, message):
+        try:
+            self.client_map[id][1].send( message.encode("utf-8") )
+        except:
+            print("送信エラー")
+
+    def get_self_ip_addr(self):
+        for ifaceName in interfaces():
+            addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+            for addr in addresses:
+                if addr != 'No IP addr' and addr != "127.0.0.1":
+                    print(ifaceName, addr)
+                    return addr
+
+
+class MainWindow(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+        self.title("Server")
+        self.geometry("400x300")
+
+        self.frame = tk.Frame(self)
+        self.frame.pack()
+
+        self.listbox = tk.Listbox(self.frame, width=40, height=15)
+        self.listbox.pack(side=tk.LEFT)
+
+        self.scroll_bar = tk.Scrollbar(self.frame, command=self.listbox.yview)
+        self.scroll_bar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.listbox.config(yscrollcommand=self.scroll_bar.set)
+
+        self.input_frame = tk.Frame(self)
+        self.input_frame.pack()
+
+        self.textbox = tk.Entry(self.input_frame)
+        self.textbox.pack(side=tk.LEFT)
+
+        self.button = tk.Button(self.input_frame, text="send")
+        self.button.pack(side=tk.RIGHT)
+
+        self.server = Server()
+        self.server.connect()
+        self.server.recv_func = self.recv_func
+        thread = threading.Thread(target=self.server.recv_loop, args=())
+        thread.daemon = True
+        thread.start()
+        #self.server.recv_loop()
+
+    def recv_func(self, id, x):
+        self.listbox.insert(tk.END, x)
+        return
+
+
+def func(x, y):
+    return
+
+
+def get_self_ip_addr():
+    for ifaceName in interfaces():
+        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+        for addr in addresses:
+            if addr != 'No IP addr' and addr != "127.0.0.1":
+                print(ifaceName, addr)
+                return addr
+        #print(' '.join(addresses))
+        #print("---", str(addresses), "---")
+
+
+class OthelloServer:
+    def __init__(self):
+        self.server = Server()
+        self.server.connect(PORT)
+        self.server.recv_func = self.recv_func
+        self.thread = threading.Thread(target=self.server.recv_loop, args=())
+        self.thread.daemon = True
+        self.thread.start()
+
+        self.opponents = {}
+
+
+    
+    def mainloop(self):
+        while True:
+            s = input()
+            y = s.split()
+            if y[0]=="exit":
+                break
+            elif y[0]=="print":
+                if y[1]=="client":
+                    print( self.server.client_map )
+    
+    def recv_func(self, id, data):
+        y = data.split()
+        if len(y)<2:
+            return
+        if y[0]=="PUT":
+            place = int(y[1])
+            for i in self.server.client_map.keys():
+                if i==id:
+                    continue
+                s = "PUT " + str(place)
+                self.server.send(i, s )
+                break
+        pass
+
+
+
+if __name__=="__main__":
+    if False:
+        host = socket.gethostname()
+        print(host)
+
+        ip = socket.gethostbyname(host)
+        ip = get_self_ip_addr()
+        print(ip)
+        IPADDR = str(ip)
+
+    server = OthelloServer()
+    server.mainloop()
+    #window = MainWindow()
+    #window.mainloop()
+
+
