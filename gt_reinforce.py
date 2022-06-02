@@ -15,7 +15,7 @@ class GTTDAgent:
         self.__creat_new_data()
 
     def __creat_new_data(self):
-        self.new_data.set_raw_value_list([i + min(0.1 , 1 - i, i - (-1)) * (np.random.random() * 2 - 1) for i in self.data.get_raw_value_list()])
+        self.new_data.set_raw_value_list([i + min(0.3 , 1 - i, i - (-1)) * (np.random.random() * 2 - 1) for i in self.data.get_raw_value_list()])
 
     def reset(self):
         self.data.reset()
@@ -66,7 +66,7 @@ class GTReinforce:
                     reward = -1
             else:
                 reward = 0
-
+            print(-reward)
             self.agent.update(-reward)
             sum_reward += -reward
 

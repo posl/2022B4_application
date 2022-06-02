@@ -229,13 +229,13 @@ if __name__ == "__main__":
 	board = Board()
 	# それぞれのプレイヤーの戦略の関数をわたす
 	# プレイヤー先行でゲーム開始
-	ab0 = AlphaBeta(1)
-	ab0.set_depth(6)
+	ab0 = AlphaBeta(0)
+	ab0.set_depth(7)
 	ab1 = AlphaBeta(1)
-	ab0.value.read_value_list("self_match1")
-	ab1.value.read_value_list("self_match2")
+	ab0.value.read_value_list("default_data")
+	ab1.value.read_value_list("default_data")
 	board.reset()
 	# board.set_plan(ab0, ab1)
 	# board.game()
-	board.debug_game(ab0, ab1)
+	board.debug_game(ab1, ab0)
 	board.print_state()
