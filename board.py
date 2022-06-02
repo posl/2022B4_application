@@ -107,6 +107,8 @@ class Board:
         self.player1_plan = None
         self.player2_plan = None
 
+        # 全体の着手のログ
+        self.put_log = []
 
     @property
     def state(self):
@@ -146,6 +148,8 @@ class Board:
         self.stone_black = (0b10 << upper_left) + (0b01 << bottom_left)
         self.stone_white = (0b01 << upper_left) + (0b10 << bottom_left)
         self.turn = 1
+        self.put_log = []
+
 
     # オセロ盤の各位置を表す、行列のインデックス (tuple) を通し番号に変換する
     @staticmethod
@@ -302,17 +306,26 @@ class Board:
         else:
             return self.can_continue_placable(True)
 
-
     # ゲーム本体
     def game(self, render_flag = False):
         flag = 1
         while flag:
             n = self.get_action()
+            self.put_log.append(n)
             mask = self.put_stone(n)
             flag = self.can_continue()
 
             if render_flag:
                 self.render(mask, flag, n)
+
+    # 内部的なゲームの場合に使用
+    def internal_game(self):
+        flag = 1
+        while flag:
+            n = self.get_action()
+            self.put_stone(n)
+            flag = self.can_continue()
+
 
     # 画面表示用関数 (このクラスを継承した子クラスが具体的に実装する)
     def render(self, mask, flag, n):
@@ -346,5 +359,6 @@ class Board:
             self.print_state()
 
             n = self.get_action()
+            self.put_log.append(n)
             self.put_stone(n)
             flag = self.can_continue()

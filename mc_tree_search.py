@@ -74,7 +74,7 @@ class MonteCarloTreeSearch:
             board.set_state(root.state)
             node = self.expansion(board, root)
             if node.is_inner_node:
-                board.game()
+                board.internal_game()
             self.backup(node, board.black_num - board.white_num)
         self.root = root
 
@@ -93,7 +93,7 @@ class MonteCarloTreeSearch:
                     node = self.expansion(board, node)
  
                 if node.is_inner_node:
-                    board.game()
+                    board.internal_game()
 
             game_result = board.black_num - board.white_num
             
@@ -108,11 +108,17 @@ class MonteCarloTreeSearch:
         if self.is_first_call:
             self.set_root(board)
         else:
-            now_state = board.state
-            for child in self.root.children:
-                # パス時はrootは変わらないことに注意
-                if child.state == now_state:
-                    self.root = child
+            put_log = board.put_log
+            print(put_log)
+            root = self.root
+            print(root.move)
+            for m in put_log[put_log.index(root.move) + 1:]:
+                print(m)
+                for child in root.children:
+                    if child.move == m:
+                        root = child
+                        break
+            self.root = root
 
         # for child in self.root.children:
         #     print(child.move, child.wins, child.visits)
@@ -191,15 +197,16 @@ if __name__ == "__main__":
     mcts = MonteCarloTreeSearch()
     mcts.reset()
     alphazero = AlphaZeroComputer(64)
-    alphazero.reset("alphazero_weights")
+    alphazero.reset("alphazero-6")
     board = Board()
     # board.set_state((0b00000000_00001110_11000111_00101011_11101111_01101110_00111100_00111000, 
     #                 0b00011100_00010000_00111000_11010100_00010000_00010000_00000000_00000000, 
     # 1))
 
-    board.set_state((0b00000000_00000000_00000000_00001000_00000000_00000000_00000000_00000000, 
-                     0b00000000_00000000_00011000_00010000_00011000_00000000_00000000_00000000,
-    0))
+    # board.set_state((0b00000000_00000000_00000000_00011110_00001000_00011000_00001000_00001000, 
+    #                  0b00010000_00011101_01111111_01100001_11110111_11100111_00110100_00100100,
+    # 1))
+
     board.debug_game(alphazero, mcts)
 
     print("game set")
