@@ -124,7 +124,7 @@ class AlphaZeroAgent:
         self.c_puct = lambda T: (log(1 + (1 + T) / c_base) + c_init) * sqrt(T)
 
     # 第１引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def reset(self, arg, simulations = 800):
+    def reset(self, arg = None, simulations = 800):
         self.load(arg)
         self.simulations = simulations
 
@@ -275,7 +275,7 @@ class AlphaZeroAgent:
 # =============================================================================
 
 class AlphaZeroComputer(AlphaZeroAgent):
-    def load(self, index = None):
+    def load(self, index):
         self.network.load_weights(self.get_trained_path(index))
 
     @staticmethod
