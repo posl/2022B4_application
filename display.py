@@ -8,16 +8,19 @@ import random
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-from mc_tree_search import MonteCarloTreeSearch, NAMonteCarloTreeSearch
+from mc_tree_search import MonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
-from gt_alpha_beta_cheat import AlphaBetaCheat
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
 from drl_alphazero import AlphaZeroComputer
 
 from board import Board
 from speedup import get_stand_bits
+from network import NetrorkPlayer
+
+IPADDR = "127.0.0.1"
+
 
 
 class Page(tk.Frame):
@@ -31,7 +34,7 @@ class Page(tk.Frame):
         self.win_height = 480
         self.font_name = "凸版文久見出しゴシック"
         self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
-        
+
 
 
 
@@ -56,7 +59,8 @@ class StartPage(Page):
         self.par.option_page.combobox1_changed()
         self.par.option_page.combobox2_changed()
         self.par.change_page(1)
-        
+
+
 
 
 class OptionPage(Page):
@@ -90,7 +94,6 @@ class OptionPage(Page):
         self.combobox1.place(x=100, y=30 )
         self.combobox1.current(0)
         self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
-        
 
         self.combobox2 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
         self.combobox2.place(x=100, y=90 )
@@ -171,7 +174,6 @@ class OptionPage(Page):
 
 
 
-
 class GamePage(Page):
     def __init__(self, par, board):
         Page.__init__(self, par, board)
@@ -214,7 +216,6 @@ class GamePage(Page):
 
         self.button3 = tk.Button(self, text="X", font = (self.font_name, 50), command=lambda:self.goto_start_page())
         self.button3.place(x=750, y=160)
-    
 
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
@@ -252,11 +253,8 @@ class GamePage(Page):
         self.game_canvas_lock = False
         self.par.quit()
 
-    
     def game_canvas_state_update(self, v):
         self.game_canvas_state = v
-        
-        
 
     #キャンバスを全消しー＞線描画ー＞黒石、白石の描画
     def render_current_board(self):
@@ -275,7 +273,7 @@ class GamePage(Page):
         for pl in wplace:
             j, i = self.board.n2t(pl)
             self.stone_white_draw(i, j)
-        
+
     #石が置けるところを青く
     def render_placeable(self):
         #self.par.sounds.play(2)
@@ -446,8 +444,6 @@ class GamePage(Page):
         self.label1.configure(text="")
         print(self.board.play_log)
 
-    
-
     def win_check(self):
         bnum = self.board.black_num
         wnum = self.board.white_num
@@ -457,6 +453,8 @@ class GamePage(Page):
             self.label1.configure(text="白の勝ち")
         else:
             self.label1.configure(text="引き分け")
+
+
 
 
 class ResultPage(Page):
@@ -497,7 +495,7 @@ class ResultPage(Page):
 
         self.button3 = tk.Button(self, width=1, height=3, text="<", font = (self.font_name, 15), command=lambda:self.cur_dec())
         self.button3.place(x=140, y=30)
-    
+
     def graph_click(self, event):
         states = self.board.play_log
         num = len(states)
@@ -509,7 +507,6 @@ class ResultPage(Page):
         self.cur = x
         self.miniboard_draw()
         return
-    
 
     def graph_draw(self):
         self.cur = 0
@@ -548,7 +545,7 @@ class ResultPage(Page):
         self.stonenum_canvas.moveto(self.curline3, turn_width*(self.cur+1)-2, 0) # 右上ー右下
         self.stonenum_canvas.moveto(self.curline4, turn_width*self.cur-2, self.stonenum_canvas_height)  # 左下ー右下
         pass
-    
+
     def miniboard_draw(self):
         self.curdraw()
         states = self.board.play_log
@@ -566,16 +563,16 @@ class ResultPage(Page):
                     self.draw_stone("#111111", i, j)
                 elif (state[1]>>n)&1:
                     self.draw_stone("#EEEEEE", i, j)
-        
+
     def draw_stone(self, color, x, y):
         self.board_canvas.create_rectangle(6+15*x, 6+15*y, 4+15*(x+1), 4+15*(y+1), fill=color, outline="#888888")
-    
+
     def cur_inc(self):
         self.cur += 1
         if self.cur >= len(self.board.play_log):
             self.cur = len(self.board.play_log)-1
         self.miniboard_draw()
-    
+
     def cur_dec(self):
         self.cur -= 1
         if self.cur <0:
@@ -589,12 +586,13 @@ class ResultPage(Page):
 
 
 
+
 class Sounds:
     def __init__(self):
         self.sounds = []
         self.musics = []
         sound_folder_path = os.path.normpath(os.path.join(os.path.abspath(__file__),  "../sound"))
-        se0 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))      
+        se0 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))
         se1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou47.wav"))
         se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
         se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
@@ -616,7 +614,7 @@ class Sounds:
 
         self.musics.append(bgm1)
         self.musics.append(bgm2)
-        
+
         self.bgm_play(0)
 
     def bgm_play(self, id, loop=-1):
@@ -629,7 +627,7 @@ class Sounds:
         if id<0 or id>=len(self.sounds):
             return
         self.sounds[id].play(loops=loop)
-    
+
     def stop(self, id):
         if id<0 or id>=len(self.sounds):
             return
@@ -638,11 +636,10 @@ class Sounds:
 
 
 
-
-
 class Human:
-    def __init__(self, par):
+    def __init__(self, par, network_player):
         self.par = par  # par : MainWindow , main_loopを呼び出すために必要
+        self.network_player = network_player
 
     def player(self, board):
         placable = set(board.list_placable())
@@ -652,8 +649,10 @@ class Human:
             board.click_attr = None
             if n in placable:
                 break
+        if self.network_player.is_use:
+            self.network_player.notice(n)
         return n
-    
+
     def cheat_player(self, board):
         t = board.turn
         bplace = board.black_positions
@@ -676,7 +675,7 @@ class Human:
             board.stone_black = board.stone_black ^ (1<<n)
             board.stone_white = board.stone_white ^ (1<<n)
         return self.player(board)
-    
+
     #本来はここに書くべきではなかろうが暫定的に
     def com_random(self, board):
         return random.choice(board.list_placable())
@@ -701,18 +700,25 @@ class Human:
 
 
 
+
 class PlayerKinds:
     def __init__(self, par):
         self.kinds_name = [] # 名前（人間、ランダムなど）
         self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
-        self.human = Human(par)
+        self.network_player = NetrorkPlayer(IPADDR)
+
+        self.human = Human(par, self.network_player)
         self.kinds_name.append("人間")
         self.kinds_func.append([self.human.player])
         self.kinds_difficulty.append(1)
 
-        self.kinds_name.append("人間-チート1")
+        self.kinds_name.append("通信")
+        self.kinds_func.append([self.network_player.next_action])
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("人間-チート")
         self.kinds_func.append([self.human.cheat_player])
         self.kinds_difficulty.append(1)
 
@@ -720,10 +726,9 @@ class PlayerKinds:
         self.kinds_func.append([self.human.com_random])
         self.kinds_difficulty.append(1)
 
-        self.kinds_name.append("ランダム-チート1")
+        self.kinds_name.append("ランダム-チート")
         self.kinds_func.append([self.human.com_cheater1])
         self.kinds_difficulty.append(1)
-        
 
         self.kinds_name.append("MC木探索")
         self.mcts_d0 = MonteCarloTreeSearch(1024*1)
@@ -732,60 +737,37 @@ class PlayerKinds:
         self.mcts_d3 = MonteCarloTreeSearch(1024*64)
         self.kinds_func.append([ self.mcts_d0, self.mcts_d1, self.mcts_d2, self.mcts_d3])
         self.kinds_difficulty.append(4)
-        
-
-        # self.kinds_name.append("MC木探索+nega_alpha")
-        # self.kinds_func.append([NAMonteCarloTreeSearch(1024*1, 2), NAMonteCarloTreeSearch(1024*4, 4), NAMonteCarloTreeSearch(1024*16, 8), NAMonteCarloTreeSearch(1024*64, 16)])
-        # self.kinds_difficulty.append(4)
-        # self.kinds_turn_diff.append(False)
 
         self.kinds_name.append("原始MC探索")
         self.kinds_func.append([PrimitiveMonteCarlo(256*1), PrimitiveMonteCarlo(256*4), PrimitiveMonteCarlo(256*16), PrimitiveMonteCarlo(256*32)])
         self.kinds_difficulty.append(4)
-        
 
-        self.kinds_name.append("原始MC探索+nega_alpha")
+        self.kinds_name.append("原始MC探索 + NegaAlpha")
         self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
         self.kinds_difficulty.append(4)
-        
 
+        self.kinds_name.append("AlphaBeta")
+        self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
+        self.kinds_difficulty.append(2)
 
-        self.kinds_name.append("Alpha Beta")
-        self.kinds_func.append([AlphaBeta()])
+        self.rainbow_computer_d0 = RainbowComputer(64)
+        self.kinds_name.append("Rainbow")
+        self.kinds_func.append([ self.rainbow_computer_d0 ])
         self.kinds_difficulty.append(1)
 
-        self.kinds_name.append("Alpha Beta-Cheat")
-        self.kinds_func.append([AlphaBetaCheat()])
+        self.reinforce_computer_d0 = ReinforceComputer(64)
+        self.kinds_name.append("Reinforce")
+        self.kinds_func.append([ self.reinforce_computer_d0 ])
         self.kinds_difficulty.append(1)
-        
 
-        if 1:
-            self.rainbow_computer_d0 = RainbowComputer(64)
-            self.kinds_name.append("Rainbow")
-            self.kinds_func.append([ self.rainbow_computer_d0 ])
-            self.kinds_difficulty.append(1)
-            
-
-        if 1:
-            self.reinforce_computer_d0 = ReinforceComputer(64)
-            self.kinds_name.append("Reinforce")
-            self.kinds_func.append([ self.reinforce_computer_d0 ])
-            self.kinds_difficulty.append(1)
-            
-
-        if 1:
-            self.alphazero_computer_d0 = AlphaZeroComputer(64)
-            self.kinds_name.append("Alphazero")
-            self.kinds_func.append([ self.alphazero_computer_d0 ])
-            self.kinds_difficulty.append(1)
-            
-
-        
-
+        self.alphazero_computer_d0 = AlphaZeroComputer(64)
+        self.kinds_name.append("AlphaZero")
+        self.kinds_func.append([ self.alphazero_computer_d0 ])
+        self.kinds_difficulty.append(1)
 
     def get_num(self):
         return len(self.kinds_name)
-    
+
     def get_name(self, id):
         if id<0 or id>=len(self.kinds_name):
             print("範囲外のIDが指定されました")
@@ -806,8 +788,6 @@ class PlayerKinds:
             print("範囲外のIDが指定されました")
             exit()
         return self.kinds_difficulty[id]
-
-
 
 
 
@@ -862,6 +842,7 @@ class DisplayBoard(Board):
 
         # mcのときの不具合を避けるためlog_stateとわける
         self.play_log = []
+
 
 
     def add_playlog(self):
@@ -920,11 +901,6 @@ class DisplayBoard(Board):
             self.main_window.mainloop()
 
     def __play(self):
-        #self.main_window.mainloop()
-        #player1_plan, player2_plan = self.click_attr
-        #player1_plan, player2_plan = self.main_window.human.player, self.main_window.human.player
-        #self.set_plan(player1_plan, player2_plan)
-
         # 最初の盤面表示
         self.reset()
         self.print_state()
@@ -945,6 +921,9 @@ class DisplayBoard(Board):
 
 if __name__ == "__main__":
     board = Board()
+    print("サーバーのIDを入力してください")
+    ip = input()
+    IPADDR = ip
     displayboard = DisplayBoard()
     displayboard.play()
     exit()
