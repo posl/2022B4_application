@@ -844,7 +844,6 @@ class DisplayBoard(Board):
         self.play_log = []
 
 
-
     def add_playlog(self):
         self.play_log.append(self.state)
 
