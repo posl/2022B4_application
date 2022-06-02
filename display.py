@@ -755,14 +755,14 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
         
 
-        if False:
+        if 1:
             self.rainbow_computer_d0 = RainbowComputer(64)
             self.kinds_name.append("Rainbow")
             self.kinds_func.append([ self.rainbow_computer_d0 ])
             self.kinds_difficulty.append(1)
             
 
-        if False:
+        if 1:
             self.reinforce_computer_d0 = ReinforceComputer(64)
             self.kinds_name.append("Reinforce")
             self.kinds_func.append([ self.reinforce_computer_d0 ])
@@ -883,7 +883,7 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        self.player_kinds.alphazero_computer_d0.reset("alphazero_weights")
+        self.player_kinds.alphazero_computer_d0.reset("alphazero-6")
         player1_plan = self.player_kinds.get_func(player1id, player1diff)
         player2_plan = self.player_kinds.get_func(player2id, player2diff)
         self.set_plan(player1_plan, player2_plan)
