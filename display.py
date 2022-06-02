@@ -17,6 +17,9 @@ from drl_alphazero import AlphaZeroComputer
 
 from board import Board
 from speedup import get_stand_bits
+from network import NetrorkPlayer
+
+IPADDR = "127.0.0.1"
 
 
 
@@ -634,8 +637,9 @@ class Sounds:
 
 
 class Human:
-    def __init__(self, par):
+    def __init__(self, par, network_player):
         self.par = par  # par : MainWindow , main_loopを呼び出すために必要
+        self.network_player = network_player
 
     def player(self, board):
         placable = set(board.list_placable())
@@ -645,6 +649,8 @@ class Human:
             board.click_attr = None
             if n in placable:
                 break
+        if self.network_player.is_use:
+            self.network_player.notice(n)
         return n
 
     def cheat_player(self, board):
@@ -701,9 +707,15 @@ class PlayerKinds:
         self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
-        self.human = Human(par)
+        self.network_player = NetrorkPlayer(IPADDR)
+
+        self.human = Human(par, self.network_player)
         self.kinds_name.append("人間")
         self.kinds_func.append([self.human.player])
+        self.kinds_difficulty.append(1)
+
+        self.kinds_name.append("通信")
+        self.kinds_func.append([self.network_player.next_action])
         self.kinds_difficulty.append(1)
 
         self.kinds_name.append("人間-チート")
@@ -733,7 +745,6 @@ class PlayerKinds:
         self.kinds_name.append("原始MC探索 + NegaAlpha")
         self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
         self.kinds_difficulty.append(4)
-
 
         self.kinds_name.append("AlphaBeta")
         self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
@@ -833,6 +844,7 @@ class DisplayBoard(Board):
         self.play_log = []
 
 
+
     def add_playlog(self):
         self.play_log.append(self.state)
 
@@ -856,7 +868,7 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        self.player_kinds.alphazero_computer_d0.reset()
+        self.player_kinds.alphazero_computer_d0.reset("alphazero-6")
         self.player_kinds.mcts_d0.reset()
         self.player_kinds.mcts_d1.reset()
         self.player_kinds.mcts_d2.reset()
@@ -909,6 +921,9 @@ class DisplayBoard(Board):
 
 if __name__ == "__main__":
     board = Board()
+    print("サーバーのIDを入力してください")
+    ip = input()
+    IPADDR = ip
     displayboard = DisplayBoard()
     displayboard.play()
     exit()
