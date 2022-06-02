@@ -755,7 +755,8 @@ def eval_alphazero_computer(index = None):
 
 
 
-
+def comp_alphazero_computer():
+    pass
 
 
 
