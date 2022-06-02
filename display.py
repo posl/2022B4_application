@@ -751,8 +751,8 @@ class PlayerKinds:
 
 
         self.kinds_name.append("Alpha Beta")
-        self.kinds_func.append([AlphaBeta()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
+        self.kinds_difficulty.append(2)
 
         self.kinds_name.append("Alpha Beta-Cheat")
         self.kinds_func.append([AlphaBetaCheat()])
