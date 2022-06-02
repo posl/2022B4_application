@@ -6,7 +6,7 @@ import time
 import sys
 #from board import board
 
-IPADDR = "192.168.35.85"
+IPADDR = "127.0.0.1"
 PORT = 10100
 
 
@@ -67,9 +67,9 @@ class Client:
 
 
 class NetrorkPlayer():
-    def __init__(self):
+    def __init__(self, ip):
         self.client = Client()
-        self.client.connect(IPADDR, PORT)
+        self.client.connect(str(ip), PORT)
         self.client.recv_func = self.recv_func
         self.thread = threading.Thread(target=self.client.recv_loop, args=())
         self.thread.daemon = True
