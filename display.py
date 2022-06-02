@@ -726,7 +726,11 @@ class PlayerKinds:
         
 
         self.kinds_name.append("MC木探索")
-        self.kinds_func.append([MonteCarloTreeSearch(1024*1), MonteCarloTreeSearch(1024*4), MonteCarloTreeSearch(1024*16), MonteCarloTreeSearch(1024*64)])
+        self.mcts_d0 = MonteCarloTreeSearch(1024*1)
+        self.mcts_d1 = MonteCarloTreeSearch(1024*4)
+        self.mcts_d2 = MonteCarloTreeSearch(1024*16)
+        self.mcts_d3 = MonteCarloTreeSearch(1024*64)
+        self.kinds_func.append([ self.mcts_d0, self.mcts_d1, self.mcts_d2, self.mcts_d3])
         self.kinds_difficulty.append(4)
         
 
@@ -747,8 +751,8 @@ class PlayerKinds:
 
 
         self.kinds_name.append("Alpha Beta")
-        self.kinds_func.append([AlphaBeta()])
-        self.kinds_difficulty.append(1)
+        self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
+        self.kinds_difficulty.append(2)
 
         self.kinds_name.append("Alpha Beta-Cheat")
         self.kinds_func.append([AlphaBetaCheat()])
@@ -884,6 +888,10 @@ class DisplayBoard(Board):
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
         self.player_kinds.alphazero_computer_d0.reset()
+        self.player_kinds.mcts_d0.reset()
+        self.player_kinds.mcts_d1.reset()
+        self.player_kinds.mcts_d2.reset()
+        self.player_kinds.mcts_d3.reset()
         player1_plan = self.player_kinds.get_func(player1id, player1diff)
         player2_plan = self.player_kinds.get_func(player2id, player2diff)
         self.set_plan(player1_plan, player2_plan)
