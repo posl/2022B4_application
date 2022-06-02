@@ -68,6 +68,10 @@ class Client:
 
 class NetrorkPlayer():
     def __init__(self, ip):
+        self.NoNetwork = (ip=="0")
+        if self.NoNetwork :
+            return
+
         self.client = Client()
         self.client.connect(str(ip), PORT)
         self.client.recv_func = self.recv_func
@@ -75,13 +79,15 @@ class NetrorkPlayer():
         self.thread.daemon = True
         self.thread.start()
 
-        self.is_use = True
+        self.NoNetwork = True
         self.put_place = -1
 
     def reset(self):
         pass
     
     def next_action(self, board):
+        if self.NoNetwork:
+            return 0
         placable = set(board.list_placable())
         print(placable)
         while self.put_place<0 or (not (self.put_place in placable)):
@@ -91,10 +97,14 @@ class NetrorkPlayer():
         return ret
     
     def notice(self, p):
+        if self.NoNetwork:
+            return
         s = "PUT " + str(p)
         self.client.send(s)
 
     def recv_func(self, data):
+        if self.NoNetwork:
+            return
         y = data.split()
         if len(y)<2:
             return

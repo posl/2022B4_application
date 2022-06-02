@@ -921,7 +921,7 @@ class DisplayBoard(Board):
 
 if __name__ == "__main__":
     board = Board()
-    print("サーバーのIDを入力してください")
+    print("サーバーのIPを入力してください-ない場合は0に")
     ip = input()
     IPADDR = ip
     displayboard = DisplayBoard()
