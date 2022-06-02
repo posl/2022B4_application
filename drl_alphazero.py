@@ -1,5 +1,6 @@
 from math import log, sqrt, ceil
 from random import choices, choice
+from glob import glob
 from collections import deque
 from bz2 import BZ2File
 import pickle
@@ -274,8 +275,23 @@ class AlphaZeroAgent:
 # =============================================================================
 
 class AlphaZeroComputer(AlphaZeroAgent):
-    def load(self, file_name):
-        self.network.load_weights(SelfMatch.get_path(file_name + ".npz").format("parameters"))
+    def load(self, index = None):
+        self.network.load_weights(self.get_trained_path(index))
+
+    @staticmethod
+    def get_trained_path(index):
+        file_path = SelfMatch.get_path("alphazero").format("parameters")
+
+        if isinstance(index, int) and (0 <= index <= 9):
+            file_path += f"-{index}.npz"
+        else:
+            # インデックスの指定がなかった場合は、最も成熟したパラメータを使う
+            file_path += "-[0-9].npz"
+            file_paths = glob(file_path)
+            file_paths.sort()
+            file_path = file_paths.pop()
+
+        return file_path
 
 
 
@@ -407,7 +423,7 @@ def alphazero_test(weights, simulations, turn, enemy):
 # =============================================================================
 
 class AlphaZero:
-    def __init__(self, buffer_size = 76800, batch_size = 128, lr = 0.0005, decay = 0.001, to_gpu = True):
+    def __init__(self, buffer_size = 76800, batch_size = 128, lr = 0.0005, decay = 0.0001, to_gpu = True):
         # 学習対象のニューラルネットワーク
         self.network = PolicyValueNet(Board.action_size)
 
@@ -422,7 +438,7 @@ class AlphaZero:
         self.use_gpu = to_gpu and gpu_enable
 
 
-    def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 300, restart = False):
+    def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 100, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -448,7 +464,9 @@ class AlphaZero:
 
             # 学習率を進捗に応じて変更する
             if restart >= 150:
-                optimizer.lr /= 2. ** (restart // 150)
+                n = 2 ** (restart // 150)
+                optimizer.lr /= n
+                simulations *= n
 
             # 次のステップから学習を再開する
             restart += 1
@@ -542,6 +560,7 @@ class AlphaZero:
 
                     if not step % 150:
                         optimizer.lr /= 2.
+                        simulations *= 2
 
 
                     # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
@@ -556,7 +575,7 @@ class AlphaZero:
                             network.save_weights(params_path + "-{}.npz".format(save_q - 1))
 
                         # エージェントの評価 (合計 100 回)
-                        win_rates = self.eval(weights, simulations)
+                        win_rates = self.eval(weights)
                         history[:, eval_q - 1] = win_rates
                         print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
 
@@ -587,7 +606,7 @@ class AlphaZero:
 
 
     @staticmethod
-    def eval(weights, simulations, enemy = PrimitiveMonteCarlo(2048)):
+    def eval(weights, simulations = 800, enemy = PrimitiveMonteCarlo(2048)):
         with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
             win_rates = []
 
@@ -611,8 +630,8 @@ class AlphaZero:
 # エージェントの最終評価を行う関数
 # =============================================================================
 
-def eval_alphazero_computer(file_name):
-    file_path = SelfMatch.get_path(file_name)
+def eval_alphazero_computer(index = None):
+    file_path = AlphaZeroComputer.get_trained_path(index)
     weights = __eval_preprocess(file_path, "sim.")
 
     # 描画用配列
@@ -643,7 +662,7 @@ def eval_alphazero_computer(file_name):
     plt.ylabel("Winning Percentage")
     plt.title("AlphaZero vs. Primitive MC")
 
-    graphs_path = file_path.format("graphs")
+    graphs_path = file_path.replace("parameters", "graphs").removesuffix(".npz")
     make_dir_exist(graphs_path)
     plt.savefig(f"{graphs_path}_bar")
     plt.clf()
@@ -651,8 +670,8 @@ def eval_alphazero_computer(file_name):
 
 
 
-def vs_alphazero_computer(file_name, simulations = 800):
-    file_path = SelfMatch.get_path(file_name)
+def vs_alphazero_computer(index = None, simulations = 800):
+    file_path = AlphaZeroComputer.get_trained_path(index)
     weights = __eval_preprocess(file_path, "no.")
 
     # 対戦する相手の設定
@@ -696,7 +715,7 @@ def vs_alphazero_computer(file_name, simulations = 800):
     fig.legend(labels, loc = (0.65, 0.2), fontsize = 10)
     fig.suptitle(f"AlphaZero's Winning Percentage (Simulations = {simulations})", fontsize = 14)
 
-    graphs_path = file_path.format("graphs")
+    graphs_path = file_path.replace("parameters", "graphs").removesuffix(".npz")
     make_dir_exist(graphs_path)
     fig.savefig(f"{graphs_path}_pie")
     fig.clf()
@@ -706,13 +725,12 @@ def vs_alphazero_computer(file_name, simulations = 800):
 
 def __eval_preprocess(file_path, key_str):
     network = PolicyValueNet(Board.action_size)
-    network.load_weights(file_path.format("parameters") + ".npz")
+    network.load_weights(file_path)
 
     # 並列実行を行うための前処理
     ray.shutdown()
     ray.init()
     weights = ray.put(network.get_weights())
-    del network
 
     # 画面表示
     print("\033[92m=== Winning Percentage ===\033[0m")
@@ -731,5 +749,5 @@ if __name__ == "__main__":
     # arena.fit(restart = False)
 
     # 評価用コード
-    eval_alphazero_computer(file_name = "alphazero-3")
-    vs_alphazero_computer(file_name = "alphazero-3", simulations = 800)
+    eval_alphazero_computer(index = None)
+    vs_alphazero_computer(index = None, simulations = 800)
