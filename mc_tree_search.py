@@ -6,7 +6,7 @@ from speedup import nega_alpha, count_stand_bits
 
 
 class MonteCarloTreeSearch:
-    expanding_threshold = 10
+    expanding_threshold = 5
 
     def __init__(self, max_tries = 65536):
         self.max_tries = max_tries
@@ -17,7 +17,6 @@ class MonteCarloTreeSearch:
         self.wins_dict = {}
         self.placable_dict = {}
         self.children_state_dict = {}
-        self.is_first_call = True
 
     def __call__(self, board : Board):
         return self.monte_carlo_tree_search(board)
@@ -93,7 +92,7 @@ class MonteCarloTreeSearch:
     # 1プレイ分、再帰で実装
     def play(self, board, state):
         placable_dict = self.placable_dict
-        
+
         # ゲーム終了時
         if not placable_dict[state]:
             return count_stand_bits(state[0]) - count_stand_bits(state[1])
@@ -125,7 +124,7 @@ class MonteCarloTreeSearch:
                 else:
                     game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])
                 
-                wins_dict[next_state][expansion_index] += (next_state[2] == (game_res > 0))
+                wins_dict[next_state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0
                 visits_dict[next_state][expansion_index] += 1
                 
             # 一層深く
@@ -133,7 +132,7 @@ class MonteCarloTreeSearch:
                 game_res = self.play(board, next_state)
 
         # 結果を記録    
-        wins_dict[state][next_index] += (state[2] == (game_res > 0))
+        wins_dict[state][next_index] += (state[2] == (game_res > 0)) if game_res else 0
         visits_dict[state][next_index] += 1
 
         return game_res
@@ -145,17 +144,17 @@ class MonteCarloTreeSearch:
         board.set_plan(self.random_action, self.random_action)
 
         state = board.state
+        visits_dict = self.visits_dict
 
-        #初回だけ呼び出す
-        if self.is_first_call:
+        # 探索木で訪れてない場合に呼ぶ
+        if state not in visits_dict:
             placable = self.__get_placable(board)
             expansion_index = self.expansion(board, state)
             expansion_state = self.children_state_dict[state][expansion_index]
             board.set_state(expansion_state)
             game_res = self.game_simulation(board)
-            self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0))
-            self.visits_dict[state][expansion_index] += 1
-            self.is_first_call = False
+            self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0
+            visits_dict[state][expansion_index] += 1
 
         # max_tries回シミュレーションする
         for _ in range(self.max_tries):
@@ -164,13 +163,13 @@ class MonteCarloTreeSearch:
         # 状態を回復する
         board.set_plan(*original_plans)
         board.set_state(state)
-        
+
         # 着手を選ぶ
-        visits = self.visits_dict[state]
+        visits = visits_dict[state]
         max_visit = max(visits)
         max_index = [i for i, v in enumerate(visits) if v == max_visit]
         return self.placable_dict[state][choice(max_index)]
-        
+
 
 class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
     def __init__(self, max_tries = 65536, limit_time = 10):
