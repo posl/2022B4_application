@@ -4,10 +4,12 @@ from glob import glob
 from collections import deque
 from bz2 import BZ2File
 import pickle
+import gc
 from time import time
 
 import numpy as np
 import ray
+import psutil
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -133,7 +135,8 @@ class AlphaZeroAgent:
         self.W = {}
         self.N = {}
 
-        # board.list_placable() の再計算を無くすための辞書
+        # 再計算を無くすための辞書
+        self.next_states_dict = {}
         self.placable_dict = {}
 
     def load(self, weights):
@@ -226,7 +229,7 @@ class AlphaZeroAgent:
             action_index = indices[0] if len(indices) == 1 else choice(indices)
 
             action = self.placable_dict[state][action_index]
-            board.put_stone(action)
+            self.board_put_stone(board, action)
 
             # 手番交代によって次の状態が変わる可能性があることに注意
             next_continue_flag = self.board_can_continue(board)
@@ -244,6 +247,19 @@ class AlphaZeroAgent:
         if continue_flag == 1:
             return -value
         return value
+
+
+    # 高速化のため、独自の put_stone メソッドを使う
+    def board_put_stone(self, board, action):
+        next_states_dict = self.next_states_dict
+        key = board.state
+        key += (action, )
+
+        if key in next_states_dict:
+            board.set_state(next_states_dict[key])
+        else:
+            board.put_stone(action)
+            next_states_dict[key] = board.state
 
 
     # 合法手のリストの取得の仕方が異なるため、独自の can_continue メソッドを使う
@@ -381,7 +397,7 @@ def alphazero_play(weights, simulations):
         action, state, mcts_policy = agent.get_action(board, count)
         memory.append([state, mcts_policy, board.turn])
 
-        board.put_stone(action)
+        agent.board_put_stone(board, action)
         if not agent.board_can_continue(board):
             break
 
@@ -455,7 +471,13 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(decay))
 
         # 学習部分は GPU による高速化の余地がある
-        self.use_gpu = to_gpu and gpu_enable
+        self.use_gpu = to_gpu and gpu_enable\
+
+    # ray.put() で、大容量のデータをメモリに格納するので、閾値を設けて強制的なガベージコレクションを実施する
+    @staticmethod
+    def auto_gc_collect(pct = 80.):
+        if psutil.virtual_memory().percent >= pct:
+            gc.collect()
 
 
     def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 100, restart = False):
@@ -483,8 +505,8 @@ class AlphaZero:
             history = np.load(f"{is_yet_path}_history.npy")
 
             # 学習率を進捗に応じて変更する
-            if restart >= 150:
-                n = 2 ** (restart // 150)
+            if restart >= 100:
+                n = 2 ** ((restart + 50) // 150)
                 optimizer.lr /= n
                 simulations *= n
 
@@ -504,6 +526,7 @@ class AlphaZero:
         ray.init()
 
         # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
+        self.auto_gc_collect()
         weights = ray.put(network.get_weights())
 
         # GPU を使用するかどうかの表示
@@ -578,12 +601,13 @@ class AlphaZero:
                             # GPU を使った場合は、モデルの重みを CPU 対応に戻す
                             network.to_cpu()
 
-                    if not step % 150:
+                    if not (step + 50) % 150:
                         optimizer.lr /= 2.
                         simulations *= 2
 
 
                     # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
+                    self.auto_gc_collect()
                     weights = ray.put(network.get_weights())
 
                     eval_q, eval_r = divmod(step, eval_interval)
