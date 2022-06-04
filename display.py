@@ -649,7 +649,7 @@ class Human:
             board.click_attr = None
             if n in placable:
                 break
-        if self.network_player.is_use:
+        if not self.network_player.NoNetwork:
             self.network_player.notice(n)
         return n
 

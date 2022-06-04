@@ -79,7 +79,7 @@ class NetrorkPlayer():
         self.thread.daemon = True
         self.thread.start()
 
-        self.NoNetwork = True
+        #self.NoNetwork = True
         self.put_place = -1
 
     def reset(self):

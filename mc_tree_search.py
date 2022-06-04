@@ -1,23 +1,8 @@
-from __future__ import annotations #dataclassにおいて自信をメンバに置くために使用
-
-from dataclasses import dataclass, field
 from math import sqrt, log
-from random import choice
+from random import choice, randrange
 
 from board import Board
 from speedup import nega_alpha, count_stand_bits
-
-
-@dataclass
-class Node:
-    parent : Node #Python 4.0 では標準になるらしい
-    children : list = field(default_factory=list)
-    untried_move : list = field(default_factory=list)
-    state : tuple = ()
-    move : int = -1
-    wins : int = 0  # 記録されているターンプレイヤーの勝ち数でないことに注意
-    visits : int = 0
-    is_inner_node : int = 1
 
 
 class MonteCarloTreeSearch:
@@ -26,136 +11,166 @@ class MonteCarloTreeSearch:
     def __init__(self, max_tries = 65536):
         self.max_tries = max_tries
 
+    # ゲーム毎に呼ぶ必要がある
     def reset(self):
+        self.visits_dict = {}
+        self.wins_dict = {}
+        self.placable_dict = {}
+        self.children_state_dict = {}
         self.is_first_call = True
 
     def __call__(self, board : Board):
-        move = self.monte_carlo_tree_search(board)
-        self.is_first_call = False
-        return move
+        return self.monte_carlo_tree_search(board)
+
+    # 合法手のリストの取得の仕方が異なるため、独自の can_continue メソッドを使う
+    def board_can_continue(self, board, pass_flag = False):
+        board.turn ^= 1
+        if self.__get_placable(board):
+            return 1 + pass_flag
+        elif pass_flag:
+            return 0
+        else:
+            return self.board_can_continue(board, True)
+
+    def __get_placable(self, board):
+        placable_dict = self.placable_dict
+        state = board.state
+
+        if state in placable_dict:
+            return placable_dict[state]
+        else:
+            placable = board.list_placable()
+            placable_dict[state] = placable
+            return placable
+
+    # 独自のゲーム関数
+    def game_simulation(self, board : Board):
+        flag = 1
+        while flag:
+            n = board.get_action()
+            board.put_stone(n)
+            flag = self.board_can_continue(board)
+
+        return board.black_num - board.white_num
 
     # ランダムで手を打つplan
-    def random_action(self, board : Board):
-        return choice(board.list_placable())
+    def random_action(self, board):
+        return choice(self.__get_placable(board))
 
-    # 優先度（uctによる）の高い子ノードを選ぶ（複数ある場合ランダム）
-    def selection(self, node : Node):
-        ucts = [child.wins / child.visits + sqrt(2 * log(node.visits) / child.visits) for child in node.children]
-        max_uct = max(ucts)
-        max_index = [i for i, u in enumerate(ucts) if u == max_uct]
-        return node.children[choice(max_index)]
+    # 優先度（utcによる）の高い子ノードを選ぶ（複数ある場合ランダム）
+    # 子供を持たない時はNoneが返る
+    def selection(self, state):
+        visits_dict = self.visits_dict
+        if state in visits_dict:
+            visit_list = visits_dict[state]
+            sum_visits = sum(visit_list)
+            ucts = [w / (v + 1e-15) + sqrt(2 * log(sum_visits) / (v + 1e-15)) for v, w in zip(visit_list, self.wins_dict[state])]
+            max_uct = max(ucts)
+            max_index = [i for i, u in enumerate(ucts) if u == max_uct]
+            return choice(max_index)
+        else:
+            return None
 
-    # 木を拡張する
-    def expansion(self, board : Board, node : Node):
-        next_move = choice(node.untried_move)
-        node.untried_move.remove(next_move)
+    # 木を拡張し、拡張した葉ノードへのランダムなインデックスを返す
+    def expansion(self, board : Board, state):
+        placable = self.placable_dict[state]
 
-        board.put_stone(next_move)
-        continue_flag = board.can_continue()
-        child = Node(parent = node, untried_move = board.list_placable(), state = board.state, move = next_move, is_inner_node = continue_flag)
-        node.children.append(child)
+        children_state = []
+        for move in placable:
+            board.set_state(state)
+            board.put_stone(move)
+            self.board_can_continue(board)
+            children_state.append(board.state)
+
+        self.children_state_dict[state] = children_state
+
+        size = len(placable)
+        self.visits_dict[state] = [0] * size
+        self.wins_dict[state] = [0] * size
+
+        return randrange(size)
+
+    # 1プレイ分、再帰で実装
+    def play(self, board, state):
+        placable_dict = self.placable_dict
         
-        return child
-    
-    # 結果を記録
-    def backup(self, node : Node, game_result):
-        while node.parent:
-            parent_turn = node.parent.state[2]
-            node.visits += 1
-            if parent_turn == (game_result > 0):
-                node.wins += 1
-            node = node.parent
-        node.visits += 1
+        # ゲーム終了時
+        if not placable_dict[state]:
+            return count_stand_bits(state[0]) - count_stand_bits(state[1])
 
-    # rootを設定
-    def set_root(self, board : Board):
-        root = Node(parent = None, state = board.state, untried_move = board.list_placable())
-        for _ in range(len(root.untried_move)):
-            board.set_state(root.state)
-            node = self.expansion(board, root)
-            if node.is_inner_node:
-                board.internal_game()
-            self.backup(node, board.black_num - board.white_num)
-        self.root = root
+        next_index = self.selection(state)
 
-    # max_try分ロールアウト
-    def play(self, board : Board):
-        for _ in range(self.max_tries):
-            node = self.root
+        # 葉ノードに到達したらプレイアウト
+        if next_index is None:
+            board.set_state(state)
+            return self.game_simulation(board)
 
-            while not node.untried_move and node.children:
-                node = self.selection(node)
-            
-            board.set_state(node.state)
+        else:
+            children_state_dict = self.children_state_dict
+            visits_dict = self.visits_dict
+            wins_dict = self.wins_dict
 
-            if node.is_inner_node:
-                if node.visits > self.expanding_threshold:
-                    node = self.expansion(board, node)
- 
-                if node.is_inner_node:
-                    board.internal_game()
+            next_state = children_state_dict[state][next_index]
 
-            game_result = board.black_num - board.white_num
-            
-            self.backup(node, game_result)
+            # 選んだ子ノードの訪問回数が初めて閾値に到達した時、木を展開
+            if visits_dict[state][next_index] == self.expanding_threshold and placable_dict[ children_state_dict[state][next_index] ]:
+                expansion_index = self.expansion(board, next_state)
+                expansion_state = children_state_dict[next_state][expansion_index]
+
+                # uct式の性質上ここで一層深くはせずにここで同時に子ノードも評価
+                if placable_dict[expansion_state]:
+                    board.set_state(expansion_state)
+                    game_res = self.game_simulation(board)
+
+                else:
+                    game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])
+                
+                wins_dict[next_state][expansion_index] += (next_state[2] == (game_res > 0))
+                visits_dict[next_state][expansion_index] += 1
+                
+            # 一層深く
+            else:
+                game_res = self.play(board, next_state)
+
+        # 結果を記録    
+        wins_dict[state][next_index] += (state[2] == (game_res > 0))
+        visits_dict[state][next_index] += 1
+
+        return game_res
 
     # 呼ばれる本体
     def monte_carlo_tree_search(self, board : Board):
         original_plans = board.plans
-        
+
         board.set_plan(self.random_action, self.random_action)
 
+        state = board.state
+
+        #初回だけ呼び出す
         if self.is_first_call:
-            self.set_root(board)
-        else:
-            put_log = board.put_log
-            print(put_log)
-            root = self.root
-            print(root.move)
-            for m in put_log[put_log.index(root.move) + 1:]:
-                print(m)
-                for child in root.children:
-                    if child.move == m:
-                        root = child
-                        break
-            self.root = root
+            placable = self.__get_placable(board)
+            expansion_index = self.expansion(board, state)
+            expansion_state = self.children_state_dict[state][expansion_index]
+            board.set_state(expansion_state)
+            game_res = self.game_simulation(board)
+            self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0))
+            self.visits_dict[state][expansion_index] += 1
+            self.is_first_call = False
 
-        # for child in self.root.children:
-        #     print(child.move, child.wins, child.visits)
-        #     for c in child.children:
-        #         print("    ", c.move, c.wins, c.visits)
+        # max_tries回シミュレーションする
+        for _ in range(self.max_tries):
+            self.play(board, state)
 
-        self.play(board)
-
-        root = self.root
-
-        # for child in root.children:
-        #     print(child.move, child.wins, child.visits)
-        #     for c in child.children:
-        #         print("    ", c.move, c.wins, c.visits)
-        #         for d in c.children:
-        #             print("         ", d.move, d.wins, d.visits)
-
-        #wins = [child.wins for child in root.children]
-        visits = [child.visits for child in root.children]
+        # 状態を回復する
+        board.set_plan(*original_plans)
+        board.set_state(state)
+        
+        # 着手を選ぶ
+        visits = self.visits_dict[state]
         max_visit = max(visits)
         max_index = [i for i, v in enumerate(visits) if v == max_visit]
-        choiced_index = choice(max_index)
-        move = root.children[choiced_index].move
-        self.root = root.children[choiced_index]
+        return self.placable_dict[state][choice(max_index)]
         
-        board.set_state(root.state)
-        board.set_plan(*original_plans)
-        
-        # print([i.move for i in root.children])
-        # print(wins)
-        # print(visits)
-        # print("put", move)
-
-        return move
-
-
-
 
 class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
     def __init__(self, max_tries = 65536, limit_time = 10):
@@ -172,49 +187,3 @@ class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
                 return move
 
         return self.monte_carlo_tree_search(board)
-
-
-if __name__ == "__main__":
-    def player(board : Board):
-        while 1:
-            try:
-                n = int(input("enter n : "))
-                if board.is_placable(n, *board.players_board):
-                    return n
-            except:
-                print("error")
-                continue
-
-    import cProfile
-    import pstats
-
-    from drl_alphazero import AlphaZeroComputer
-
-
-    pr = cProfile.Profile()
-    pr.enable()
-
-    mcts = MonteCarloTreeSearch()
-    mcts.reset()
-    alphazero = AlphaZeroComputer(64)
-    alphazero.reset("alphazero-6")
-    board = Board()
-    # board.set_state((0b00000000_00001110_11000111_00101011_11101111_01101110_00111100_00111000, 
-    #                 0b00011100_00010000_00111000_11010100_00010000_00010000_00000000_00000000, 
-    # 1))
-
-    # board.set_state((0b00000000_00000000_00000000_00011110_00001000_00011000_00001000_00001000, 
-    #                  0b00010000_00011101_01111111_01100001_11110111_11100111_00110100_00100100,
-    # 1))
-
-    board.debug_game(alphazero, mcts)
-
-    print("game set")
-    print("black:", board.black_num)
-    print("white:", board.white_num)
-
-    pr.disable()
-    stats = pstats.Stats(pr)
-    stats.sort_stats('tottime')
-    stats.print_stats()
-
