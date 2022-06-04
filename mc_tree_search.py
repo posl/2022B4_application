@@ -124,7 +124,7 @@ class MonteCarloTreeSearch:
                 else:
                     game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])
                 
-                wins_dict[next_state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0
+                wins_dict[next_state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0.5
                 visits_dict[next_state][expansion_index] += 1
                 
             # 一層深く
@@ -132,7 +132,7 @@ class MonteCarloTreeSearch:
                 game_res = self.play(board, next_state)
 
         # 結果を記録    
-        wins_dict[state][next_index] += (state[2] == (game_res > 0)) if game_res else 0
+        wins_dict[state][next_index] += (state[2] == (game_res > 0)) if game_res else 0.5
         visits_dict[state][next_index] += 1
 
         return game_res
@@ -153,7 +153,7 @@ class MonteCarloTreeSearch:
             expansion_state = self.children_state_dict[state][expansion_index]
             board.set_state(expansion_state)
             game_res = self.game_simulation(board)
-            self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0
+            self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0.5
             visits_dict[state][expansion_index] += 1
 
         # max_tries回シミュレーションする

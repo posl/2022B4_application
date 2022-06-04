@@ -28,10 +28,8 @@ class PrimitiveMonteCarlo:
             board.set_state(state)
 
             board.game()
-            if board.black_num == board.white_num:
-                score += 0.5
-            elif ((board.black_num > board.white_num) == my_turn):
-                score += 1
+            res = board.black_num - board.white_num
+            score += ((res > 0) == my_turn) if res else 0.5
 
         return score
 
