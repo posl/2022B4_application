@@ -750,15 +750,15 @@ class PlayerKinds:
         self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
         self.kinds_difficulty.append(2)
 
-        self.rainbow_computer_d0 = RainbowComputer(64)
-        self.kinds_name.append("Rainbow")
-        self.kinds_func.append([ self.rainbow_computer_d0 ])
-        self.kinds_difficulty.append(1)
+        #self.rainbow_computer_d0 = RainbowComputer(64)
+        #self.kinds_name.append("Rainbow")
+        #self.kinds_func.append([ self.rainbow_computer_d0 ])
+        #self.kinds_difficulty.append(1)
 
-        self.reinforce_computer_d0 = ReinforceComputer(64)
-        self.kinds_name.append("Reinforce")
-        self.kinds_func.append([ self.reinforce_computer_d0 ])
-        self.kinds_difficulty.append(1)
+        #self.reinforce_computer_d0 = ReinforceComputer(64)
+        #self.kinds_name.append("Reinforce")
+        #self.kinds_func.append([ self.reinforce_computer_d0 ])
+        #self.kinds_difficulty.append(1)
 
         self.alphazero_computer_d0 = AlphaZeroComputer(64)
         self.kinds_name.append("AlphaZero")

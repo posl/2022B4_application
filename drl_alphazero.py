@@ -650,7 +650,7 @@ class AlphaZero:
 
 
     @staticmethod
-    def eval(weights, simulations = 800, enemy = AlphaBeta()):
+    def eval(weights, simulations = 800, enemy = PrimitiveMonteCarlo(2048)):
         with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
             win_rates = []
 
@@ -780,6 +780,7 @@ def eval_alphazero_computer(index = None):
 
 
 def comp_alphazero_computer():
+    
     pass
 
 
