@@ -24,32 +24,24 @@ from gt_alpha_beta import AlphaBeta
 # =============================================================================
 
 class SimpleCNN(Layer):
-    def __init__(self, use_batch_norm = True):
+    def __init__(self):
         super().__init__()
 
-        conv_layer = BatchNormConv2d if use_batch_norm else dzl.Conv2d
-        self.conv1 = conv_layer(32, 3, 1, 1)
-        self.conv2 = conv_layer(32, 3, 1, 1)
-        self.conv3 = conv_layer(64, 3, 1, 0)
-        self.conv4 = conv_layer(64, 3, 1, 0)
+        self.conv1 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
+        self.bn1 = dzl.BatchNorm()
+        self.conv2 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
+        self.bn2 = dzl.BatchNorm()
+        self.conv3 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
+        self.bn3 = dzl.BatchNorm()
+        self.conv4 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
+        self.bn4 = dzl.BatchNorm()
 
     def forward(self, x):
-        x = relu(self.conv1(x))
-        x = relu(self.conv2(x))
-        x = relu(self.conv3(x))
-        x = relu(self.conv4(x))
+        x = relu(self.bn1(self.conv1(x)))
+        x = relu(self.bn2(self.conv2(x)))
+        x = relu(self.bn3(self.conv3(x)))
+        x = relu(self.bn4(self.conv4(x)))
         return flatten(x)
-
-
-class BatchNormConv2d(Layer):
-    def __init__(self, out_channels, filter_size, stride, padding):
-        super().__init__()
-
-        self.conv = dzl.Conv2d(out_channels, filter_size, stride, padding)
-        self.bn = dzl.BatchNorm()
-
-    def forward(self, x):
-        return self.bn(self.conv(x))
 
 
 

@@ -3,9 +3,9 @@ from random import choices
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_train
-from drl_utilities import ResNet50, SelfMatch, eval_computer
+from drl_utilities import SimpleCNN, SelfMatch, eval_computer
 import inada_framework.layers as dzl
-from inada_framework.functions import flatten, relu, softmax, log
+from inada_framework.functions import relu, dropout, softmax, log
 from board import Board
 
 
@@ -18,14 +18,20 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        self.cnn = ResNet50()
-        self.conv = dzl.Conv2d1x1(2)
-        self.bn = dzl.BatchNorm()
-        self.fc = dzl.Affine(action_size)
+        self.cnn = SimpleCNN()
+
+        self.fc1 = dzl.Affine(1024, nobias = True)
+        self.bn1 = dzl.BatchNorm()
+        self.fc2 = dzl.Affine(512, nobias = True)
+        self.bn2 = dzl.BatchNorm()
+
+        self.p_head = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = self.bn(self.conv(self.cnn(x)))
-        return self.fc(flatten(relu(x)))
+        x = self.cnn(x)
+        x = dropout(relu(self.bn1(self.fc1(x))), dropout_ratio = 0.3)
+        x = dropout(relu(self.bn2(self.fc2(x))), dropout_ratio = 0.3)
+        return self.p_head(x)
 
 
 
@@ -115,7 +121,7 @@ class ReinforceAgent:
 # =============================================================================
 
 class Reinforce(SelfMatch):
-    def fit_episode(self, progress):
+    def fit_episode(self, progress = None):
         board = self.board
         agent = self.agent
 
@@ -136,7 +142,7 @@ class Reinforce(SelfMatch):
 
 def fit_reinforce_agent(episodes = 100000, restart = False):
     # ハイパーパラメータ設定
-    gamma = 0.95
+    gamma = 0.90
     lr = 0.00005
     to_gpu = True
 
@@ -187,7 +193,7 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    # fit_reinforce_agent(restart = True)
+    fit_reinforce_agent(restart = True)
 
     # 評価用コード
     eval_computer(ReinforceComputer, "REINFORCE", 0)
