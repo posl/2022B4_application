@@ -124,7 +124,7 @@ class MonteCarloTreeSearch:
                 else:
                     game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])
                 
-                wins_dict[next_state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0.5
+                wins_dict[next_state][expansion_index] += (next_state[2] == (game_res > 0)) if game_res else 0.5
                 visits_dict[next_state][expansion_index] += 1
                 
             # 一層深く
