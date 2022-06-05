@@ -23,29 +23,6 @@ from gt_alpha_beta import AlphaBeta
 # オセロボードの画像処理用 CNN
 # =============================================================================
 
-class SimpleCNN(Layer):
-    def __init__(self):
-        super().__init__()
-
-        self.conv1 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
-        self.bn1 = dzl.BatchNorm()
-        self.conv2 = dzl.Conv2d(512, 3, 1, 1, nobias = True)
-        self.bn2 = dzl.BatchNorm()
-        self.conv3 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
-        self.bn3 = dzl.BatchNorm()
-        self.conv4 = dzl.Conv2d(512, 3, 1, 0, nobias = True)
-        self.bn4 = dzl.BatchNorm()
-
-    def forward(self, x):
-        x = relu(self.bn1(self.conv1(x)))
-        x = relu(self.bn2(self.conv2(x)))
-        x = relu(self.bn3(self.conv3(x)))
-        x = relu(self.bn4(self.conv4(x)))
-        return flatten(x)
-
-
-
-
 # 前のレイヤが学習しきれなかった残余を次の層に渡すという工程を繰り返すネットワーク (Residual Networks)
 class ResNet50(Layer):
     def __init__(self):

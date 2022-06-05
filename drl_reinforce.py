@@ -3,9 +3,9 @@ from random import choices
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_train
-from drl_utilities import SimpleCNN, SelfMatch, eval_computer
+from drl_utilities import SelfMatch, eval_computer
 import inada_framework.layers as dzl
-from inada_framework.functions import relu, dropout, softmax, log
+from inada_framework.functions import relu, softmax, log
 from board import Board
 
 
@@ -18,20 +18,15 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
-        self.cnn = SimpleCNN()
-
-        self.fc1 = dzl.Affine(1024, nobias = True)
-        self.bn1 = dzl.BatchNorm()
-        self.fc2 = dzl.Affine(512, nobias = True)
-        self.bn2 = dzl.BatchNorm()
-
-        self.p_head = dzl.Affine(action_size)
+        self.fc1 = dzl.Affine(512)
+        self.fc2 = dzl.Affine(512)
+        self.fc3 = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = self.cnn(x)
-        x = dropout(relu(self.bn1(self.fc1(x))), dropout_ratio = 0.3)
-        x = dropout(relu(self.bn2(self.fc2(x))), dropout_ratio = 0.3)
-        return self.p_head(x)
+        x = x.reshape(len(x), -1)
+        x = relu(self.fc1(x))
+        x = relu(self.fc2(x))
+        return self.fc3(x)
 
 
 
