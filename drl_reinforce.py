@@ -1,8 +1,8 @@
-from random import choices
+from random import choices, sample
 
 import numpy as np
 
-from inada_framework import Model, cuda, optimizers, no_train
+from inada_framework import Model, cuda, optimizers, no_grad
 from drl_utilities import SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, softmax, log
@@ -36,7 +36,7 @@ class PolicyNet(Model):
 # =============================================================================
 
 class ReinforceAgent:
-    def __init__(self, action_size, gamma = 0.88, lr = 0.000025, to_gpu = False):
+    def __init__(self, action_size, gamma = 0.90, lr = 0.00002, to_gpu = False):
         self.memory1 = []
         self.memory0 = []
 
@@ -62,7 +62,7 @@ class ReinforceAgent:
 
 
     def __call__(self, board):
-        with no_train():
+        with no_grad():
             action, __ = self.get_action(board)
         return action
 
@@ -71,9 +71,11 @@ class ReinforceAgent:
             placable = board.list_placable()
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp)
-        policy = self.pi(state[None, :])
-        probs = softmax(policy[:, np.array(placable)])
+        state = board.get_img(xp)[None, :]
+        mask = np.array(placable)
+
+        policy = self.pi(state)[:, mask]
+        probs = softmax(policy)
 
         if len(placable) == 1:
             action_index = 0
@@ -138,8 +140,8 @@ class Reinforce(SelfMatch):
 def fit_reinforce_agent(episodes = 100000, restart = False):
     # ハイパーパラメータ設定
     gamma = 0.90
-    lr = 0.00005
-    to_gpu = True
+    lr = 0.00002
+    to_gpu = False
 
     # 環境
     board = Board()
@@ -159,15 +161,22 @@ def fit_reinforce_agent(episodes = 100000, restart = False):
 # =============================================================================
 
 class ReinforceComputer:
-    def __init__(self, action_size, file_name = "reinforce-0", to_gpu = False):
+    def __init__(self, action_size, to_gpu = False):
+        self.action_size = action_size
         self.use_gpu = to_gpu and cuda.gpu_enable
-        pi = PolicyNet(action_size)
-        self.pi = pi
 
+    def reset(self, file_name = "reinforce"):
         file_path = Reinforce.get_path(file_name).format("parameters")
-        pi.load_weights(file_path + ".npz")
-        if self.use_gpu:
-            pi.to_gpu()
+
+        each_pi = []
+        for i in sample(range(3), 2):
+            pi = PolicyNet(self.action_size)
+            pi.load_weights(f"{file_path}-{i}.npz")
+            if self.use_gpu:
+                pi.to_gpu()
+
+            each_pi.append(pi)
+        self.each_pi = each_pi
 
     def __call__(self, board):
         placable = board.list_placable()
@@ -175,13 +184,17 @@ class ReinforceComputer:
             return placable[0]
 
         xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp)
-        with no_train():
-            policy = self.pi(state[None, :])
+        state = board.get_img(xp)[None, :]
+        mask = np.array(placable)
 
-        policy = policy.data[0, np.array(placable)]
-        policy -= policy.max()
-        return choices(placable, xp.exp(policy))[0]
+        with no_grad():
+            probs = 0
+            for pi in self.each_pi:
+                policy = pi(state)[:, mask]
+                probs += softmax(policy).data[0]
+
+        action = choices(placable, probs)[0]
+        return action
 
 
 
