@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from inada_framework import Layer, cuda
 import inada_framework.layers as dzl
-from inada_framework.functions import relu, flatten
+from inada_framework.functions import relu
 from inada_framework.utilities import make_dir_exist
 from board import Board
 
@@ -190,7 +190,7 @@ class SelfMatch:
 
     # 前回の状態を引き継いで、学習を途中再開することができる
     def fit(self, runs, episodes, restart = False, file_name = "params"):
-        file_path = SelfMatch.get_path(file_name)
+        file_path = self.get_path(file_name)
         is_yet_path = file_path.format("is_yet")
         params_path = file_path.format("parameters")
         graphs_path = file_path.format("graphs")
