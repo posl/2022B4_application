@@ -5,7 +5,7 @@ import numpy as np
 from inada_framework import Model, cuda, optimizers, no_grad
 from drl_utilities import SelfMatch, eval_computer
 import inada_framework.layers as dzl
-from inada_framework.functions import relu, softmax, log
+from inada_framework.functions import relu, flatten, softmax, log
 from board import Board
 
 
@@ -18,12 +18,16 @@ class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
 
+        self.conv1 = dzl.Conv2d(64, 3, 1)
+        self.conv2 = dzl.Conv2d(64, 3, 1)
         self.fc1 = dzl.Affine(512)
         self.fc2 = dzl.Affine(512)
         self.fc3 = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = x.reshape(len(x), -1)
+        x = relu(self.conv1(x))
+        x = relu(self.conv2(x))
+        x = flatten(x)
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         return self.fc3(x)
@@ -140,7 +144,7 @@ class Reinforce(SelfMatch):
 def fit_reinforce_agent(episodes = 100000, restart = False):
     # ハイパーパラメータ設定
     gamma = 0.90
-    lr = 0.00002
+    lr = 0.000025
     to_gpu = False
 
     # 環境

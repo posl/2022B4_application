@@ -12,6 +12,7 @@ import ray
 import psutil
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from matplotlib import collections, patches
 
 from inada_framework import Model, Function, no_train
 from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu
@@ -433,23 +434,28 @@ def alphazero_test(weights, simulations, turn, enemy):
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_valid(weights1, weights0, simulations):
+def alphazero_valid(weights1, weights0, couple):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント
     agent1 = AlphaZeroAgent(board.action_size)
-    agent1.reset(weights1, simulations)
+    agent1.reset(weights1)
     agent0 = AlphaZeroAgent(board.action_size)
-    agent0.reset(weights0, simulations)
+    agent0.reset(weights0)
 
     # 方策の設定・１ゲーム勝負
     board.set_plan(agent1, agent0)
     board.game()
 
     # 先攻が勝利したか否かをを取得
-    return ((board.black_num - board.white_num) > 0)
+    result = board.black_num - board.white_num
+    if result:
+        result = result > 0, result < 0
+    else:
+        result = 0, 0
+    return couple, result
 
 
 
@@ -687,7 +693,7 @@ def eval_alphazero_computer(index = None):
     network = PolicyValueNet(Board.action_size)
     network.load_weights(params_path)
     weights = ray.put(network.get_weights())
-    del network
+    del params_path, network
 
 
     # 対戦する相手の設定
@@ -780,8 +786,109 @@ def eval_alphazero_computer(index = None):
 
 
 def comp_alphazero_computer():
-    
-    pass
+    # ファイルのパス
+    graphs_path = SelfMatch.get_path("alphazero").format("graphs")
+    params_path = graphs_path.replace("graphs", "parameters")
+    params_paths = glob(f"{params_path}-[0-9].npz")
+    params_paths.sort()
+
+    # 並列実行を行うための初期化
+    ray.shutdown()
+    ray.init()
+
+    # パラメータを共有メモリにコピー
+    network = PolicyValueNet(Board.action_size)
+    weights_list = []
+
+    for params_path in params_paths:
+        network.load_weights(params_path)
+        weights_list.append(ray.put(network.get_weights()))
+
+    N = len(weights_list)
+    del params_path, params_paths, network
+
+
+    # 先攻・後攻入れ替えて４回ずつ、計８回だけ自己対戦を行う
+    remains = []
+    for i in range(N):
+        for j in range(i + 1, N):
+            WI, WJ = weights_list[i], weights_list[j]
+            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(4)])
+            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(4)])
+
+    # 並列実行を行う (回数は最大で、360 回)
+    results = np.zeros((N, N, 2), dtype = np.int32)
+    while remains:
+        finished, remains = ray.wait(remains, num_returns = 1)
+        couple, result = ray.get(finished[0])
+        results[couple] += result
+
+
+    # 図の生成
+    fig, ax = plt.subplots()
+    ax.clear()
+
+    # タイトルを設定
+    fig.suptitle("AlphaZero's Winning Percentages In Self Match", fontsize = 14, color = "red")
+    ax.set_title("(Between Agents With Different Progress Rates)", fontsize = 12)
+
+    # ラベルを描画しないように設定
+    ax.tick_params(labelbottom = False, labelleft = False, labelright = False, labeltop = False)
+
+    # 目盛り線・グリッド線を描画
+    HW = N + 1
+    ax.set_xticks(range(HW + 1))
+    ax.set_yticks(range(HW + 1))
+    ax.grid(True, color = "darkgray")
+
+    # 各軸方向の範囲を設定
+    ax.set_xlim(0, HW)
+    ax.set_ylim(0, HW)
+
+    # 総当たり表を見やすくするための直線を描画
+    lines = [(0, HW), (HW, 0)], [(1, 0), (1, HW)], [(0, N), (HW, N)]
+    ax.add_collection(collections.LineCollection(lines, color = "gray"))
+
+    # 先攻・後攻を表現するための楕円を描画
+    xy = np.array([0, N])
+    ax.add_patch(patches.Ellipse(xy = xy + 0.3, width = 0.2, height = 0.25, fc = "black", ec = "black"))
+    ax.add_patch(patches.Ellipse(xy = xy + 0.7, width = 0.2, height = 0.25, fc = "white", ec = "black"))
+
+    # コンピュータそれぞれの学習の進捗率を示す列を追加
+    for i in range(1, HW):
+        progress = 10 * i
+        x = 0.1 if progress == 100 else 0.2
+        progress = f"{progress} %"
+
+        ax.text(x, (N - i) + 0.4, progress, size = "small")
+        ax.text(x + i, N + 0.4, progress, size = "small")
+
+
+    # 自己対戦の結果を表に反映させる
+    lines = [], []
+    for i in range(N):
+        y = N - (i + 1)
+
+        for j in range(N):
+            if i == j:
+                continue
+
+            x = j + 1
+            black, white = results[i, j]
+            ax.text(x + 0.2, y + 0.4, f"{black} - {white}", size = "small")
+
+            diff = black - white
+            if diff:
+                is_blue = int(diff < 0)
+                lines[is_blue].append([(x + 0.2, y + 0.3), (x + 0.8, y + 0.3)])
+
+    # 勝敗を分かりやすくするための直線を描画
+    ax.add_collection(collections.LineCollection(lines[0], color = "red"))
+    ax.add_collection(collections.LineCollection(lines[1], color = "blue"))
+
+    # 図の保存
+    fig.savefig(f"{graphs_path}_self")
+    fig.clf()
 
 
 
@@ -793,3 +900,4 @@ if __name__ == "__main__":
 
     # 評価用コード
     eval_alphazero_computer(index = None)
+    comp_alphazero_computer()
