@@ -22,7 +22,6 @@ from network import NetrorkPlayer
 IPADDR = "127.0.0.1"
 
 
-
 class Page(tk.Frame):
     def __init__(self, par, board):
         # ページに共通する属性やメソッドなどを記述
@@ -30,8 +29,8 @@ class Page(tk.Frame):
         self.par = par
         self.board = board
 
-        self.win_width = 640
-        self.win_height = 480
+        self.win_width = 640*2
+        self.win_height = 480*2
         self.font_name = "凸版文久見出しゴシック"
         self.grid(row=0, column=0, sticky="nsew") #正常な画面表示に必要
 
@@ -44,13 +43,13 @@ class StartPage(Page):
 
         self.configure(bg="#881111")
 
-        self.label = tk.Label(self, text="Othello", font = (self.font_name, 50), fg="#119911", bg="#881111")
+        self.label = tk.Label(self, text="Othello", font = (self.font_name, 100), fg="#119911", bg="#881111")
         self.label.pack(anchor="center", expand=True)
         #self.label.place(x=200, y=50)
-        self.button1 = tk.Button(self, text="Play", font = (self.font_name, 50), command=lambda:self.goto_option_page())
+        self.button1 = tk.Button(self, text="Play", font = (self.font_name, 100), command=lambda:self.goto_option_page())
         self.button1.pack(anchor="center", expand=True)
         #self.button1.place(x=200, y=200)
-        self.button2 = tk.Button(self, text="Quit", font = (self.font_name, 50), command=lambda:exit())
+        self.button2 = tk.Button(self, text="Quit", font = (self.font_name, 100), command=lambda:exit())
         self.button2.pack(anchor="center", expand=True)
         #self.button2.place(x=200, y=270)
 
@@ -73,49 +72,49 @@ class OptionPage(Page):
         self.combo_menus = ["---"]
         self.combo_menus2 = ("x1", "x2", "x3", "x4")
 
-        self.label1 = tk.Label(self, text="Player1", fg="#999999")
+        self.label1 = tk.Label(self, text="Player1", fg="#999999", font = (self.font_name, 30))
         self.label1.place(x=10, y=30)
 
-        self.label2 = tk.Label(self, text="Player2", fg="#999999")
-        self.label2.place(x=10, y=90)
+        self.label2 = tk.Label(self, text="Player2", fg="#999999", font = (self.font_name, 30))
+        self.label2.place(x=10, y=200)
 
-        self.label3 = tk.Label(self, text="表示速度", fg="#999999")
-        self.label3.place(x=10, y=150)
+        self.label3 = tk.Label(self, text="表示速度", fg="#999999", font = (self.font_name, 30))
+        self.label3.place(x=10, y=370)
 
-        self.combobox3 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
-        self.combobox3.place(x=330, y=30 )
+        self.combobox3 = ttk.Combobox(self, height=4, font = (self.font_name, 30), values = self.combo_menus, state="readonly")
+        self.combobox3.place(x=630, y=30 )
         self.combobox3.current(0)
 
-        self.combobox4 = ttk.Combobox(self, height=4, values = self.combo_menus, state="readonly")
-        self.combobox4.place(x=330, y=90 )
+        self.combobox4 = ttk.Combobox(self, height=4, font = (self.font_name, 30), values = self.combo_menus, state="readonly")
+        self.combobox4.place(x=630, y=200 )
         self.combobox4.current(0)
 
-        self.combobox1 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
-        self.combobox1.place(x=100, y=30 )
+        self.combobox1 = ttk.Combobox(self, height=8, font = (self.font_name, 30), values = self.combo_menus, state="readonly")
+        self.combobox1.place(x=200, y=30 )
         self.combobox1.current(0)
         self.combobox1.bind("<<ComboboxSelected>>",lambda e: self.combobox1_changed() )
 
-        self.combobox2 = ttk.Combobox(self, height=8, values = self.combo_menus, state="readonly")
-        self.combobox2.place(x=100, y=90 )
+        self.combobox2 = ttk.Combobox(self, height=8, font = (self.font_name, 30), values = self.combo_menus, state="readonly")
+        self.combobox2.place(x=200, y=200 )
         self.combobox2.current(0)
         self.combobox2.bind("<<ComboboxSelected>>",lambda e: self.combobox2_changed() )
 
-        self.combobox5 = ttk.Combobox(self, height=4, values = self.combo_menus2, state="readonly")
-        self.combobox5.place(x=100, y=150 )
+        self.combobox5 = ttk.Combobox(self, height=4, font = (self.font_name, 30), values = self.combo_menus2, state="readonly")
+        self.combobox5.place(x=200, y=370 )
         self.combobox5.current(0)
 
-        self.button1 = tk.Button(self, text="Next", font = (self.font_name, 50), command=lambda:self.start_game())
-        self.button1.place(x=450, y=380)
+        self.button1 = tk.Button(self, text="Next", font = (self.font_name, 100), command=lambda:self.start_game())
+        self.button1.place(x=900, y=2*350)
 
     def combobox1_changed(self):
         n = self.combobox1.current()
         n = self.board.player_kinds.get_difficulty(n)
         if n<2:
-            self.combobox3.place(x = 1000)
+            self.combobox3.place(x = 3000)
             self.combobox3["values"] = ["1"]
             self.combobox3.current(0)
         else:
-            self.combobox3.place(x=330)
+            self.combobox3.place(x=630)
             self.combo_menus.clear()
             for i in range(n):
                 self.combo_menus.append("難易度"+str(i+1))
@@ -126,11 +125,11 @@ class OptionPage(Page):
         n = self.combobox2.current()
         n = self.board.player_kinds.get_difficulty(n)
         if n<2:
-            self.combobox4.place(x = 1000)
+            self.combobox4.place(x = 3000)
             self.combobox4["values"] = ["1"]
             self.combobox4.current(0)
         else:
-            self.combobox4.place(x=330)
+            self.combobox4.place(x=630)
             self.combo_menus.clear()
             for i in range(n):
                 self.combo_menus.append("難易度"+str(i+1))
@@ -179,43 +178,43 @@ class GamePage(Page):
         Page.__init__(self, par, board)
         self.configure(bg="#992299")
 
-        self.canvas_width = 400
-        self.canvas_height = 400
+        self.canvas_width = 15 + 2*45*8
+        self.canvas_height = 15 + 2*45*8
 
-        self.cell_width = (self.canvas_width-10) // 8
-        self.cell_height = (self.canvas_height-10) // 8
+        self.cell_width = (self.canvas_width-15) // 8
+        self.cell_height = (self.canvas_height-15) // 8
 
         self.player1 = 0
         self.player2 = 0
 
         self.game_canvas = tk.Canvas(self, width=self.canvas_width, height=self.canvas_height)
-        self.game_canvas.place(x=100, y=50)
+        self.game_canvas.place(x=200, y=100)
         self.game_canvas.bind("<Button-1>", self.cell_click)
         self.game_canvas_state = 0
         self.game_canvas_lock = False
         self.time_len_coef = 1
 
-        self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=30)
-        self.counter_bar.place(x=100, y=5)
+        self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=60)
+        self.counter_bar.place(x=200, y=5)
 
-        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080", font = (self.font_name, 50))
+        self.black_conter_label = tk.Label(self, text="B00", fg="#111111", bg="#808080", font = (self.font_name, 90))
         self.black_conter_label.place(x=10, y=10)
 
-        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (self.font_name, 50))
-        self.white_conter_label.place(x=530, y=10)
+        self.white_conter_label = tk.Label(self, text="W00", fg="#EEEEEE", bg="#808080", font = (self.font_name, 90))
+        self.white_conter_label.place(x=10 + self.canvas_width + 300, y=10)
 
-        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (self.font_name, 25))
-        self.label1.place(x=1000, y=300)
+        self.label1 = tk.Label(self, text="", fg="#111111", bg="#808080", font = (self.font_name, 50))
+        self.label1.place(x=3000, y=270*2)
 
         # 見えないところに置かれている、削除するかも？
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 25), command=lambda:None)
-        self.button1.place(x=750, y=380)
+        self.button1.place(x=3000, y=380)
 
-        self.button2 = tk.Button(self, text=">", font = (self.font_name, 50), command=lambda:self.goto_result_page())
-        self.button2.place(x=750, y=380)
+        self.button2 = tk.Button(self, text=">", font = (self.font_name, 70), command=lambda:self.goto_result_page())
+        self.button2.place(x=3000, y=340*2)
 
         self.button3 = tk.Button(self, text="X", font = (self.font_name, 50), command=lambda:self.goto_start_page())
-        self.button3.place(x=750, y=160)
+        self.button3.place(x=3000, y=160)
 
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
@@ -314,24 +313,24 @@ class GamePage(Page):
 
     def stone_black_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#111111")
-        for k in range(17):
-            k_ = 17 - k
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
             s = format(3*k, "02X")
             s = "#" + s + s + s
             self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_white_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#EEEEEE")
-        for k in range(17):
-            k_ = 17 - k
-            s = format((0xEE-17*3)+3*k_, "02X")
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
+            s = format((0xEE-(self.cell_width//2-3)*3)+3*k_, "02X")
             s = "#" + s + s + s
             self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_gray_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#777777")
-        for k in range(17):
-            k_ = 17 - k
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
             s = format(0x77+k, "02X")
             s = "#" + s + s + s
             self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
@@ -339,24 +338,24 @@ class GamePage(Page):
 
     def stone_blue_draw(self, x, y):
         self.game_canvas.create_rectangle(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#11FFFF")
-        for k in range(17):
-            k_ = 17 - k
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
             s = format(0xff-3*k, "02X")
             s = "#" + "11" + s + s
             self.game_canvas.create_rectangle(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_red_draw(self, x, y):
         self.game_canvas.create_rectangle(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#FF3333")
-        for k in range(17):
-            k_ = 17 - k
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
             s = format(0xff-3*k, "02X")
             s = "#" + s + "33" + "33"
             self.game_canvas.create_rectangle(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
 
     def stone_yellow_draw(self, x, y):
         self.game_canvas.create_oval(11+self.cell_width*x, 11+self.cell_height*y, 9+self.cell_width*(x+1), 9+self.cell_height*(y+1), fill="#FFFF44")
-        for k in range(17):
-            k_ = 17 - k
+        for k in range(self.cell_width//2-3):
+            k_ = self.cell_width//2-3 - k
             s = format(0xff-3*k, "02X")
             s = "#" + s + s + "44"
             self.game_canvas.create_oval(10+self.cell_width*(2*x+1)//2 - (k_+1), 10+self.cell_height*(2*y+1)//2  - (k_+1), 10+self.cell_width*(2*x+1)//2  + (k_+1), 10+self.cell_height*(2*y+1)//2   + (k_+1), fill=s, outline = s)
@@ -373,13 +372,13 @@ class GamePage(Page):
         bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum+0.1)-0.5)*3 )+1) / 2  )
         self.counter_bar.create_rectangle(0, 0, self.canvas_width+10, 100, fill = "#22FF77")
         self.counter_bar.create_rectangle(0, 0, bw_bounder_x, 100, fill = "#000000", outline="#000000")
-        for i in range(30):
-            s = format((30-i)*4, "02X" )
+        for i in range(60):
+            s = format((60-i)*2, "02X" )
             s = "#" + s + s + s
             self.counter_bar.create_rectangle(0, i, bw_bounder_x, 1+i, fill = s, outline=s)
         self.counter_bar.create_rectangle(bw_bounder_x, 0, self.canvas_width+10, 100, fill = "#EEEEEE")
-        for i in range(30):
-            s = format((0xEE-30*3)+i*3, "02X" )
+        for i in range(60):
+            s = format((0xEE-60*1)+i*1, "02X" )
             s = "#" + s + s + s
             self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
         return
@@ -425,13 +424,13 @@ class GamePage(Page):
 
     def result_view(self):
         self.win_check()
-        self.button2.place(x=520)
-        self.label1.place(x=520)
+        self.button2.place(x=1020)
+        self.label1.place(x=1020)
 
     def goto_start_page(self):
         self.par.change_page(0)
-        self.button2.place(x=1000)
-        self.label1.place(x=1000)
+        self.button2.place(x=3000)
+        self.label1.place(x=3000)
         self.label1.configure(text="")
         self.par.sounds.bgm_play(0)
         self.par.quit()
@@ -439,8 +438,8 @@ class GamePage(Page):
     def goto_result_page(self):
         self.par.result_page.graph_draw()
         self.par.change_page(3)
-        self.button2.place(x=1000)
-        self.label1.place(x=1000)
+        self.button2.place(x=3000)
+        self.label1.place(x=3000)
         self.label1.configure(text="")
         print(self.board.play_log)
 
@@ -468,33 +467,33 @@ class ResultPage(Page):
         self.cell_width = (self.canvas_width-10) // 8
         self.cell_height = (self.canvas_height-10) // 8
 
-        self.board_canvas_width = 130
-        self.board_canvas_height = 130
+        self.board_canvas_width = 10 + 120*2
+        self.board_canvas_height = 10 + 120*2
 
         self.cur = 0
 
-        self.stonenum_canvas_width = 600
-        self.stonenum_canvas_height = 300
+        self.stonenum_canvas_width = 600*2
+        self.stonenum_canvas_height = 280*2
 
         self.board_canvas = tk.Canvas(self, width=self.board_canvas_width, height=self.board_canvas_height)
-        self.board_canvas.place(x=200, y=10)
+        self.board_canvas.place(x=400, y=10)
 
         self.stonenum_canvas = tk.Canvas(self, width=self.stonenum_canvas_width, height=self.stonenum_canvas_height)
-        self.stonenum_canvas.place(x=10, y=150)
+        self.stonenum_canvas.place(x=10, y=280)
         self.stonenum_canvas.bind("<Button-1>", self.graph_click)
         self.curline1 = None
         self.curline2 = None
         self.curline3 = None
         self.curline4 = None
 
-        self.button1 = tk.Button(self, text="開始画面へ", font = (self.font_name, 25), command=lambda:self.goto_start_page())
-        self.button1.place(x=480, y=10)
+        self.button1 = tk.Button(self, text="開始画面へ", font = (self.font_name, 50), command=lambda:self.goto_start_page())
+        self.button1.place(x=1000, y=10)
 
-        self.button2 = tk.Button(self, width=1, height=3, text=">", font = (self.font_name, 15), command=lambda:self.cur_inc())
-        self.button2.place(x=350, y=30)
+        self.button2 = tk.Button(self, width=1, height=3, text=">", font = (self.font_name, 30), command=lambda:self.cur_inc())
+        self.button2.place(x=700, y=30)
 
-        self.button3 = tk.Button(self, width=1, height=3, text="<", font = (self.font_name, 15), command=lambda:self.cur_dec())
-        self.button3.place(x=140, y=30)
+        self.button3 = tk.Button(self, width=1, height=3, text="<", font = (self.font_name, 30), command=lambda:self.cur_dec())
+        self.button3.place(x=280, y=30)
 
     def graph_click(self, event):
         states = self.board.play_log
@@ -553,8 +552,8 @@ class ResultPage(Page):
         self.board_canvas.delete("all")
         self.board_canvas.create_rectangle(0, 0, self.board_canvas_width, self.board_canvas_height, fill="#55FF88")
         for i in range(9):
-            self.board_canvas.create_line(5+15*i, 5, 5+15*i, 5+15*8, fill="#000000")
-            self.board_canvas.create_line(5, 5+15*i, 5+15*8, 5+15*i, fill="#000000")
+            self.board_canvas.create_line(5+30*i, 5, 5+30*i, 5+30*8, fill="#000000")
+            self.board_canvas.create_line(5, 5+30*i, 5+30*8, 5+30*i, fill="#000000")
         for i in range(8):
             for j in range(8):
                 t = (j, i)
@@ -565,7 +564,7 @@ class ResultPage(Page):
                     self.draw_stone("#EEEEEE", i, j)
 
     def draw_stone(self, color, x, y):
-        self.board_canvas.create_rectangle(6+15*x, 6+15*y, 4+15*(x+1), 4+15*(y+1), fill=color, outline="#888888")
+        self.board_canvas.create_rectangle(6+30*x, 6+30*y, 4+30*(x+1), 4+30*(y+1), fill=color, outline="#888888")
 
     def cur_inc(self):
         self.cur += 1
@@ -797,8 +796,8 @@ class MainWindow(tk.Tk):
         tk.Tk.__init__(self, *args, **kwargs)
         pygame.init()
         self.board = board
-        self.width = 640
-        self.height = 480
+        self.width = 640*2
+        self.height = 480*2
         self.geometry( str(self.width) + "x" + str(self.height) )
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -826,6 +825,7 @@ class MainWindow(tk.Tk):
             self.game_page.tkraise()
         elif page_id==3:
             self.result_page.tkraise()
+
 
 
 
