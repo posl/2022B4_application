@@ -537,7 +537,7 @@ class AlphaZero:
 
         # GPU を使用するかどうかの表示
         answer = "Yes, it do." if self.use_gpu else "No, it don't."
-        print(f"\nQ: Will this script use GPU?\nA: {answer}\n")
+        print(f"Q: Will this script use GPU?\nA: {answer}\n")
         del answer
 
 
@@ -686,6 +686,7 @@ def eval_alphazero_computer(index = None):
     # ファイルのパス
     params_path = AlphaZeroComputer.get_trained_path(index)
     graphs_path = params_path.replace("parameters", "graphs")[:-6]
+    print(f"use {params_path}")
 
     # 並列実行を行うための初期化
     ray.shutdown()
@@ -819,11 +820,14 @@ def comp_alphazero_computer():
             remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(4)])
 
     # 並列実行を行う (回数は最大で、360 回)
-    results = np.zeros((N, N, 2), dtype = np.int32)
-    while remains:
-        finished, remains = ray.wait(remains, num_returns = 1)
-        couple, result = ray.get(finished[0])
-        results[couple] += result
+    with tqdm(desc = "now evaluating", total = N * (N - 1) * 4, leave = False) as pbar:
+        results = np.zeros((N, N, 2), dtype = np.int32)
+
+        while remains:
+            finished, remains = ray.wait(remains, num_returns = 1)
+            couple, result = ray.get(finished[0])
+            results[couple] += result
+            pbar.update(1)
 
 
     # 図の生成
