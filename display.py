@@ -867,7 +867,7 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        self.player_kinds.alphazero_computer_d0.reset("alphazero-6")
+        self.player_kinds.alphazero_computer_d0.reset()
         self.player_kinds.mcts_d0.reset()
         self.player_kinds.mcts_d1.reset()
         self.player_kinds.mcts_d2.reset()

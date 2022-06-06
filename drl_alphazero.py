@@ -639,6 +639,8 @@ class AlphaZero:
                 buffer.save(f"{is_yet_path}_buffer.bz2", step)
                 np.save(f"{is_yet_path}_history.npy", history)
 
+            print("\033[K")
+
         finally:
             # 学習の進捗を x 軸、その時の勝率を y 軸とするグラフを描画し、画像保存する
             x = np.arange(1, 101)
