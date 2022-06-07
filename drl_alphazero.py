@@ -128,6 +128,7 @@ class AlphaZeroAgent:
     def reset(self, arg = None, simulations = 800):
         self.load(arg)
         self.simulations = simulations
+        self.count = 0
 
         # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率も参考にした累計行動価値、各状態・行動の探索回数
         self.P = {}
@@ -147,13 +148,16 @@ class AlphaZeroAgent:
             return self.get_action(board)
 
     def get_action(self, board, count = None):
+        selfplay_flag = (count is not None)
+        if not selfplay_flag:
+            count = self.count
+            self.count = count + 3
+
         # 必要に応じて、ルート盤面の合法手リストの登録も行うので、先に呼ぶ必要がある
         placable = self.__get_placable(board)
-
-        selfplay_flag = (count is not None)
         board_img, policy = self.__search(board, board.state, selfplay_flag)
 
-        if selfplay_flag and count < self.sampling_limits:
+        if count < self.sampling_limits:
             action = choices(placable, policy)[0]
         else:
             indices = np.where(policy == policy.max())[0]
@@ -647,7 +651,7 @@ class AlphaZero:
 
 
     @staticmethod
-    def eval(weights, simulations = 100, enemy = PrimitiveMonteCarlo(2048)):
+    def eval(weights, simulations = 100, enemy = AlphaBeta()):
         with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
             enemy = ray.put(enemy)
             win_rates = []
