@@ -1,15 +1,13 @@
 from math import log, sqrt, ceil
 from random import choices, choice
 from glob import glob
-from collections import deque
+from collections import deque, defaultdict
 from bz2 import BZ2File
 import pickle
-import gc
 from time import time
 
 import numpy as np
 import ray
-import psutil
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib import collections, patches
@@ -479,13 +477,6 @@ class AlphaZero:
         # 学習部分は GPU による高速化の余地がある
         self.use_gpu = to_gpu and gpu_enable\
 
-    # ray.put() で、大容量のデータをメモリに格納するので、閾値を設けて強制的なガベージコレクションを実施する
-    @staticmethod
-    def auto_gc_collect(pct = 80.):
-        if psutil.virtual_memory().percent >= pct:
-            gc.collect()
-
-
     def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 100, restart = False):
         network = self.network
         buffer = self.buffer
@@ -532,7 +523,6 @@ class AlphaZero:
         ray.init()
 
         # ray の共有メモリへの重みパラメータのコピーを明示的に行うことで、以降の処理を高速化する
-        self.auto_gc_collect()
         weights = ray.put(network.get_weights())
 
         # GPU を使用するかどうかの表示
@@ -613,7 +603,6 @@ class AlphaZero:
 
 
                     # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
-                    self.auto_gc_collect()
                     weights = ray.put(network.get_weights())
 
                     eval_q, eval_r = divmod(step, eval_interval)
@@ -658,8 +647,9 @@ class AlphaZero:
 
 
     @staticmethod
-    def eval(weights, simulations = 800, enemy = PrimitiveMonteCarlo(2048)):
+    def eval(weights, simulations = 100, enemy = PrimitiveMonteCarlo(2048)):
         with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
+            enemy = ray.put(enemy)
             win_rates = []
 
             for turn in (1, 0):
@@ -686,7 +676,7 @@ def eval_alphazero_computer(index = None):
     # ファイルのパス
     params_path = AlphaZeroComputer.get_trained_path(index)
     graphs_path = params_path.replace("parameters", "graphs")[:-6]
-    print(f"use {params_path}")
+    print(f"\nuse {params_path}")
 
     # 並列実行を行うための初期化
     ray.shutdown()
@@ -736,7 +726,7 @@ def eval_alphazero_computer(index = None):
             pie_fig.delaxes(pie_ax)
             continue
 
-        # 評価部分
+        # 対戦部分
         print(f"\n\033[92m>> vs. {name}\033[0m")
         print("sims || first | second")
         print("=======================")
@@ -811,16 +801,19 @@ def comp_alphazero_computer():
     del params_path, params_paths, network
 
 
-    # 先攻・後攻入れ替えて４回ずつ、計８回だけ自己対戦を行う
+    # 先攻・後攻入れ替えて７回ずつ、自己対戦を行う
     remains = []
     for i in range(N):
         for j in range(i + 1, N):
             WI, WJ = weights_list[i], weights_list[j]
-            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(4)])
-            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(4)])
+            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(7)])
+            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(7)])
 
-    # 並列実行を行う (回数は最大で、360 回)
-    with tqdm(desc = "now evaluating", total = N * (N - 1) * 4, leave = False) as pbar:
+    start = time()
+    print("\nstart evaluating by self match.")
+
+    # 並列実行を行う (回数は最大で、630 回)
+    with tqdm(desc = "now evaluating", total = N * (N - 1) * 7, leave = False) as pbar:
         results = np.zeros((N, N, 2), dtype = np.int32)
 
         while remains:
@@ -828,6 +821,8 @@ def comp_alphazero_computer():
             couple, result = ray.get(finished[0])
             results[couple] += result
             pbar.update(1)
+
+    print("done!  (took {:5g} minutes)".format((time() - start) / 60.))
 
 
     # 図の生成
@@ -871,7 +866,7 @@ def comp_alphazero_computer():
 
 
     # 自己対戦の結果を表に反映させる
-    lines = [], []
+    lines_dict = defaultdict(lambda: [])
     for i in range(N):
         y = N - (i + 1)
 
@@ -880,17 +875,19 @@ def comp_alphazero_computer():
                 continue
 
             x = j + 1
-            black, white = results[i, j]
-            ax.text(x + 0.2, y + 0.4, f"{black} - {white}", size = "small")
+            black_wins, white_wins = results[i, j]
+            ax.text(x + 0.2, y + 0.4, f"{black_wins} - {white_wins}", size = "small")
 
-            diff = black - white
+            diff = black_wins - white_wins
             if diff:
-                is_blue = int(diff < 0)
-                lines[is_blue].append([(x + 0.2, y + 0.3), (x + 0.8, y + 0.3)])
+                lines_dict[diff].append([(x + 0.2, y + 0.3), (x + 0.8, y + 0.3)])
 
-    # 勝敗を分かりやすくするための直線を描画
-    ax.add_collection(collections.LineCollection(lines[0], color = "red"))
-    ax.add_collection(collections.LineCollection(lines[1], color = "blue"))
+    # 結果を分かりやすくするための下線を描画
+    for diff, lines in lines_dict.items():
+        if lines:
+            alpha = abs(diff) / 7
+            RGBA = (1., 0, 0, alpha) if diff > 0 else (0, 0, 1., alpha)
+            ax.add_collection(collections.LineCollection(lines, color = RGBA))
 
     # 図の保存
     fig.savefig(f"{graphs_path}_self")
