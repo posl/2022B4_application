@@ -19,15 +19,19 @@ class PolicyNet(Model):
         super().__init__()
 
         self.conv1 = dzl.Conv2d(64, 3, 1, 1)
+        self.bn1 = dzl.BatchNorm()
         self.conv2 = dzl.Conv2d(64, 3, 1, 1)
+        self.bn2 = dzl.BatchNorm()
         self.conv3 = dzl.Conv2d1x1(64)
+        self.bn3 = dzl.BatchNorm()
+
         self.fc1 = dzl.Affine(512)
         self.fc2 = dzl.Affine(512)
         self.fc3 = dzl.Affine(action_size)
 
     def forward(self, x):
-        x = relu(self.conv1(x))
-        x = relu(self.conv2(x) + self.conv3(x))
+        x = relu(self.bn1(self.conv1(x)))
+        x = relu(self.bn2(self.conv2(x)) + self.bn3(self.conv3(x)))
         x = flatten(x)
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
