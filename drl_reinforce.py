@@ -179,9 +179,9 @@ class ReinforceComputer:
         file_path = self.file_path
 
         each_pi = []
-        for i in sample(range(3), 2):
+        for i in sample(range(5), 3):
             pi = PolicyNet(self.action_size)
-            pi.load_weights(f"{file_path}-tmp{i}.npz")
+            pi.load_weights(f"{file_path}-{i}.npz")
             if self.use_gpu:
                 pi.to_gpu()
 
@@ -224,7 +224,7 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    # fit_reinforce_agent(restart = True)
+    fit_reinforce_agent(restart = True)
 
     # 評価用コード
     eval_computer(ReinforceComputer, "REINFORCE")

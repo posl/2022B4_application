@@ -298,8 +298,8 @@ class SelfMatch:
         raise NotImplementedError()
 
 
-    # エージェントを指定した敵と 100 回戦わせた時の勝利数を取得する
-    def eval(self, enemy = corners_plan, in_progress = True):
+    # エージェントを指定した敵と戦わせた時の勝利数を取得する (学習中の評価時と、学習後の検証時で処理が多々異なる)
+    def eval(self, enemy = corners_plan, valid_flag = False):
         board = self.board
         agent = self.agent
         win_rates = []
@@ -308,21 +308,23 @@ class SelfMatch:
             plans = (agent, enemy) if turn else (enemy, agent)
             board.set_plan(*plans)
 
-            if in_progress:
-                n_gen = range(100)
-            else:
+            if valid_flag:
                 n_gen = tqdm(range(20), desc = "first" if turn else "second", leave = False)
+            else:
+                n_gen = range(100)
 
             win_count = 0
             for __ in n_gen:
-                agent.reset()
+                if valid_flag:
+                    agent.reset()
+
                 board.reset()
                 board.game()
 
                 result = board.black_num - board.white_num
                 win_count += (result > 0) if turn else (result < 0)
 
-            if not in_progress:
+            if valid_flag:
                 win_count *= 5
             win_rates.append(win_count)
         return win_rates
@@ -376,7 +378,7 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
             name, enemy = enemys.pop()
             print(f"vs. {name}")
 
-            win_rates = arena.eval(enemy, in_progress = False)
+            win_rates = arena.eval(enemy, valid_flag = True)
             print("| {} | ~ | {} % | {} % |".format(name, *win_rates), file = f)
 
             # かかった時間の画面表示
