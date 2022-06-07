@@ -170,17 +170,18 @@ def fit_reinforce_agent(episodes = 10000, restart = False):
 # =============================================================================
 
 class ReinforceComputer:
-    def __init__(self, action_size, to_gpu = False):
+    def __init__(self, action_size, file_name = "reinforce", to_gpu = False):
         self.action_size = action_size
+        self.file_path = Reinforce.get_path(file_name).format("parameters")
         self.use_gpu = to_gpu and cuda.gpu_enable
 
-    def reset(self, file_name = "reinforce"):
-        file_path = Reinforce.get_path(file_name).format("parameters")
+    def reset(self):
+        file_path = self.file_path
 
         each_pi = []
         for i in sample(range(3), 2):
             pi = PolicyNet(self.action_size)
-            pi.load_weights(f"{file_path}-{i}.npz")
+            pi.load_weights(f"{file_path}-tmp{i}.npz")
             if self.use_gpu:
                 pi.to_gpu()
 
@@ -191,6 +192,19 @@ class ReinforceComputer:
         placable = board.list_placable()
         if len(placable) == 1:
             return placable[0]
+
+        for action in placable:
+            with board.log_runtime():
+                board.put_stone(action)
+                flag = board.can_continue()
+
+                if not flag:
+                    result = board.black_num - board.white_num
+                    is_win = (result > 0) if board.turn else (result < 0)
+
+                    # 必ず勝つ手が存在するならば、そこに置く
+                    if is_win:
+                        return action
 
         xp = cuda.cp if self.use_gpu else np
         state = board.get_img(xp)[None, :]
@@ -210,7 +224,7 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(restart = True)
+    # fit_reinforce_agent(restart = True)
 
     # 評価用コード
-    eval_computer(ReinforceComputer, "REINFORCE", 0)
+    eval_computer(ReinforceComputer, "REINFORCE")

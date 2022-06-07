@@ -653,13 +653,13 @@ def fit_rainbow_agent(episodes = 150000, restart = False):
 # =============================================================================
 
 class RainbowComputer(RainbowAgent):
-    def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow-0", to_gpu = False):
+    def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow", to_gpu = False):
         use_gpu = to_gpu and gpu_enable
         qnet = RainbowNet(action_size, quantiles_num, use_gpu)
         self.qnet = qnet
 
-        file_path = Rainbow.get_path(file_name).format("parameters")
-        qnet.load_weights(file_path + ".npz")
+        file_path = Rainbow.get_path(f"{file_name}-0.npz").format("parameters")
+        qnet.load_weights(file_path)
         if use_gpu:
             qnet.to_gpu()
 
@@ -671,4 +671,4 @@ if __name__ == "__main__":
     # fit_rainbow_agent(restart = False)
 
     # 評価用コード
-    eval_computer(RainbowComputer, "Rainbow", 0)
+    eval_computer(RainbowComputer, "Rainbow")

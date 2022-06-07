@@ -315,6 +315,7 @@ class SelfMatch:
 
             win_count = 0
             for __ in n_gen:
+                agent.reset()
                 board.reset()
                 board.game()
 
@@ -343,7 +344,7 @@ class SelfMatch:
 # コンピュータの評価
 # =============================================================================
 
-def eval_computer(com_class, com_name: str, com_index: int, enemys: list = []):
+def eval_computer(com_class, com_name: str, enemys: list = []):
     name = com_name.lower()
     file_path = SelfMatch.get_path(f"{name}.md").format("graphs")
     make_dir_exist(file_path)
@@ -352,7 +353,7 @@ def eval_computer(com_class, com_name: str, com_index: int, enemys: list = []):
     board = Board()
 
     # コンピュータ
-    computer = com_class(board.action_size, file_name = "{}-{}".format(name, com_index))
+    computer = com_class(board.action_size, file_name = name)
 
     # 対戦場
     arena = SelfMatch(board, computer)
