@@ -2,7 +2,7 @@ from random import choices, sample
 
 import numpy as np
 
-from inada_framework import Model, cuda, optimizers, no_grad
+from inada_framework import Model, cuda, optimizers, no_train
 from drl_utilities import SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, softmax, log
@@ -71,7 +71,7 @@ class ReinforceAgent:
 
 
     def __call__(self, board):
-        with no_grad():
+        with no_train():
             action, __ = self.get_action(board)
         return action
 
@@ -196,7 +196,7 @@ class ReinforceComputer:
         state = board.get_img(xp)[None, :]
         mask = np.array(placable)
 
-        with no_grad():
+        with no_train():
             probs = 0
             for pi in self.each_pi:
                 policy = pi(state)[:, mask]
