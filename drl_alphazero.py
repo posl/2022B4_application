@@ -801,19 +801,20 @@ def comp_alphazero_computer():
     del params_path, params_paths, network
 
 
-    # 先攻・後攻入れ替えて７回ずつ、自己対戦を行う
+    # 先攻・後攻入れ替えて M 回ずつ、自己対戦を行う
+    M = 25
+    start = time()
+    print("\n\033[92m>>Evaluatation by self match\033[0m")
+
     remains = []
     for i in range(N):
         for j in range(i + 1, N):
             WI, WJ = weights_list[i], weights_list[j]
-            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(7)])
-            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(7)])
+            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(M)])
+            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(M)])
 
-    start = time()
-    print("\nstart evaluating by self match.")
-
-    # 並列実行を行う (回数は最大で、630 回)
-    with tqdm(desc = "now evaluating", total = N * (N - 1) * 7, leave = False) as pbar:
+    # 並列実行を行う
+    with tqdm(desc = "now evaluating", total = N * (N - 1) * M, leave = False) as pbar:
         results = np.zeros((N, N, 2), dtype = np.int32)
 
         while remains:
@@ -885,7 +886,7 @@ def comp_alphazero_computer():
     # 結果を分かりやすくするための下線を描画
     for diff, lines in lines_dict.items():
         if lines:
-            alpha = abs(diff) / 7
+            alpha = abs(diff) / M
             RGBA = (1., 0, 0, alpha) if diff > 0 else (0, 0, 1., alpha)
             ax.add_collection(collections.LineCollection(lines, color = RGBA))
 
