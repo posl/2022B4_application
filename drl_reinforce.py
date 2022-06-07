@@ -146,10 +146,10 @@ class Reinforce(SelfMatch):
         agent.update(board.reward, board.turn)
 
 
-def fit_reinforce_agent(episodes = 50000, restart = False):
+def fit_reinforce_agent(episodes = 10000, restart = False):
     # ハイパーパラメータ設定
     gamma = 0.90
-    lr = 0.000025
+    lr = 0.00002
     to_gpu = False
 
     # 環境
@@ -160,7 +160,7 @@ def fit_reinforce_agent(episodes = 50000, restart = False):
 
     # 自己対戦
     self_match = Reinforce(board, agent)
-    self_match.fit(3, episodes, restart, "reinforce")
+    self_match.fit(5, episodes, restart, "reinforce")
 
 
 
