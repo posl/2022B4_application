@@ -708,33 +708,33 @@ class ComRand:
 class PlayerKinds:
     def __init__(self, par):
         self.kinds_name = [] # 名前（人間、ランダムなど）
-        self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
-        self.kinds_class = []
-        self.kinds_args = []
+        self.kinds_class = [] # クラスを入れる
+        self.kinds_args = [] # クラスのinitの引数 
 
-        self.kinds_reset = [] 
-        self.kinds_resetargs = []
+        self.kinds_reset = []  # reset関数を呼ぶ必要があるか
+        self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
 
-        self.network_player = NetrorkPlayer(IPADDR)
+        NetrorkPlayer.ip = IPADDR
+        self.network_player = NetrorkPlayer()
         Human.par = par
         Human.network_player = self.network_player
         self.human = Human()
         
         self.kinds_name.append("人間")
         self.kinds_difficulty.append(1)
-        self.kinds_class.append(None)
-        self.kinds_args.append(None)
-        self.kinds_reset.append(None)
+        self.kinds_class.append(Human)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(False)
         self.kinds_resetargs.append(None)
 
         self.kinds_name.append("通信")
         self.kinds_difficulty.append(1)
-        self.kinds_class.append(None)
-        self.kinds_args.append(None)
-        self.kinds_reset.append(None)
-        self.kinds_resetargs.append(None)
+        self.kinds_class.append(NetrorkPlayer)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append([ () ])
 
         self.kinds_name.append("ランダム")
         self.kinds_difficulty.append(1)
@@ -746,79 +746,63 @@ class PlayerKinds:
         self.kinds_name.append("MC木")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( MonteCarloTreeSearch )
-        self.kinds_args.append( [ (1*1024, ), (2*1024, ), (3*1024, ), (4*1024, ) ] )
+        self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
         self.kinds_reset.append(True)
         self.kinds_resetargs.append( [ (), (), (), ()  ] )
 
-
-        # OLD---------------
-        return
-        self.human = Human(par, self.network_player)
-        self.kinds_name.append("人間")
-        self.kinds_func.append([self.human.player])
-        self.kinds_difficulty.append(1)
-
-        self.kinds_name.append("通信")
-        self.kinds_func.append([self.network_player.next_action])
-        self.kinds_difficulty.append(1)
-
-        self.kinds_name.append("人間-チート")
-        self.kinds_func.append([self.human.cheat_player])
-        self.kinds_difficulty.append(1)
-
-        self.kinds_name.append("ランダム")
-        self.kinds_func.append([self.human.com_random])
-        self.kinds_difficulty.append(1)
-
-        #self.kinds_name.append("ランダム-チート")
-        #self.kinds_func.append([self.human.com_cheater1])
-        #self.kinds_difficulty.append(1)
-
-        self.kinds_name.append("MC木探索")
-        self.mcts_d0 = MonteCarloTreeSearch(1024*1)
-        self.mcts_d1 = MonteCarloTreeSearch(1024*4)
-        self.mcts_d2 = MonteCarloTreeSearch(1024*16)
-        self.mcts_d3 = MonteCarloTreeSearch(1024*64)
-        self.kinds_func.append([ self.mcts_d0, self.mcts_d1, self.mcts_d2, self.mcts_d3])
-        self.kinds_difficulty.append(4)
-
         self.kinds_name.append("rp_mcts")
-        self.kinds_func.append([RootPalallelMonteCarloTreeSearch(30000), RootPalallelMonteCarloTreeSearch(50000)])
         self.kinds_difficulty.append(2)
+        self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
+        self.kinds_args.append( [ (30000, ), (50000, ) ] )
+        self.kinds_reset.append( False )
+        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("原始MC探索")
-        self.kinds_func.append([PrimitiveMonteCarlo(256*1), PrimitiveMonteCarlo(256*4), PrimitiveMonteCarlo(256*16), PrimitiveMonteCarlo(256*32)])
         self.kinds_difficulty.append(4)
+        self.kinds_class.append( PrimitiveMonteCarlo )
+        self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("原始MC探索 + NegaAlpha")
-        self.kinds_func.append([NAPrimitiveMonteCarlo(256*1, 2), NAPrimitiveMonteCarlo(256*4, 4), NAPrimitiveMonteCarlo(256*16, 8), NAPrimitiveMonteCarlo(256*32, 16)])
         self.kinds_difficulty.append(4)
+        self.kinds_class.append( NAPrimitiveMonteCarlo )
+        self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("AlphaBeta")
-        self.kinds_func.append([AlphaBeta(0), AlphaBeta(1)])
         self.kinds_difficulty.append(2)
+        self.kinds_class.append( AlphaBeta )
+        self.kinds_args.append( [ (0, ), (1, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (), ()  ] )
 
-        #self.rainbow_computer_d0 = RainbowComputer(64)
-        #self.kinds_name.append("Rainbow")
-        #self.kinds_func.append([ self.rainbow_computer_d0 ])
-        #self.kinds_difficulty.append(1)
-
-        self.reinforce_computer_d0 = ReinforceComputer(64)
         self.kinds_name.append("Reinforce")
-        self.kinds_func.append([ self.reinforce_computer_d0 ])
         self.kinds_difficulty.append(1)
+        self.kinds_class.append( ReinforceComputer )
+        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ ()  ] )
 
-        self.alphazero_computer_d0 = AlphaZeroComputer(64)
         self.kinds_name.append("AlphaZero")
-        self.kinds_func.append([ self.alphazero_computer_d0 ])
         self.kinds_difficulty.append(1)
+        self.kinds_class.append( AlphaZeroComputer )
+        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ ()  ] )
+
+        #self.kinds_name.append("RainBow")
+        #self.kinds_difficulty.append(1)
+        #self.kinds_class.append( RainbowComputer )
+        #self.kinds_args.append( [ (64, ) ] )
+        #self.kinds_reset.append(True)
+        #self.kinds_resetargs.append( [ ()  ] )
+
+
 
     def get_agent(self, id, diff):
-        if id==0:
-            return self.human
-        elif id==1:
-            return self.network_player
-        elif id>1:
+        if id>=0:
             agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
             if self.kinds_reset[id]:
                 agent.reset( * self.kinds_resetargs[id][diff] )
@@ -838,14 +822,6 @@ class PlayerKinds:
             exit()
         return self.kinds_name[id]
 
-    def get_func(self, id, diff):
-        if id<0 or id>=len(self.kinds_func):
-            print("範囲外のIDが指定されました")
-            exit()
-        if diff<0 or diff>=len(self.kinds_difficulty):
-            print("範囲外のIDが指定されました")
-            exit()
-        return self.kinds_func[id][diff]
 
     def get_difficulty(self, id):
         if id<0 or id>=len(self.kinds_difficulty):
