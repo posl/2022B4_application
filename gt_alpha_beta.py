@@ -26,27 +26,35 @@ class GTValue:
 		try:
 			self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place\
 			= value_list
-			self.set_block_points()
+			self.__set_block_points()
 		except:
 			pass
 
+	#使用するディレクトリをセットする
 	def set_data_dir(self, dir_name):
 		self.dir_name = dir_name
 
+	#データをファイルに書き込む
 	def write_value_list(self, file_name = "tmp_data"):
+		#ディレクトリが指定されていない場合,セットされたディレクトリを使用する
 		if not "/" in file_name:
 			file_name = self.dir_name + file_name
+
 		with open(file_name, mode = "w") as f:
 			f.write(" ".join(map(str, self.get_raw_value_list())))
 
+	#ファイルからデータを読み込むs
 	def read_value_list(self, file_name = "default_data"):
+		#ディレクトリが指定されていない場合,セットされたディレクトリを使用する
 		if not "/" in file_name:
 			file_name = self.dir_name + file_name
+
 		with open(file_name, mode = "r") as f:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 	
-	def set_block_points(self):
+	#マス毎の評価値を設定する
+	def __set_block_points(self):
 		block_points = {}
 		self.block_points = block_points
 
@@ -68,10 +76,9 @@ class GTValue:
 
 			block_points[i] = block_point
 
-
 	#黒側の評価値を返す
-	def evaluate_black(self, board : Board, flag):
-		#石の数の評価
+	def eval_board_black(self, board : Board, flag):
+		#置かれているマスの評価
 		value_black = 0
 		for i in range(board.action_size):
 			if (board.stone_black >> i) & 1:
@@ -85,7 +92,8 @@ class GTValue:
 
 		return value_black
 
-	# 置けるマスの数による評価
+	#置けるマスの数による評価
+	#select_place_funcが0の時使用される
 	def __eval_current_actions(self, board : Board):
 		value = self.place * len(board.list_placable())
 		board.turn = not board.turn
@@ -94,6 +102,7 @@ class GTValue:
 		return value
 
 	# 置けるマスの数による評価
+	#select_place_funcが1の時使用される
 	def __eval_valid_actions(self, board: Board, flag = 2):
 		# ゲームが終了した場合、置けるマスは０
 		if not flag:
@@ -122,9 +131,9 @@ class GTValue:
 
 
 class AlphaBeta:
-	def __init__(self, select_place_func = 0, value = 0):
+	def __init__(self, select_place_func = 0, value = None):
 		#評価関数を決定する.指定がない場合はdefault_dataを使用する
-		if value == 0:
+		if value is None:
 			self.value = GTValue(select_place_func)
 		else:
 			self.value = value
@@ -151,9 +160,9 @@ class AlphaBeta:
 	# 評価関数
 	def __evaluate(self, board : Board, flag):
 		if self.turn == 1:
-			return self.value.evaluate_black(board, flag)
+			return self.value.eval_board_black(board, flag)
 		else:
-			return - self.value.evaluate_black(board, flag)
+			return - self.value.eval_board_black(board, flag)
 
 	# 評価が最大値となる場所を求める
 	def __first_max_node(self, board : Board, alpha , beta):
@@ -216,26 +225,13 @@ class AlphaBeta:
 		return value
 
 if __name__ == "__main__":
-	def player(board):
-		while 1:
-			try:
-				n = int(input("enter n : "))
-				if board.is_placable(n):
-					return n
-			except:
-				print("error")
-				continue
-
+	#確認用プログラム
 	board = Board()
-	# それぞれのプレイヤーの戦略の関数をわたす
-	# プレイヤー先行でゲーム開始
 	ab0 = AlphaBeta(0)
-	ab0.set_depth(7)
 	ab1 = AlphaBeta(1)
 	ab0.value.read_value_list("default_data")
 	ab1.value.read_value_list("default_data")
 	board.reset()
-	# board.set_plan(ab0, ab1)
-	# board.game()
-	board.debug_game(ab1, ab0)
+	board.set_plan(ab1, ab0)
+	board.game()
 	board.print_state()
