@@ -17,7 +17,7 @@ from drl_alphazero import AlphaZeroComputer
 
 from board import Board
 from speedup import get_stand_bits
-from network import NetrorkPlayer
+from gui_network import NetrorkPlayer
 
 IPADDR = "127.0.0.1"
 
@@ -754,10 +754,10 @@ class PlayerKinds:
         #self.kinds_func.append([ self.rainbow_computer_d0 ])
         #self.kinds_difficulty.append(1)
 
-        #self.reinforce_computer_d0 = ReinforceComputer(64)
-        #self.kinds_name.append("Reinforce")
-        #self.kinds_func.append([ self.reinforce_computer_d0 ])
-        #self.kinds_difficulty.append(1)
+        self.reinforce_computer_d0 = ReinforceComputer(64)
+        self.kinds_name.append("Reinforce")
+        self.kinds_func.append([ self.reinforce_computer_d0 ])
+        self.kinds_difficulty.append(1)
 
         self.alphazero_computer_d0 = AlphaZeroComputer(64)
         self.kinds_name.append("AlphaZero")
