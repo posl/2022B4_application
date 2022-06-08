@@ -636,9 +636,8 @@ class Sounds:
 
 
 class Human:
-    def __init__(self, par, network_player):
-        self.par = par  # par : MainWindow , main_loopを呼び出すために必要
-        self.network_player = network_player
+    par = None
+    network_player = None
 
     def player(self, board):
         placable = set(board.list_placable())
@@ -651,6 +650,9 @@ class Human:
         if not self.network_player.NoNetwork:
             self.network_player.notice(n)
         return n
+    
+    def __call__(self, board):
+        return self.player(board)
 
     def cheat_player(self, board):
         t = board.turn
@@ -697,6 +699,9 @@ class Human:
                     board.stone_white = board.stone_white ^ (1<<p)
         return ret
 
+class ComRand:
+    def __call__(self, board):
+        return random.choice(board.list_placable())
 
 
 
@@ -706,8 +711,48 @@ class PlayerKinds:
         self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
-        self.network_player = NetrorkPlayer(IPADDR)
+        self.kinds_class = []
+        self.kinds_args = []
 
+        self.kinds_reset = [] 
+        self.kinds_resetargs = []
+
+        self.network_player = NetrorkPlayer(IPADDR)
+        Human.par = par
+        Human.network_player = self.network_player
+        self.human = Human()
+        
+        self.kinds_name.append("人間")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append(None)
+        self.kinds_args.append(None)
+        self.kinds_reset.append(None)
+        self.kinds_resetargs.append(None)
+
+        self.kinds_name.append("通信")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append(None)
+        self.kinds_args.append(None)
+        self.kinds_reset.append(None)
+        self.kinds_resetargs.append(None)
+
+        self.kinds_name.append("ランダム")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append( ComRand )
+        self.kinds_args.append( [ () ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append(None)
+
+        self.kinds_name.append("MC木")
+        self.kinds_difficulty.append(4)
+        self.kinds_class.append( MonteCarloTreeSearch )
+        self.kinds_args.append( [ (1*1024, ), (2*1024, ), (3*1024, ), (4*1024, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (), (), (), ()  ] )
+
+
+        # OLD---------------
+        return
         self.human = Human(par, self.network_player)
         self.kinds_name.append("人間")
         self.kinds_func.append([self.human.player])
@@ -725,9 +770,9 @@ class PlayerKinds:
         self.kinds_func.append([self.human.com_random])
         self.kinds_difficulty.append(1)
 
-        self.kinds_name.append("ランダム-チート")
-        self.kinds_func.append([self.human.com_cheater1])
-        self.kinds_difficulty.append(1)
+        #self.kinds_name.append("ランダム-チート")
+        #self.kinds_func.append([self.human.com_cheater1])
+        #self.kinds_difficulty.append(1)
 
         self.kinds_name.append("MC木探索")
         self.mcts_d0 = MonteCarloTreeSearch(1024*1)
@@ -767,6 +812,22 @@ class PlayerKinds:
         self.kinds_name.append("AlphaZero")
         self.kinds_func.append([ self.alphazero_computer_d0 ])
         self.kinds_difficulty.append(1)
+
+    def get_agent(self, id, diff):
+        if id==0:
+            return self.human
+        elif id==1:
+            return self.network_player
+        elif id>1:
+            agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
+            if self.kinds_reset[id]:
+                agent.reset( * self.kinds_resetargs[id][diff] )
+            return agent
+        else:
+            print("Index Error")
+            exit()
+            return None
+
 
     def get_num(self):
         return len(self.kinds_name)
@@ -871,16 +932,19 @@ class DisplayBoard(Board):
     # id...種類のID  diff...難易度
     # gameの設定
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        self.player_kinds.mcts_d0.reset()
-        self.player_kinds.mcts_d1.reset()
-        self.player_kinds.mcts_d2.reset()
-        self.player_kinds.mcts_d3.reset()
-        self.player_kinds.reinforce_computer_d0.reset()
-        self.player_kinds.alphazero_computer_d0.reset()
+        agent1 = self.player_kinds.get_agent(player1id, player1diff)
+        agent2 = self.player_kinds.get_agent(player2id, player2diff)
+        if False:# OLD あとで消す
+            self.player_kinds.mcts_d0.reset()
+            self.player_kinds.mcts_d1.reset()
+            self.player_kinds.mcts_d2.reset()
+            self.player_kinds.mcts_d3.reset()
+            self.player_kinds.reinforce_computer_d0.reset()
+            self.player_kinds.alphazero_computer_d0.reset()
 
-        player1_plan = self.player_kinds.get_func(player1id, player1diff)
-        player2_plan = self.player_kinds.get_func(player2id, player2diff)
-        self.set_plan(player1_plan, player2_plan)
+            player1_plan = self.player_kinds.get_func(player1id, player1diff)
+            player2_plan = self.player_kinds.get_func(player2id, player2diff)
+        self.set_plan(agent1, agent2)
 
     def render(self, mask, flag, n = 999):
         self.add_playlog()

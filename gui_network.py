@@ -83,6 +83,10 @@ class NetrorkPlayer():
 
         #self.NoNetwork = True
         self.put_place = -1
+    
+
+    def __call__(self, board):
+        return self.next_action(board)
 
     def reset(self):
         pass
@@ -205,9 +209,9 @@ class Server:
     # 新たなクライアントがいる場合には、スレッドを立てて処理を任せる
     def recv_loop(self):
         while True:
-            sock_cl, addr = self.sock.accept()
             while len(self.client_map)>=self.max_connection:
                 time.sleep(1.0)
+            sock_cl, addr = self.sock.accept()
             self.client_map[self.client_id_curr] = (self.client_id_curr, sock_cl, addr )
             id = self.client_id_curr
             self.client_id_curr += 1
