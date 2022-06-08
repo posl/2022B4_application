@@ -489,7 +489,7 @@ class AlphaZero:
         self.use_gpu = to_gpu and gpu_enable
 
 
-    def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 100, restart = False):
+    def fit(self, updates = 300, episodes = 128, epochs = 5, simulations = 800, restart = False):
         network = self.network
         buffer = self.buffer
         optimizer = self.optimizer
@@ -514,10 +514,8 @@ class AlphaZero:
             history = np.load(f"{is_yet_path}_history.npy")
 
             # 学習率を進捗に応じて変更する
-            if restart >= 100:
-                n = 2 ** ((restart + 50) // 150)
-                optimizer.lr /= n
-                simulations *= n
+            n = 4. ** (restart // 100)
+            optimizer.lr /= n
 
             # 次のステップから学習を再開する
             restart += 1
@@ -613,9 +611,8 @@ class AlphaZero:
                             # GPU を使った場合は、モデルの重みを CPU 対応に戻す
                             network.to_cpu()
 
-                    if not (step + 50) % 150:
-                        optimizer.lr /= 2.
-                        simulations *= 2
+                    if not step % 100:
+                        optimizer.lr /= 4.
 
 
                     # パラメータを更新したので、新しく ray の共有メモリに重みをコピーする
@@ -709,13 +706,27 @@ def eval_alphazero_computer(index = None):
     del params_path, network
 
 
-    # 対戦する相手の設定
+    # 対戦する相手の設定  (name, alias, instance)
     enemys = []
-    enemys.append(("Rainbow", "rain", RainbowComputer(Board.action_size)))
-    enemys.append(("REINFORCE", "rein", ReinforceComputer(Board.action_size)))
-    enemys.append(("Alpha Beta", "ab", AlphaBeta()))
-    enemys.append(("MCTS", "mcts", MonteCarloTreeSearch()))
-    enemys.append(("MC Primitive", "mcp", PrimitiveMonteCarlo()))
+
+    enemy = RainbowComputer(Board.action_size)
+    enemy.reset()
+    enemys.append(("Rainbow", "rain", enemy))
+
+    enemy = ReinforceComputer(Board.action_size)
+    enemy.reset()
+    enemys.append(("REINFORCE", "rein", enemy))
+
+    enemy = AlphaBeta()
+    enemys.append(("Alpha Beta", "ab", enemy))
+
+    enemy = MonteCarloTreeSearch()
+    enemy.reset()
+    enemys.append(("MCTS", "mcts", enemy))
+
+    enemy = PrimitiveMonteCarlo()
+    enemys.append(("MC Primitive", "mcp", enemy))
+
 
     # 棒グラフの設定
     bar_fig, bar_ax = plt.subplots(tight_layout = True)
