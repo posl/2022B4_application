@@ -8,7 +8,7 @@ import random
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
-from mc_tree_search import MonteCarloTreeSearch
+from mc_tree_search import MonteCarloTreeSearch, RootPalallelMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
@@ -736,6 +736,10 @@ class PlayerKinds:
         self.mcts_d3 = MonteCarloTreeSearch(1024*64)
         self.kinds_func.append([ self.mcts_d0, self.mcts_d1, self.mcts_d2, self.mcts_d3])
         self.kinds_difficulty.append(4)
+
+        self.kinds_name.append("rp_mcts")
+        self.kinds_func.append([RootPalallelMonteCarloTreeSearch(30000), RootPalallelMonteCarloTreeSearch(50000)])
+        self.kinds_difficulty.append(2)
 
         self.kinds_name.append("原始MC探索")
         self.kinds_func.append([PrimitiveMonteCarlo(256*1), PrimitiveMonteCarlo(256*4), PrimitiveMonteCarlo(256*16), PrimitiveMonteCarlo(256*32)])
