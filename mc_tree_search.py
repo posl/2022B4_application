@@ -1,8 +1,12 @@
 from math import sqrt, log
 from random import choice, randrange
+from random import Random
+from statistics import mode
+
+import ray
 
 from board import Board
-from speedup import nega_alpha, count_stand_bits
+from speedup import count_stand_bits
 
 
 class MonteCarloTreeSearch:
@@ -24,14 +28,14 @@ class MonteCarloTreeSearch:
     # 合法手のリストの取得の仕方が異なるため、独自の can_continue メソッドを使う
     def board_can_continue(self, board, pass_flag = False):
         board.turn ^= 1
-        if self.__get_placable(board):
+        if self.get_placable(board):
             return 1 + pass_flag
         elif pass_flag:
             return 0
         else:
             return self.board_can_continue(board, True)
 
-    def __get_placable(self, board):
+    def get_placable(self, board):
         placable_dict = self.placable_dict
         state = board.state
 
@@ -54,7 +58,7 @@ class MonteCarloTreeSearch:
 
     # ランダムで手を打つplan
     def random_action(self, board):
-        return choice(self.__get_placable(board))
+        return choice(self.get_placable(board))
 
     # 優先度（utcによる）の高い子ノードを選ぶ（複数ある場合ランダム）
     # 子供を持たない時はNoneが返る
@@ -148,11 +152,16 @@ class MonteCarloTreeSearch:
 
         # 探索木で訪れてない場合に呼ぶ
         if state not in visits_dict:
-            placable = self.__get_placable(board)
+            placable = self.get_placable(board)
             expansion_index = self.expansion(board, state)
             expansion_state = self.children_state_dict[state][expansion_index]
-            board.set_state(expansion_state)
-            game_res = self.game_simulation(board)
+            
+            if self.placable_dict[expansion_state]:
+                board.set_state(expansion_state)
+                game_res = self.game_simulation(board)
+            else:
+                game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])     
+        
             self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0.5
             visits_dict[state][expansion_index] += 1
 
@@ -171,18 +180,101 @@ class MonteCarloTreeSearch:
         return self.placable_dict[state][choice(max_index)]
 
 
-class NAMonteCarloTreeSearch(MonteCarloTreeSearch):
-    def __init__(self, max_tries = 65536, limit_time = 10):
+@ray.remote
+class RPMCTS(MonteCarloTreeSearch):
+    def __init__(self, rand, max_tries = 50000):
         self.max_tries = max_tries
-        self.limit_time = limit_time
+        self.__choice = rand.choice
+        self.__randrange = rand.randrange
 
-    def __call__(self, board : Board):
-        placable = board.list_placable()
+    def selection(self, state):
+        visits_dict = self.visits_dict
+        if state in visits_dict:
+            visit_list = visits_dict[state]
+            sum_visits = sum(visit_list)
+            ucts = [w / (v + 1e-15) + sqrt(2 * log(sum_visits) / (v + 1e-15)) for v, w in zip(visit_list, self.wins_dict[state])]
+            max_uct = max(ucts)
+            max_index = [i for i, u in enumerate(ucts) if u == max_uct]
+            return self.__choice(max_index)
+        else:
+            return None
+    
+    def expansion(self, board : Board, state):
+        placable = self.placable_dict[state]
 
-        if count_stand_bits(board.stone_black | board.stone_white) > 44:
-            move = nega_alpha(*board.players_board, self.limit_time)
-            if move in placable:
-                print("checkmate")
-                return move
+        children_state = []
+        for move in placable:
+            board.set_state(state)
+            board.put_stone(move)
+            self.board_can_continue(board)
+            children_state.append(board.state)
 
-        return self.monte_carlo_tree_search(board)
+        self.children_state_dict[state] = children_state
+
+        size = len(placable)
+        self.visits_dict[state] = [0] * size
+        self.wins_dict[state] = [0] * size
+
+        return self.__randrange(size)
+
+    def monte_carlo_tree_search(self, state):
+        self.visits_dict = {}
+        self.wins_dict = {}
+        self.placable_dict = {}
+        self.children_state_dict = {}
+        
+        board = Board()
+
+        board.set_state(state)
+        board.set_plan(self.random_action, self.random_action)
+
+        visits_dict = self.visits_dict
+
+        placable = self.get_placable(board)
+        expansion_index = self.expansion(board, state)
+        expansion_state = self.children_state_dict[state][expansion_index]
+        
+        if self.placable_dict[expansion_state]:
+            board.set_state(expansion_state)
+            game_res = self.game_simulation(board)
+        
+        else:
+            game_res = count_stand_bits(expansion_state[0]) - count_stand_bits(expansion_state[1])     
+        
+        self.wins_dict[state][expansion_index] += (state[2] == (game_res > 0)) if game_res else 0.5
+        visits_dict[state][expansion_index] += 1
+
+        # max_tries回シミュレーションする
+        for _ in range(self.max_tries):
+            self.play(board, state)
+
+        # 着手を選ぶ
+        visits = visits_dict[state]
+        max_visit = max(visits)
+        max_index = [i for i, v in enumerate(visits) if v == max_visit]
+        return self.placable_dict[state][self.__choice(max_index)]
+
+
+class RootPalallelMonteCarloTreeSearch:
+    parallelization_num = 8
+
+    def __init__(self, max_tries = 50000):
+        self.max_tries = max_tries
+        #並列実行用に複数のrandomインスタンスを用意する
+        self.randoms = [Random(randrange(10000)) for _ in range(self.parallelization_num)]
+
+    def reset(self):
+        pass
+
+    def __call__(self, board):
+        ray.init()
+        
+        agents = [RPMCTS.remote(self.randoms[i], self.max_tries) for i in range(self.parallelization_num)]
+
+        move_candidate = [agent.monte_carlo_tree_search.remote(board.state) for agent in agents]
+        
+        move = mode(ray.get(move_candidate))
+
+        ray.shutdown()
+
+        return move
