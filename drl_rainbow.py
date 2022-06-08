@@ -121,13 +121,13 @@ class RainbowNet(Model):
         x = self.cnn(x)
 
         # 学習の円滑化のためにアドバンテージ分布は中心化する
-        advantages = flatten(relu(self.bn_a(self.conv_a(x))))
-        advantages = self.a2(self.a1(x))
+        # advantages = relu(self.bn_a(self.conv_a(x)))
+        advantages = self.a2(self.a1(flatten(x)))
         advantages = advantages.reshape((batch_size, action_size, quantiles_num))
         advantages -= advantages.mean(axis = 1, keepdims = True)
 
-        values = flatten(relu(self.bn_v(self.conv_v(x))))
-        values = self.v2(self.v1(x))
+        # values = relu(self.bn_v(self.conv_v(x)))
+        values = self.v2(self.v1(flatten(x)))
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
 
@@ -705,10 +705,13 @@ class RainbowComputer(RainbowAgent):
         qnet = RainbowNet(action_size, quantiles_num, use_gpu)
         self.qnet = qnet
 
-        file_path = Rainbow.get_path(f"{file_name}-0.npz").format("parameters")
+        file_path = Rainbow.get_path(f"{file_name}.npz").format("parameters")
         qnet.load_weights(file_path)
         if use_gpu:
             qnet.to_gpu()
+
+    def reset(self):
+        pass
 
 
 
@@ -718,14 +721,4 @@ if __name__ == "__main__":
     # fit_rainbow_agent(restart = False)
 
     # 評価用コード
-    # eval_computer(RainbowComputer, "Rainbow")
-
-    print("Start spliting parameters file, to get over Git's rule.")
-    qnet = RainbowNet(64, 50)
-
-    file_path = Rainbow.get_path("rainbow-0.npz").format("parameters")
-    qnet.load_weights(file_path)
-    qnet.save_weights(file_path)
-
-    os.remove(file_path)
-    print("Successfully done!")
+    eval_computer(RainbowComputer, "Rainbow")

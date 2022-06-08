@@ -253,7 +253,7 @@ class SelfMatch:
 
                             # 学習再開に必要な情報の保存 (合計 100 回)
                             pbar.set_description(f"now saving")
-                            self.save(is_yet_path)
+                            self.save(is_yet_path, is_yet = True)
                             history[:, -1] = run, episode
                             np.save(f"{is_yet_path}_history.npy", history)
 
@@ -262,7 +262,7 @@ class SelfMatch:
 
                 # パラメータの最終保存・評価結果の表示
                 if restart <= episodes:
-                    self.save(params_path, run - 1)
+                    self.save(params_path, index = run - 1 if runs > 1 else None)
                     print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
                     print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
 
@@ -276,12 +276,12 @@ class SelfMatch:
 
             if run > 1:
                 try:
-                    com_index = eval_q
+                    index = eval_q
                 except NameError:
-                    com_index = 100
+                    index = 100
 
-                y[:, :com_index] /= run
-                y[:, com_index:] /= run - 1
+                y[:, :index] /= run
+                y[:, index:] /= run - 1
 
             plt.plot(x, y[0], label = "first")
             plt.plot(x, y[1], label = "second")
@@ -330,13 +330,15 @@ class SelfMatch:
         return win_rates
 
 
-    def save(self, file_path, com_index = None):
-        if com_index is None:
-            self.agent.save(file_path, is_yet = True)
-        else:
-            # パラメータの最終保存を行う場合は、その後エージェントの初期化も行う
-            agent = self.agent
-            agent.save(file_path + f"-{com_index}")
+    def save(self, file_path, index = None, is_yet = False):
+        if index is not None:
+            file_path += f"-{index}"
+
+        agent = self.agent
+        agent.save(file_path, is_yet)
+
+        # パラメータの最終保存を行う場合は、その後エージェントの初期化も行う
+        if not is_yet:
             agent.reset()
 
 
@@ -365,7 +367,7 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     enemys.append(("MCTS", MonteCarloTreeSearch()))
     enemys.append(("Primitive MC", PrimitiveMonteCarlo()))
     enemys.append(("Corners Plan", corners_plan))
-    enemys.append(("Simple Plan", simple_plan))\
+    enemys.append(("Simple Plan", simple_plan))
 
     # 評価結果はマークダウンの表形式でファイルに出力する
     with open(file_path, "a+") as f:
