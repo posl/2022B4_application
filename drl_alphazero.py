@@ -883,7 +883,7 @@ def comp_alphazero_computer():
             black_wins, white_wins = results[i, j]
             result = f"{black_wins} - {white_wins}"
 
-            x_offset = 0.1 * (7.5 - len(result))
+            x_offset = 0.05 + 0.075 * (7 - len(result))
             ax.text(x + x_offset, y + 0.4, result, size = "small")
 
             diff = black_wins - white_wins
@@ -893,7 +893,7 @@ def comp_alphazero_computer():
     # 結果を分かりやすくするための下線を描画
     for diff, lines in lines_dict.items():
         if lines:
-            S = abs(diff) / M
+            S = 1. - abs(diff) / M
             RGBA = (1., S, S, 0.8) if diff > 0 else (S, S, 1., 0.8)
             ax.add_collection(collections.LineCollection(lines, color = RGBA))
 
