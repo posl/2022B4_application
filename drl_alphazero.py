@@ -157,8 +157,8 @@ class AlphaZeroAgent:
             action = choices(placable, policy)[0]
         else:
             indices = np.where(policy == policy.max())[0]
-            action_index = indices[0] if len(indices) == 1 else choice(indices)
-            action = placable[action_index]
+            index = indices[0] if len(indices) == 1 else choice(indices)
+            action = placable[index]
 
         if selfplay_flag:
             # 方策の形状をニューラルネットワークの出力と合わせる
@@ -219,15 +219,17 @@ class AlphaZeroAgent:
             return board.reward
 
         elif state in self.P:
-            # 右辺の第１項が過去の結果を勘案しつつ探索を促進する項で、第２項が勝率を見て活用を促進する項
+            W = self.W[state]
             N = self.N[state]
-            pucts = self.c_puct(N.sum()) * self.P[state] / (1 + N) + self.W[state] / (N + 1e-15)
+
+            # 右辺の第１項が過去の結果を勘案しつつ探索を促進する項で、第２項が勝率を見て活用を促進する項
+            pucts = self.c_puct(N.sum()) * self.P[state] / (1 + N) + W / (N + 1e-15)
 
             # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
             indices = np.where(pucts == pucts.max())[0]
-            action_index = indices[0] if len(indices) == 1 else choice(indices)
+            index = indices[0] if len(indices) == 1 else choice(indices)
 
-            action = self.placable_dict[state][action_index]
+            action = self.placable_dict[state][index]
             self.board_put_stone(board, action)
 
             # 手番交代によって次の状態が変わる可能性があることに注意
@@ -235,8 +237,8 @@ class AlphaZeroAgent:
             value = self.__evaluate(board, board.state, next_continue_flag)
 
             # 結果を反映させる
-            self.W[state][action_index] += value
-            self.N[state][action_index] += 1.
+            W[index] += value
+            N[index] += 1.
 
         else:
             # 展開していなかった盤面の場合は、ニューラルネットワークの出力である過去の勝率を評価値として返す
@@ -889,7 +891,7 @@ def comp_alphazero_computer():
     # 結果を分かりやすくするための下線を描画
     for diff, lines in lines_dict.items():
         if lines:
-            S = 1. - abs(diff) / M
+            S = max(0.8 - abs(diff) / M, 0)
             RGBA = (1., S, S, 0.8) if diff > 0 else (S, S, 1., 0.8)
             ax.add_collection(collections.LineCollection(lines, color = RGBA))
 
