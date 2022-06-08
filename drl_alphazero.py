@@ -1,5 +1,5 @@
 from math import log, sqrt, ceil
-from random import choices, choice
+from random import Random, sample, choices
 from glob import glob
 from collections import deque, defaultdict
 from bz2 import BZ2File
@@ -117,12 +117,21 @@ class AlphaZeroLoss(Function):
 # =============================================================================
 
 class AlphaZeroAgent:
-    def __init__(self, action_size, sampling_limits = 15, c_base = 19652, c_init = 1.25):
+    def __init__(self, action_size, seed = None, sampling_limits = 15, c_base = 19652, c_init = 1.25):
         self.network = PolicyValueNet(action_size)
+
+        # 並列実行によって、同じ乱数の種を使わないようにするために、明示的にインスタンスを生成する
+        rand = Random(seed)
+        self.__choices = rand.choices
+        self.__choice = rand.choice
+
+        rng = np.random.default_rng(seed)
+        self.__dirichlet = rng.dirichlet
 
         # ハイパーパラメータ
         self.sampling_limits = sampling_limits
         self.c_puct = lambda T: (log(1 + (1 + T) / c_base) + c_init) * sqrt(T)
+
 
     # 第１引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
     def reset(self, arg = None, simulations = 800):
@@ -154,10 +163,10 @@ class AlphaZeroAgent:
         board_img, policy = self.__search(board, board.state, selfplay_flag)
 
         if selfplay_flag and (count < self.sampling_limits):
-            action = choices(placable, policy)[0]
+            action = self.__choices(placable, policy)[0]
         else:
             indices = np.where(policy == policy.max())[0]
-            index = indices[0] if len(indices) == 1 else choice(indices)
+            index = indices[0] if len(indices) == 1 else self.__choice(indices)
             action = placable[index]
 
         if selfplay_flag:
@@ -180,7 +189,7 @@ class AlphaZeroAgent:
         # 自己対戦時の探索初期状態では、ランダムな手が選ばれやすくなるように、ノイズをかける
         if selfplay_flag:
             P = self.P[root_state]
-            self.P[root_state] = 0.75 * P + 0.25 * np.random.dirichlet(alpha = np.full(len(P), 0.35))
+            self.P[root_state] = 0.75 * P + 0.25 * self.__dirichlet(alpha = np.full(len(P), 0.35))
 
         # PUCT アルゴリズムで指定回数だけシミュレーションを行う
         for __ in range(self.simulations):
@@ -227,7 +236,7 @@ class AlphaZeroAgent:
 
             # np.argmax を使うと選択が前にある要素に偏るため、np.where で取り出したインデックスからランダムに選ぶ
             indices = np.where(pucts == pucts.max())[0]
-            index = indices[0] if len(indices) == 1 else choice(indices)
+            index = indices[0] if len(indices) == 1 else self.__choice(indices)
 
             action = self.placable_dict[state][index]
             self.board_put_stone(board, action)
@@ -383,13 +392,13 @@ class ReplayBuffer:
 # =============================================================================
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_play(weights, simulations):
+def play(seed, weights, simulations):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size)
+    agent = AlphaZeroAgent(board.action_size, seed)
     agent.reset(weights, simulations)
 
     # 実際に１ゲームプレイして、対局データを収集する
@@ -414,13 +423,13 @@ def alphazero_play(weights, simulations):
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_test(weights, simulations, turn, enemy):
+def test(seed, weights, simulations, turn, enemy):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size)
+    agent = AlphaZeroAgent(board.action_size, seed)
     agent.reset(weights, simulations)
 
     # 方策の設定・１ゲーム勝負
@@ -434,15 +443,15 @@ def alphazero_test(weights, simulations, turn, enemy):
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def alphazero_valid(weights1, weights0, couple):
+def verify(seed1, seed0, weights1, weights0, couple):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント
-    agent1 = AlphaZeroAgent(board.action_size)
+    agent1 = AlphaZeroAgent(board.action_size, seed1)
     agent1.reset(weights1)
-    agent0 = AlphaZeroAgent(board.action_size)
+    agent0 = AlphaZeroAgent(board.action_size, seed0)
     agent0.reset(weights0)
 
     # 方策の設定・１ゲーム勝負
@@ -477,7 +486,8 @@ class AlphaZero:
         self.optimizer.add_hook(WeightDecay(decay))
 
         # 学習部分は GPU による高速化の余地がある
-        self.use_gpu = to_gpu and gpu_enable\
+        self.use_gpu = to_gpu and gpu_enable
+
 
     def fit(self, updates = 500, episodes = 128, epochs = 5, simulations = 100, restart = False):
         network = self.network
@@ -539,8 +549,11 @@ class AlphaZero:
         print("===========================")
 
         # 変数定義
+        population = range(episodes * 1024)
+
         assert not updates % 100
         eval_interval = updates // 100
+
         start_time = time()
 
 
@@ -549,7 +562,8 @@ class AlphaZero:
                 with tqdm(desc = f"step {step}", total = episodes, leave = False) as pbar:
                     with no_train():
                         # まだ完遂していないタスクがリストの中に残るようになる
-                        remains = [alphazero_play.remote(weights, simulations) for __ in range(episodes)]
+                        seeds = sample(population, episodes)
+                        remains = [play.remote(seed, weights, simulations) for seed in seeds]
 
                         # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
                         while remains:
@@ -650,12 +664,16 @@ class AlphaZero:
 
     @staticmethod
     def eval(weights, simulations = 100, enemy = AlphaBeta()):
-        with tqdm(desc = "now evaluating", total = 40, leave = False) as pbar:
+        N = 20
+        population = range(N * 1024)
+
+        with tqdm(desc = "now evaluating", total = N * 2, leave = False) as pbar:
             enemy = ray.put(enemy)
             win_rates = []
 
             for turn in (1, 0):
-                remains = [alphazero_test.remote(weights, simulations, turn, enemy) for __ in range(20)]
+                seeds = sample(population, N)
+                remains = [test.remote(seed, weights, simulations, turn, enemy) for seed in seeds]
 
                 # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
                 win_count = 0
@@ -664,7 +682,7 @@ class AlphaZero:
                     win_count += ray.get(finished[0])
                     pbar.update(1)
 
-                win_rates.append(win_count * 5)
+                win_rates.append(int(win_count * (100 / N)))
         return win_rates
 
 
@@ -804,16 +822,23 @@ def comp_alphazero_computer():
 
 
     # 先攻・後攻入れ替えて M 回ずつ、自己対戦を行う
-    M = 25
-    start = time()
     print("\n\033[92m>>Evaluatation by self match\033[0m")
+    start = time()
+
+    M = 25
+    n_gen = range(0, M * 1024, 1024)
 
     remains = []
     for i in range(N):
         for j in range(i + 1, N):
-            WI, WJ = weights_list[i], weights_list[j]
-            remains.extend([alphazero_valid.remote(WI, WJ, (i, j)) for __ in range(M)])
-            remains.extend([alphazero_valid.remote(WJ, WI, (j, i)) for __ in range(M)])
+            couple = i, j
+
+            for k in (1, -1):
+                l, m = couple[::k]
+                WL, WM = weights_list[l], weights_list[m]
+
+                seeds = [choices(range(i, i + 1024), k = 2) for i in n_gen]
+                remains.extend([verify.remote(SL, SM, WL, WM, (l, m)) for SL, SM in seeds])
 
     # 並列実行を行う
     with tqdm(desc = "now evaluating", total = N * (N - 1) * M, leave = False) as pbar:
