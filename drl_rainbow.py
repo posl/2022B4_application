@@ -1,4 +1,6 @@
 from math import sqrt
+from collections import defaultdict
+import os
 from functools import cache
 from collections import deque
 from bz2 import BZ2File
@@ -12,7 +14,7 @@ from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
 from inada_framework.functions import affine, relu, flatten, broadcast_to, sum_to
 from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, eval_computer
 import inada_framework.layers as dzl
-from inada_framework.utilities import reshape_for_broadcast
+from inada_framework.utilities import make_dir_exist, reshape_for_broadcast
 from board import Board
 
 from speedup import get_qmax_action, update_sumtree, weighted_sampling
@@ -129,6 +131,7 @@ class RainbowNet(Model):
         values = values.reshape((batch_size, 1, quantiles_num))
         return values + advantages
 
+
     # 合法手の中から行動価値関数が最大の行動を選択する
     def get_actions(self, states, placables):
         quantile_values = self(states)
@@ -145,6 +148,50 @@ class RainbowNet(Model):
         # インデックスとして使うので、高速化のために np.ndarray に変換する
         actions = [get_qmax_action(q, placable) for q, placable in zip(qs, placables)]
         return np.array(actions)
+
+
+    # GitHub のファイルの容量上限を突破するために、パラメータを分割して保存する
+    def save_weights(self, file_path):
+        params_dict = {}
+        self.flatten_params(params_dict)
+
+        # パラメータの保存時には、主記憶上にデータがあるようにする
+        arrays_dicts = defaultdict(lambda: {})
+        for i, (key, param) in enumerate(params_dict.items()):
+            data = param.data
+            if data is not None:
+                arrays_dicts[i % 5][key] = as_numpy(data)
+
+        try:
+            base_path = file_path.removesuffix(".npz")
+            make_dir_exist(base_path)
+            for i, arrays_dict in arrays_dicts.items():
+                np.savez_compressed(f"{base_path}-{i}.npz", **arrays_dict)
+
+        except (Exception, KeyboardInterrupt):
+            for i in range(5):
+                file_path = f"{base_path}-{i}.npz"
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            raise
+
+    def __load_weights(self, file_path):
+        base_path = file_path.removesuffix(".npz")
+
+        npz = {}
+        for i in range(5):
+            file_path = f"{base_path}-{i}.npz"
+
+            if os.path.exists(file_path):
+                npz.update(np.load(file_path))
+            else:
+                message = f"\"{file_path}\" is not found."
+                raise FileNotFoundError(message)
+
+        params_dict = {}
+        self.flatten_params(params_dict)
+        for key, param in params_dict.items():
+            param.data = npz.get(key)
 
 
 
@@ -671,4 +718,14 @@ if __name__ == "__main__":
     # fit_rainbow_agent(restart = False)
 
     # 評価用コード
-    eval_computer(RainbowComputer, "Rainbow")
+    # eval_computer(RainbowComputer, "Rainbow")
+
+    print("Start spliting parameters file, to get over Git's rule.")
+    qnet = RainbowNet(64, 50)
+
+    file_path = Rainbow.get_path("rainbow-0.npz").format("parameters")
+    qnet.load_weights(file_path)
+    qnet.save_weights(file_path)
+
+    os.remove(file_path)
+    print("Successfully done!")
