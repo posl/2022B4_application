@@ -175,7 +175,7 @@ class RainbowNet(Model):
                     os.remove(file_path)
             raise
 
-    def __load_weights(self, file_path):
+    def load_weights(self, file_path):
         base_path = file_path.removesuffix(".npz")
 
         npz = {}

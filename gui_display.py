@@ -2,7 +2,7 @@ import os
 import tkinter as tk
 import tkinter.ttk as ttk
 import math
-import random
+from random import choice, randrange
 
 # pygame のウェルカムメッセージを表示させないための設定
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
@@ -395,20 +395,6 @@ class GamePage(Page):
         self.board.after(1500, self.result_view)
 
     def cell_click(self, event):
-        """
-        if self.board.turn==1 and self.player1==0:
-            print()
-        if self.board.turn==1 and self.player1>0:
-            self.board.se4.play()
-            print("あなたの番ではありません：")
-            return
-        if self.board.turn==0 and self.player2==0:
-            print()
-        if self.board.turn==0 and self.player2>0:
-            self.par.play(4)
-            print("あなたの番ではありません：")
-            return
-        """
         if self.game_canvas_lock == True:
             return
         print("cell_click:",self.game_canvas_state)
@@ -650,7 +636,7 @@ class Human:
         if not self.network_player.NoNetwork:
             self.network_player.notice(n)
         return n
-    
+
     def __call__(self, board):
         return self.player(board)
 
@@ -679,21 +665,21 @@ class Human:
 
     #本来はここに書くべきではなかろうが暫定的に
     def com_random(self, board):
-        return random.choice(board.list_placable())
+        return choice(board.list_placable())
 
     def com_cheater1(self, board):
         t = board.turn
         bplace = board.black_positions
         wplace = board.white_positions
-        ret = random.choice(board.list_placable())
+        ret = choice(board.list_placable())
         if len(bplace)+len(wplace)>4:
             if t==1:
-                p = random.choice(wplace)
+                p = choice(wplace)
                 if p!=ret:
                     board.stone_white = board.stone_white ^ (1<<p)
                     board.stone_black = board.stone_black ^ (1<<p)
             else:
-                p = random.choice(bplace)
+                p = choice(bplace)
                 if p!=ret:
                     board.stone_black = board.stone_black ^ (1<<p)
                     board.stone_white = board.stone_white ^ (1<<p)
@@ -701,7 +687,7 @@ class Human:
 
 class ComRand:
     def __call__(self, board):
-        return random.choice(board.list_placable())
+        return choice(board.list_placable())
 
 
 
@@ -711,17 +697,15 @@ class PlayerKinds:
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
         self.kinds_class = [] # クラスを入れる
-        self.kinds_args = [] # クラスのinitの引数 
+        self.kinds_args = [] # クラスのinitの引数
 
         self.kinds_reset = []  # reset関数を呼ぶ必要があるか
         self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
 
         NetrorkPlayer.ip = IPADDR
-        self.network_player = NetrorkPlayer()
         Human.par = par
-        Human.network_player = self.network_player
-        self.human = Human()
-        
+        Human.network_player = NetrorkPlayer()
+
         self.kinds_name.append("人間")
         self.kinds_difficulty.append(1)
         self.kinds_class.append(Human)
@@ -743,28 +727,28 @@ class PlayerKinds:
         self.kinds_reset.append(False)
         self.kinds_resetargs.append(None)
 
-        self.kinds_name.append("MC木")
+        self.kinds_name.append("MC木探索")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( MonteCarloTreeSearch )
         self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
         self.kinds_reset.append(True)
         self.kinds_resetargs.append( [ (), (), (), ()  ] )
 
-        self.kinds_name.append("rp_mcts")
+        self.kinds_name.append("MC木探索 + ルート並列化")
         self.kinds_difficulty.append(2)
         self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
         self.kinds_args.append( [ (30000, ), (50000, ) ] )
         self.kinds_reset.append( False )
         self.kinds_resetargs.append( None )
 
-        self.kinds_name.append("原始MC探索")
+        self.kinds_name.append("原始MC法")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( PrimitiveMonteCarlo )
         self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
         self.kinds_reset.append(False)
         self.kinds_resetargs.append( None )
 
-        self.kinds_name.append("原始MC探索 + NegaAlpha")
+        self.kinds_name.append("原始MC法 + NegaAlpha")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( NAPrimitiveMonteCarlo )
         self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
@@ -785,13 +769,6 @@ class PlayerKinds:
         self.kinds_reset.append(True)
         self.kinds_resetargs.append( [ ()  ] )
 
-        self.kinds_name.append("AlphaZero")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ ()  ] )
-
         #self.kinds_name.append("RainBow")
         #self.kinds_difficulty.append(1)
         #self.kinds_class.append( RainbowComputer )
@@ -799,6 +776,12 @@ class PlayerKinds:
         #self.kinds_reset.append(True)
         #self.kinds_resetargs.append( [ ()  ] )
 
+        self.kinds_name.append("AlphaZero")
+        self.kinds_difficulty.append(3)
+        self.kinds_class.append( AlphaZeroComputer )
+        self.kinds_args.append( [ (64, ), (64, ), (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (randrange(10), 50), (randrange(5, 10), 200), (None, 800)  ] )
 
 
     def get_agent(self, id, diff):
@@ -810,8 +793,6 @@ class PlayerKinds:
         else:
             print("Index Error")
             exit()
-            return None
-
 
     def get_num(self):
         return len(self.kinds_name)
@@ -821,7 +802,6 @@ class PlayerKinds:
             print("範囲外のIDが指定されました")
             exit()
         return self.kinds_name[id]
-
 
     def get_difficulty(self, id):
         if id<0 or id>=len(self.kinds_difficulty):
@@ -910,16 +890,6 @@ class DisplayBoard(Board):
     def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
         agent1 = self.player_kinds.get_agent(player1id, player1diff)
         agent2 = self.player_kinds.get_agent(player2id, player2diff)
-        if False:# OLD あとで消す
-            self.player_kinds.mcts_d0.reset()
-            self.player_kinds.mcts_d1.reset()
-            self.player_kinds.mcts_d2.reset()
-            self.player_kinds.mcts_d3.reset()
-            self.player_kinds.reinforce_computer_d0.reset()
-            self.player_kinds.alphazero_computer_d0.reset()
-
-            player1_plan = self.player_kinds.get_func(player1id, player1diff)
-            player2_plan = self.player_kinds.get_func(player2id, player2diff)
         self.set_plan(agent1, agent2)
 
     def render(self, mask, flag, n = 999):
