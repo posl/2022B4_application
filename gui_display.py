@@ -711,30 +711,31 @@ class PlayerKinds:
         self.kinds_func = [] # どこに打つかを返す関数
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
-        self.kinds_class = []
-        self.kinds_args = []
+        self.kinds_class = [] # クラスを入れる
+        self.kinds_args = [] # クラスのinitの引数 
 
         self.kinds_reset = [] 
         self.kinds_resetargs = []
 
-        self.network_player = NetrorkPlayer(IPADDR)
+        NetrorkPlayer.ip = IPADDR
+        self.network_player = NetrorkPlayer()
         Human.par = par
         Human.network_player = self.network_player
         self.human = Human()
         
         self.kinds_name.append("人間")
         self.kinds_difficulty.append(1)
-        self.kinds_class.append(None)
-        self.kinds_args.append(None)
-        self.kinds_reset.append(None)
+        self.kinds_class.append(Human)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(False)
         self.kinds_resetargs.append(None)
 
         self.kinds_name.append("通信")
         self.kinds_difficulty.append(1)
-        self.kinds_class.append(None)
-        self.kinds_args.append(None)
-        self.kinds_reset.append(None)
-        self.kinds_resetargs.append(None)
+        self.kinds_class.append(NetrorkPlayer)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append([ () ])
 
         self.kinds_name.append("ランダム")
         self.kinds_difficulty.append(1)
@@ -814,11 +815,7 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
 
     def get_agent(self, id, diff):
-        if id==0:
-            return self.human
-        elif id==1:
-            return self.network_player
-        elif id>1:
+        if id>=0:
             agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
             if self.kinds_reset[id]:
                 agent.reset( * self.kinds_resetargs[id][diff] )

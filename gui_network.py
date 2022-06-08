@@ -68,21 +68,30 @@ class Client:
 
 
 
-class NetrorkPlayer():
-    def __init__(self, ip):
-        self.NoNetwork = (ip=="0")
-        if self.NoNetwork :
-            return
+class NetrorkPlayer():    
+    ip = None
+    client = None
+    reset_fin = False
+    NoNetwork = True
+    thread = None
 
-        self.client = Client()
-        self.client.connect(str(ip), PORT)
-        self.client.recv_func = self.recv_func
-        self.thread = threading.Thread(target=self.client.recv_loop, args=())
-        self.thread.daemon = True
-        self.thread.start()
+    def reset(self):
+        if self.reset_fin==False:
+            reset_fin = True
+            ip = self.ip
+            self.NoNetwork = (ip=="0")
+            if self.NoNetwork :
+                return
 
-        #self.NoNetwork = True
-        self.put_place = -1
+            self.client = Client()
+            self.client.connect(str(ip), PORT)
+            self.client.recv_func = self.recv_func
+            self.thread = threading.Thread(target=self.client.recv_loop, args=())
+            self.thread.daemon = True
+            self.thread.start()
+
+            #self.NoNetwork = True
+            self.put_place = -1
     
 
     def __call__(self, board):
