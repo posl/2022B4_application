@@ -300,5 +300,3 @@ class OthelloServer:
 if __name__=="__main__":
     server = OthelloServer()
     server.mainloop()
-    #window = MainWindow()
-    #window.mainloop()
