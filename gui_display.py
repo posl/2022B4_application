@@ -939,6 +939,7 @@ if __name__ == "__main__":
     print("サーバーのIPを入力してください-ない場合は0に")
     ip = input()
     IPADDR = ip
+    NetrorkPlayer.ip = ip
     displayboard = DisplayBoard()
     displayboard.play()
     exit()
