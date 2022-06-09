@@ -48,9 +48,29 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
   pipenv update
   ```
-  
+  Cython を使って、実行ファイルを生成する。 (実行ファイルの生成場所が変わるので、cd コマンドを推奨)
+  ```
+  cd ./src/pyx  &&  pipenv run python setup.py build_ext --inplace
+  ```
+  アプリケーションを実行する。
+  ```
+  cd ./src  &&  pipenv run python play.py
+  ```
 - 自前の python 環境を使う場合
+  パッケージをインストールする。
+  ```
+  pip install -U setuptools pip  &&  pip install -r requirements.txt
+  ```
+  Cython を使って、実行ファイルを生成する。 (実行ファイルの生成場所が変わるので、cd コマンドを推奨)
+  ```
+  cd ./src/pyx  &&  python setup.py build_ext --inplace
+  ```
+  アプリケーションを実行する。
+  ```
+  cd ./src  &&  python play.py
+  ```
 - docker を使う場合
+  鋭意、作成中。
 <br>
 
 
