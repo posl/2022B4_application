@@ -585,7 +585,7 @@ class Sounds:
         self.musics.append(sound_folder_path.format("maou09.mp3"))
         self.musics.append(sound_folder_path.format("temsu08.mp3"))
 
-        self.bgm_play()
+        self.bgm_play(0)
 
     def bgm_play(self, id, loop=-1):
         if id<0 or id>=len(self.musics):
@@ -675,7 +675,7 @@ class ComRand:
 
 
 class PlayerKinds:
-    def __init__(self, par, ip):
+    def __init__(self, par):
         self.kinds_name = [] # 名前（人間、ランダムなど）
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
@@ -685,7 +685,7 @@ class PlayerKinds:
         self.kinds_reset = []  # reset関数を呼ぶ必要があるか
         self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
 
-        NetrorkPlayer.ip = ip
+        NetrorkPlayer.ip = IPADDR
         Human.par = par
         Human.network_player = NetrorkPlayer()
         Human.network_player.reset()
@@ -836,14 +836,14 @@ class MainWindow(tk.Tk):
 
 
 class DisplayBoard(Board):
-    def __init__(self, ip):
+    def __init__(self):
         super().__init__()
 
         # ウインドウ
         self.main_window = MainWindow(self)
 
         # プレイヤーの種類
-        self.player_kinds = PlayerKinds(self.main_window, ip)
+        self.player_kinds = PlayerKinds(self.main_window)
 
         # 画面表示用のクリックイベントを保持するための属性
         self.click_attr = None
@@ -918,6 +918,6 @@ class DisplayBoard(Board):
 
 
 if __name__ == "__main__":
-    ip = input("サーバーのIPを入力してください-ない場合は0に\n")
-    displayboard = DisplayBoard(ip)
+    IPADDR = input("サーバーのIPを入力してください-ない場合は0に\n")
+    displayboard = DisplayBoard()
     displayboard.play()

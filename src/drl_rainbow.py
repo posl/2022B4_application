@@ -13,7 +13,6 @@ from inada_framework import Layer, Parameter, Model, Function, optimizers, no_tr
 from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
 from inada_framework.functions import affine, relu, flatten, broadcast_to, sum_to
 from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, eval_computer
-import inada_framework.layers as dzl
 from inada_framework.utilities import make_dir_exist, reshape_for_broadcast
 from board import Board
 
