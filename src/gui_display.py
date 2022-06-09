@@ -881,7 +881,7 @@ class DisplayBoard(Board):
         self.main_window.game_page.canvas_update(flag, n)
 
 
-    def play(self):
+    def play(self, ip):
         # ウインドウ
         self.main_window = MainWindow(self)
 
