@@ -4,7 +4,6 @@
    1. [実行環境](#実行環境)
    2. [実行方法](#実行方法)
    3. [担当](#担当)
-<br>
 
 
 
@@ -13,12 +12,12 @@
 ## 実行環境
 - python 3.9.12
 - tcl-tk 8.6.12
-<br>
 
-Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動作しない可能性があるため、以下の手順を踏む。
-<br>
 
-- brew が入っていない場合<br>
+<!-- omit in toc -->
+### Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動作しない可能性があるため、以下の手順を踏む。
+
+- brew が入っていない場合<br><br>
   brew のインストールを行う。
   ```
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
@@ -31,9 +30,8 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
   brew update
   ```
-<br>
 
-- tcl-tk 関連<br>
+- tcl-tk 関連<br><br>
   tcl-tk のバージョンを確認する。
   ```
   brew info tcl-tk
@@ -42,7 +40,6 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
   brew upgrade tcl-tk
   ```
-<br>
 
 
 
@@ -55,7 +52,6 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
 
 - 自前の python 環境を使う場合
 - docker を使う場合
-<br>
 
 
 
