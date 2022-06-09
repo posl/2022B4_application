@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 import numpy as np
 
-from speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
+from pyx.speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
 
 
 

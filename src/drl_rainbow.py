@@ -17,7 +17,7 @@ import inada_framework.layers as dzl
 from inada_framework.utilities import make_dir_exist, reshape_for_broadcast
 from board import Board
 
-from speedup import get_qmax_action, update_sumtree, weighted_sampling
+from pyx.speedup import get_qmax_action, update_sumtree, weighted_sampling
 
 
 

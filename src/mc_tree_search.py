@@ -6,7 +6,7 @@ from statistics import mode
 import ray
 
 from board import Board
-from speedup import count_stand_bits
+from pyx.speedup import count_stand_bits
 
 
 class MonteCarloTreeSearch:

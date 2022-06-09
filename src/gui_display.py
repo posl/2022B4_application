@@ -17,7 +17,7 @@ from drl_alphazero import AlphaZeroComputer
 
 from gui_network import NetrorkPlayer
 from board import Board
-from speedup import get_stand_bits
+from pyx.speedup import get_stand_bits
 
 
 

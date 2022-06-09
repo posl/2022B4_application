@@ -1,7 +1,7 @@
 from random import choice
 
 from board import Board
-from speedup import nega_alpha, count_stand_bits
+from pyx.speedup import nega_alpha, count_stand_bits
 
 
 class PrimitiveMonteCarlo:

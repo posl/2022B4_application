@@ -1,3 +1,5 @@
+from os.path import join, dirname
+
 from board import Board
 
 
@@ -7,10 +9,10 @@ class GTValue:
 		#置けるマスの評価方法を決定する
 		if select_place_func == 0:
 			self.__eval_actions = self.__eval_current_actions
-			self.set_data_dir("./../data/gt/current/")
+			self.dir_name = "current"
 		else:
 			self.__eval_actions = self.__eval_valid_actions
-			self.set_data_dir("./../data/gt/valid/")
+			self.dir_name = "valid"
 
 		self.reset()
 
@@ -30,26 +32,18 @@ class GTValue:
 		except:
 			pass
 
-	#使用するディレクトリをセットする
-	def set_data_dir(self, dir_name):
-		self.dir_name = dir_name
-
 	#データをファイルに書き込む
 	def write_value_list(self, file_name = "tmp_data"):
-		#ディレクトリが指定されていない場合,セットされたディレクトリを使用する
-		if not "/" in file_name:
-			file_name = self.dir_name + file_name
+		file_path = join(dirname(__file__), "..", "data", "gt", self.dir_name, file_name)
 
-		with open(file_name, mode = "w") as f:
+		with open(file_path, mode = "w") as f:
 			f.write(" ".join(map(str, self.get_raw_value_list())))
 
 	#ファイルからデータを読み込むs
 	def read_value_list(self, file_name = "default_data"):
-		#ディレクトリが指定されていない場合,セットされたディレクトリを使用する
-		if not "/" in file_name:
-			file_name = self.dir_name + file_name
+		file_path = join(dirname(__file__), "..", "data", "gt", self.dir_name, file_name)
 
-		with open(file_name, mode = "r") as f:
+		with open(file_path, mode = "r") as f:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
 
