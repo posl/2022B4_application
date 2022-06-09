@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+matplotlib = "*"
+tqdm = "*"
+cython = "*"
+ray = "*"
+protobuf = "==3.20.1"
+pygame = "*"
+netifaces = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
+
+[scripts]
+main = "python -m cProfile -o profiling.prof"

@@ -769,12 +769,12 @@ class PlayerKinds:
         self.kinds_reset.append(True)
         self.kinds_resetargs.append( [ ()  ] )
 
-        #self.kinds_name.append("RainBow")
-        #self.kinds_difficulty.append(1)
-        #self.kinds_class.append( RainbowComputer )
-        #self.kinds_args.append( [ (64, ) ] )
-        #self.kinds_reset.append(True)
-        #self.kinds_resetargs.append( [ ()  ] )
+        self.kinds_name.append("RainBow")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append( RainbowComputer )
+        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ ()  ] )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
@@ -935,10 +935,7 @@ class DisplayBoard(Board):
 
 
 if __name__ == "__main__":
-    board = Board()
-    print("サーバーのIPを入力してください-ない場合は0に")
-    ip = input()
+    ip = input("サーバーのIPを入力してください-ない場合は0に\n")
     IPADDR = ip
     displayboard = DisplayBoard()
     displayboard.play()
-    exit()
