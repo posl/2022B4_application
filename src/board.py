@@ -3,7 +3,8 @@ from contextlib import contextmanager
 
 import numpy as np
 
-from pyx.speedup import count_stand_bits, get_reverse_board, get_legal_list, get_board_img
+import pyx.speedup as sp
+from pyx.speedup import get_board_img, get_stand_bits
 
 
 
@@ -87,9 +88,9 @@ class Board:
     def __init__(self):
         # list_placable : 30 ~ 40 倍、reverse : 3 倍  (大体の平均)
         if self.height == self.width == 8:
-            self.__count_bits = count_stand_bits
-            self.__reverse = get_reverse_board
-            self.__list_placable = get_legal_list
+            self.__count_bits = sp.count_stand_bits
+            self.__reverse = sp.get_reverse_board
+            self.__list_placable = sp.get_legal_list
         else:
             self.__count_bits = self.__count_bits_python
             self.__reverse = self.__reverse_python
@@ -101,11 +102,16 @@ class Board:
         self.turn = 1
 
         # オセロ盤の状態のログを取って、前の状態に戻ることを可能にするためのスタック
-        self.log_state = []
+        self.log_stack = []
 
         # プレイヤーの方策を設定するための属性
         self.player1_plan = None
         self.player2_plan = None
+
+        # 画面表示用の属性
+        self.click_attr = None
+        self.reversed = 0
+        self.log_list = []
 
 
     @property
@@ -124,10 +130,17 @@ class Board:
         self.undo_state()
 
     def add_state(self):
-        self.log_state.append(self.state)
+        self.log_stack.append(self.state)
 
     def undo_state(self):
-        self.set_state(self.log_state.pop())
+        self.set_state(self.log_stack.pop())
+
+
+    def add_playlog(self):
+        self.log_list.append(self.state)
+
+    def clear_playlog(self):
+        self.log_list.clear()
 
 
     # オセロ盤の状態を画像データとして取得する (形状は (2, height, width))
@@ -170,6 +183,19 @@ class Board:
     @staticmethod
     def __count_bits_python(x):
         return bin(x).count("1")
+
+
+    @property
+    def black_positions(self):
+        return get_stand_bits(self.stone_black)
+
+    @property
+    def white_positions(self):
+        return get_stand_bits(self.stone_white)
+
+    @property
+    def reverse_positions(self):
+        return get_stand_bits(self.reversed)
 
 
     # ゲーム終了後、勝敗に応じて報酬を与えるための属性 (最後の手番の人から見て、勝ち : 1, 負け : -1, 分け : 0)
@@ -305,9 +331,14 @@ class Board:
 
 
     # ゲーム本体
-    def game(self):
+    def game(self, render_func = None):
+        render_flag = render_func is not None
+
         flag = 1
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
             flag = self.can_continue()
+
+            if render_flag:
+                render_func(mask, flag, n)

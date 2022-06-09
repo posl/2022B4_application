@@ -7,7 +7,6 @@ from random import choice, randrange
 # pygame のウェルカムメッセージを表示させないための設定
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
-import ray
 
 from mc_tree_search import MonteCarloTreeSearch, RootPalallelMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
@@ -18,12 +17,199 @@ from drl_alphazero import AlphaZeroComputer
 
 from gui_network import NetrorkPlayer
 from board import Board
-from pyx.speedup import get_stand_bits
+
+
+
+class Human:
+    par = None
+    network_player = None
+
+    def player(self, board):
+        placable = set(board.list_placable())
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            if n in placable:
+                break
+        if not self.network_player.NoNetwork:
+            self.network_player.notice(n)
+        return n
+
+    def __call__(self, board):
+        return self.player(board)
+
+    def cheat_player(self, board):
+        t = board.turn
+        n = 0
+        while True:
+            self.par.mainloop()
+            n = board.click_attr
+            board.click_attr = None
+            break
+        if t==1:
+            if ((board.stone_white>>n) & 1):
+                board.stone_white = board.stone_white ^ (1<<n)
+            board.stone_black = board.stone_black ^ (1<<n)
+        else:
+            if ((board.stone_black>>n) & 1):
+                board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
+            board.stone_black = board.stone_black ^ (1<<n)
+            board.stone_white = board.stone_white ^ (1<<n)
+        return self.player(board)
+
+    #本来はここに書くべきではなかろうが暫定的に
+    def com_random(self, board):
+        return choice(board.list_placable())
+
+    def com_cheater1(self, board):
+        t = board.turn
+        bplace = board.black_positions
+        wplace = board.white_positions
+        ret = choice(board.list_placable())
+        if len(bplace)+len(wplace)>4:
+            if t==1:
+                p = choice(wplace)
+                if p!=ret:
+                    board.stone_white = board.stone_white ^ (1<<p)
+                    board.stone_black = board.stone_black ^ (1<<p)
+            else:
+                p = choice(bplace)
+                if p!=ret:
+                    board.stone_black = board.stone_black ^ (1<<p)
+                    board.stone_white = board.stone_white ^ (1<<p)
+        return ret
+
+
+class ComRand:
+    def __call__(self, board):
+        return choice(board.list_placable())
+
+
+
+
+class PlayerKinds:
+    def __init__(self):
+        self.kinds_name = [] # 名前（人間、ランダムなど）
+        self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
+
+        self.kinds_class = [] # クラスを入れる
+        self.kinds_args = [] # クラスのinitの引数
+
+        self.kinds_reset = []  # reset関数を呼ぶ必要があるか
+        self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
+
+        self.kinds_name.append("人間")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append(Human)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append(None)
+
+        self.kinds_name.append("通信")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append(NetrorkPlayer)
+        self.kinds_args.append([ () ])
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append([ () ])
+
+        self.kinds_name.append("ランダム")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append( ComRand )
+        self.kinds_args.append( [ () ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append(None)
+
+        self.kinds_name.append("MC木探索")
+        self.kinds_difficulty.append(4)
+        self.kinds_class.append( MonteCarloTreeSearch )
+        self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (), (), (), ()  ] )
+
+        self.kinds_name.append("MC木探索 + ルート並列化")
+        self.kinds_difficulty.append(2)
+        self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
+        self.kinds_args.append( [ (30000, ), (50000, ) ] )
+        self.kinds_reset.append( False )
+        self.kinds_resetargs.append( None )
+
+        self.kinds_name.append("原始MC法")
+        self.kinds_difficulty.append(4)
+        self.kinds_class.append( PrimitiveMonteCarlo )
+        self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append( None )
+
+        self.kinds_name.append("原始MC法 + NegaAlpha")
+        self.kinds_difficulty.append(4)
+        self.kinds_class.append( NAPrimitiveMonteCarlo )
+        self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append( None )
+
+        self.kinds_name.append("AlphaBeta")
+        self.kinds_difficulty.append(2)
+        self.kinds_class.append( AlphaBeta )
+        self.kinds_args.append( [ (0, ), (1, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (), ()  ] )
+
+        self.kinds_name.append("Reinforce")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append( ReinforceComputer )
+        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ ()  ] )
+
+        self.kinds_name.append("RainBow")
+        self.kinds_difficulty.append(1)
+        self.kinds_class.append( RainbowComputer )
+        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ ()  ] )
+
+        self.kinds_name.append("AlphaZero")
+        self.kinds_difficulty.append(3)
+        self.kinds_class.append( AlphaZeroComputer )
+        self.kinds_args.append( [ (64, ), (64, ), (64, ) ] )
+        self.kinds_reset.append(True)
+        self.kinds_resetargs.append( [ (randrange(10), 50), (randrange(5, 10), 200), (None, 800)  ] )
+
+
+    def get_agent(self, id, diff):
+        if id>=0:
+            agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
+            if self.kinds_reset[id]:
+                agent.reset( * self.kinds_resetargs[id][diff] )
+            return agent
+        else:
+            print("Index Error")
+            exit()
+
+    def get_num(self):
+        return len(self.kinds_name)
+
+    def get_name(self, id):
+        if id<0 or id>=len(self.kinds_name):
+            print("範囲外のIDが指定されました")
+            exit()
+        return self.kinds_name[id]
+
+    def get_difficulty(self, id):
+        if id<0 or id>=len(self.kinds_difficulty):
+            print("範囲外のIDが指定されました")
+            exit()
+        return self.kinds_difficulty[id]
+
+
 
 
 
 class Page(tk.Frame):
-    def __init__(self, par, board):
+    def __init__(self, par, board = None):
         # ページに共通する属性やメソッドなどを記述
         tk.Frame.__init__(self, par)
         self.par = par
@@ -38,8 +224,8 @@ class Page(tk.Frame):
 
 
 class StartPage(Page):
-    def __init__(self, par, board):
-        Page.__init__(self, par, board)
+    def __init__(self, par):
+        Page.__init__(self, par)
 
         self.configure(bg="#881111")
 
@@ -106,9 +292,13 @@ class OptionPage(Page):
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 100), command=lambda:self.start_game())
         self.button1.place(x=900, y=2*350)
 
+        # 設定情報
+        self.player_kinds = PlayerKinds()
+
+
     def combobox1_changed(self):
         n = self.combobox1.current()
-        n = self.board.player_kinds.get_difficulty(n)
+        n = self.player_kinds.get_difficulty(n)
         if n<2:
             self.combobox3.place(x = 3000)
             self.combobox3["values"] = ["1"]
@@ -123,7 +313,7 @@ class OptionPage(Page):
 
     def combobox2_changed(self):
         n = self.combobox2.current()
-        n = self.board.player_kinds.get_difficulty(n)
+        n = self.player_kinds.get_difficulty(n)
         if n<2:
             self.combobox4.place(x = 3000)
             self.combobox4["values"] = ["1"]
@@ -137,10 +327,10 @@ class OptionPage(Page):
             self.combobox4.current(0)
 
     def set_player_kinds(self):
-        n = self.board.player_kinds.get_num()
+        n = self.player_kinds.get_num()
         self.combo_menus.clear()
         for i in range(n):
-            self.combo_menus.append(self.board.player_kinds.get_name(i))
+            self.combo_menus.append(self.player_kinds.get_name(i))
         self.combobox1["values"] = self.combo_menus
         self.combobox2["values"] = self.combo_menus
         self.combobox1.current(0)
@@ -150,22 +340,24 @@ class OptionPage(Page):
     def game_config_validate(self):
         player1_id = self.combobox1.current()
         player2_id = self.combobox2.current()
-        player1_diff = self.combobox3.current()  #難易度
-        player2_diff = self.combobox4.current()  #難易度
-        # ボード側に上の値を渡して設定させる処理をここに書く
-        self.board.game_config(player1_id, player2_id, player1_diff, player2_diff)
+        player1_diff = self.combobox3.current()
+        player2_diff = self.combobox4.current()
+
+        # プレイヤー、またはコンピュータの設定
+        agent1 = self.player_kinds.get_agent(player1_id, player1_diff)
+        agent2 = self.player_kinds.get_agent(player2_id, player2_diff)
+        self.board.set_plan(agent1, agent2)
 
         self.par.game_page.time_len_coef = self.combobox5.current() + 1
 
-        name1 = self.board.player_kinds.get_name(player1_id)
-        name2 = self.board.player_kinds.get_name(player2_id)
+        name1 = self.player_kinds.get_name(player1_id)
+        name2 = self.player_kinds.get_name(player2_id)
         self.par.title(name1 + "Lv." + str(player1_diff+1) + "(黒) vs " + name2  + "Lv." + str(player2_diff+1) + "(白)")
         return
 
     def start_game(self):
         self.game_config_validate()
         self.par.change_page(2)
-        self.board.click_attr = True
         self.par.game_page.game_canvas_state = 0
         self.par.sounds.bgm_play(1)
         self.par.quit()
@@ -275,7 +467,6 @@ class GamePage(Page):
 
     #石が置けるところを青く
     def render_placeable(self):
-        #self.par.sounds.play(2)
         lp = self.board.list_placable()
         for w in lp:
             j, i = self.board.n2t(w)
@@ -384,16 +575,6 @@ class GamePage(Page):
         return
 
 
-    def game_exit_check(self):
-        flg = 0
-        flg = self.board.can_continue(True)
-        flg = self.board.can_continue(True)
-        if flg:
-            self.board.game_playing = 1
-            return
-        self.board.game_playing = 0
-        self.board.after(1500, self.result_view)
-
     def cell_click(self, event):
         if self.game_canvas_lock == True:
             return
@@ -427,7 +608,7 @@ class GamePage(Page):
         self.button2.place(x=3000)
         self.label1.place(x=3000)
         self.label1.configure(text="")
-        print(self.board.play_log)
+        print(self.board.log_list)
 
     def win_check(self):
         bnum = self.board.black_num
@@ -482,7 +663,7 @@ class ResultPage(Page):
         self.button3.place(x=280, y=30)
 
     def graph_click(self, event):
-        states = self.board.play_log
+        states = self.board.log_list
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         x = event.x
@@ -495,7 +676,7 @@ class ResultPage(Page):
 
     def graph_draw(self):
         self.cur = 0
-        states = self.board.play_log
+        states = self.board.log_list
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
@@ -521,7 +702,7 @@ class ResultPage(Page):
         self.miniboard_draw()
 
     def curdraw(self):
-        states = self.board.play_log
+        states = self.board.log_list
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
@@ -533,7 +714,7 @@ class ResultPage(Page):
 
     def miniboard_draw(self):
         self.curdraw()
-        states = self.board.play_log
+        states = self.board.log_list
         state = states[self.cur]
         self.board_canvas.delete("all")
         self.board_canvas.create_rectangle(0, 0, self.board_canvas_width, self.board_canvas_height, fill="#55FF88")
@@ -554,8 +735,8 @@ class ResultPage(Page):
 
     def cur_inc(self):
         self.cur += 1
-        if self.cur >= len(self.board.play_log):
-            self.cur = len(self.board.play_log)-1
+        if self.cur >= len(self.board.log_list):
+            self.cur = len(self.board.log_list)-1
         self.miniboard_draw()
 
     def cur_dec(self):
@@ -607,196 +788,6 @@ class Sounds:
 
 
 
-class Human:
-    par = None
-    network_player = None
-
-    def player(self, board):
-        placable = set(board.list_placable())
-        while True:
-            self.par.mainloop()
-            n = board.click_attr
-            board.click_attr = None
-            if n in placable:
-                break
-        if not self.network_player.NoNetwork:
-            self.network_player.notice(n)
-        return n
-
-    def __call__(self, board):
-        return self.player(board)
-
-    def cheat_player(self, board):
-        t = board.turn
-        n = 0
-        while True:
-            self.par.mainloop()
-            n = board.click_attr
-            board.click_attr = None
-            break
-        if t==1:
-            if ((board.stone_white>>n) & 1):
-                board.stone_white = board.stone_white ^ (1<<n)
-            board.stone_black = board.stone_black ^ (1<<n)
-        else:
-            if ((board.stone_black>>n) & 1):
-                board.stone_black = board.stone_black ^ (1<<n)
-            board.stone_white = board.stone_white ^ (1<<n)
-        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
-            board.stone_black = board.stone_black ^ (1<<n)
-            board.stone_white = board.stone_white ^ (1<<n)
-        return self.player(board)
-
-    #本来はここに書くべきではなかろうが暫定的に
-    def com_random(self, board):
-        return choice(board.list_placable())
-
-    def com_cheater1(self, board):
-        t = board.turn
-        bplace = board.black_positions
-        wplace = board.white_positions
-        ret = choice(board.list_placable())
-        if len(bplace)+len(wplace)>4:
-            if t==1:
-                p = choice(wplace)
-                if p!=ret:
-                    board.stone_white = board.stone_white ^ (1<<p)
-                    board.stone_black = board.stone_black ^ (1<<p)
-            else:
-                p = choice(bplace)
-                if p!=ret:
-                    board.stone_black = board.stone_black ^ (1<<p)
-                    board.stone_white = board.stone_white ^ (1<<p)
-        return ret
-
-class ComRand:
-    def __call__(self, board):
-        return choice(board.list_placable())
-
-
-
-class PlayerKinds:
-    def __init__(self, par, ip):
-        self.kinds_name = [] # 名前（人間、ランダムなど）
-        self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
-
-        self.kinds_class = [] # クラスを入れる
-        self.kinds_args = [] # クラスのinitの引数
-
-        self.kinds_reset = []  # reset関数を呼ぶ必要があるか
-        self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
-
-        NetrorkPlayer.ip = ip
-        Human.par = par
-        Human.network_player = NetrorkPlayer()
-        Human.network_player.reset()
-
-        self.kinds_name.append("人間")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append(Human)
-        self.kinds_args.append([ () ])
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append(None)
-
-        self.kinds_name.append("通信")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append(NetrorkPlayer)
-        self.kinds_args.append([ () ])
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append([ () ])
-
-        self.kinds_name.append("ランダム")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append( ComRand )
-        self.kinds_args.append( [ () ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append(None)
-
-        self.kinds_name.append("MC木探索")
-        self.kinds_difficulty.append(4)
-        self.kinds_class.append( MonteCarloTreeSearch )
-        self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (), (), (), ()  ] )
-
-        self.kinds_name.append("MC木探索 + ルート並列化")
-        self.kinds_difficulty.append(2)
-        self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
-        self.kinds_args.append( [ (30000, ), (50000, ) ] )
-        self.kinds_reset.append( False )
-        self.kinds_resetargs.append( None )
-
-        self.kinds_name.append("原始MC法")
-        self.kinds_difficulty.append(4)
-        self.kinds_class.append( PrimitiveMonteCarlo )
-        self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append( None )
-
-        self.kinds_name.append("原始MC法 + NegaAlpha")
-        self.kinds_difficulty.append(4)
-        self.kinds_class.append( NAPrimitiveMonteCarlo )
-        self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append( None )
-
-        self.kinds_name.append("AlphaBeta")
-        self.kinds_difficulty.append(2)
-        self.kinds_class.append( AlphaBeta )
-        self.kinds_args.append( [ (0, ), (1, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (), ()  ] )
-
-        self.kinds_name.append("Reinforce")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append( ReinforceComputer )
-        self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ ()  ] )
-
-        self.kinds_name.append("RainBow")
-        self.kinds_difficulty.append(1)
-        self.kinds_class.append( RainbowComputer )
-        self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ ()  ] )
-
-        self.kinds_name.append("AlphaZero")
-        self.kinds_difficulty.append(3)
-        self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (64, ), (64, ), (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (randrange(10), 50), (randrange(5, 10), 200), (None, 800)  ] )
-
-
-    def get_agent(self, id, diff):
-        if id>=0:
-            agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
-            if self.kinds_reset[id]:
-                agent.reset( * self.kinds_resetargs[id][diff] )
-            return agent
-        else:
-            print("Index Error")
-            exit()
-
-    def get_num(self):
-        return len(self.kinds_name)
-
-    def get_name(self, id):
-        if id<0 or id>=len(self.kinds_name):
-            print("範囲外のIDが指定されました")
-            exit()
-        return self.kinds_name[id]
-
-    def get_difficulty(self, id):
-        if id<0 or id>=len(self.kinds_difficulty):
-            print("範囲外のIDが指定されました")
-            exit()
-        return self.kinds_difficulty[id]
-
-
-
-
 class MainWindow(tk.Tk):
     def __init__(self, board, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
@@ -808,7 +799,7 @@ class MainWindow(tk.Tk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.start_page = StartPage(self, self.board)
+        self.start_page = StartPage(self)
         self.option_page = OptionPage(self, self.board)
         self.game_page = GamePage(self, self.board)
         self.result_page = ResultPage(self, self.board)
@@ -835,121 +826,60 @@ class MainWindow(tk.Tk):
 
 
 
-@ray.remote()
-def parallelized_play_game(board):
-    flag = 1
-    while flag:
-        n = board.get_action()
-        mask = board.put_stone(n)
-        flag = board.can_continue()
-        board.render(mask, flag, n)
+class DisplayBoard:
+    def __init__(self, ip):
+        self.board = Board()
+        self.main_window = MainWindow(self.board)
 
-    return False
+        # クリックイベントの待ちループを起こさせるために必要な設定
+        Human.par = self.main_window
 
-
-@ray.remote()
-def parallelized_main_loop(board):
-    board.main_window.mainloop()
-    return True
+        # 通信周りで必要な設定
+        NetrorkPlayer.ip = ip
+        Human.network_player = NetrorkPlayer()
+        Human.network_player.reset()
 
 
-
-
-class DisplayBoard(Board):
-    def __init__(self):
-        super().__init__()
-
-        # 画面表示用のクリックイベントを保持するための属性
-        self.click_attr = None
-
-        # 画面表示用にどこがひっくり返されたかを保持するための属性
-        self.reversed = 0
-
-        # mcのときの不具合を避けるためlog_stateとわける
-        self.play_log = []
-
-
-    def add_playlog(self):
-        self.play_log.append(self.state)
-
-    def clear_playlog(self):
-        self.play_log.clear()
-
-
-    @property
-    def black_positions(self):
-        return get_stand_bits(self.stone_black)
-
-    @property
-    def white_positions(self):
-        return get_stand_bits(self.stone_white)
-
-    @property
-    def reverse_positions(self):
-        return get_stand_bits(self.reversed)
-
-
-    # id...種類のID  diff...難易度
-    def game_config(self, player1id, player2id, player1diff=0, player2diff=0):
-        agent1 = self.player_kinds.get_agent(player1id, player1diff)
-        agent2 = self.player_kinds.get_agent(player2id, player2diff)
-        self.set_plan(agent1, agent2)
-
-    def render(self, mask, flag, n = 999):
-        self.add_playlog()
-        self.reversed = mask
-        self.main_window.game_page.canvas_update(flag, n)
-
-
-    def play(self, ip):
-        # ウインドウ
-        self.main_window = MainWindow(self)
-
-        # プレイヤーの種類
-        self.player_kinds = PlayerKinds(self.main_window, ip)
+    def play(self):
+        main_window = self.main_window
 
         while True:
-            self.main_window.change_page(0)
-            self.main_window.mainloop()
-            if self.click_attr:
-                is_interrupted = self.__play()
-                if is_interrupted:
-                    continue
-            else:
-                break
-            self.main_window.game_page.result_view()
-            self.main_window.mainloop()
+            main_window.change_page(0)
+            main_window.mainloop()
+            self.__play()
+            main_window.game_page.result_view()
+            main_window.mainloop()
 
     def __play(self):
-        self.reset()
-        self.clear_playlog()
+        board = self.board
+        main_window = self.main_window
+
+        board.reset()
+        board.clear_playlog()
 
         # 最初の盤面表示
-        self.render(None, None)
-        self.main_window.after(100, self.main_window.quit)
-        self.main_window.mainloop()
+        self.render()
+        main_window.after(100, main_window.quit)
+        main_window.mainloop()
 
-        # 中断を可能にするためのループ処理と、ゲームのプレイを同時に実行する
-        ray.init()
-        remains = [parallelized_main_loop.remote(self), parallelized_play_game.remote(self)]
-        finished, remains = ray.wait(remains, num_returns = 1)
-        is_interrupted = ray.get(finished[0])
-        ray.shutdown()
+        # １ゲーム
+        board.game(self.render)
 
-        # 例外終了の場合は、それを示す真偽値を返す
-        if is_interrupted:
-            return True
+        # 最後の１石だけ表示されない問題を解消 (１秒待機)
+        main_window.after(1000, main_window.quit)
+        main_window.mainloop()
 
-        # 最後の１石だけ表示されない問題を解消する (１秒待機)
-        self.main_window.after(1000, self.main_window.quit)
-        self.main_window.mainloop()
 
-        return False
+    # 画面描画用メソッド
+    def render(self, mask = 0, flag = None, n = 999):
+        self.board.add_playlog()
+        self.board.reversed = mask
+        self.main_window.game_page.canvas_update(flag, n)
 
 
 
 
 if __name__ == "__main__":
     ip = input("サーバーのIPを入力してください-ない場合は0に\n")
-    displayboard = DisplayBoard()
-    displayboard.play(ip)
+    displayboard = DisplayBoard(ip)
+    displayboard.play()
