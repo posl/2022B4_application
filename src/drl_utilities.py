@@ -4,8 +4,11 @@ from time import time
 from datetime import timedelta, timezone, datetime
 
 import numpy as np
-from tqdm import tqdm
-import matplotlib.pyplot as plt
+try:
+    from tqdm import tqdm
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
 
 from inada_framework import Layer, cuda
 import inada_framework.layers as dzl

@@ -70,7 +70,9 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   cd ./src  &&  python play.py
   ```
 - docker を使う場合
+  ```
   鋭意、作成中。
+  ```
 <br>
 
 

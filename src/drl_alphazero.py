@@ -8,9 +8,12 @@ from time import time
 
 import numpy as np
 import ray
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-from matplotlib import collections, patches
+try:
+    from tqdm import tqdm
+    import matplotlib.pyplot as plt
+    from matplotlib import collections, patches
+except ImportError:
+    pass
 
 from inada_framework import Model, Function, no_train
 from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu
