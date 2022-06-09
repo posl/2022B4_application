@@ -675,7 +675,7 @@ class ComRand:
 
 
 class PlayerKinds:
-    def __init__(self, par):
+    def __init__(self, par, ip):
         self.kinds_name = [] # 名前（人間、ランダムなど）
         self.kinds_difficulty = [] # 難易度がいくつあるか(0からN-1) １以下なら難易度選択が非表示
 
@@ -685,7 +685,7 @@ class PlayerKinds:
         self.kinds_reset = []  # reset関数を呼ぶ必要があるか
         self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
 
-        NetrorkPlayer.ip = IPADDR
+        NetrorkPlayer.ip = ip
         Human.par = par
         Human.network_player = NetrorkPlayer()
         Human.network_player.reset()
@@ -839,12 +839,6 @@ class DisplayBoard(Board):
     def __init__(self):
         super().__init__()
 
-        # ウインドウ
-        self.main_window = MainWindow(self)
-
-        # プレイヤーの種類
-        self.player_kinds = PlayerKinds(self.main_window)
-
         # 画面表示用のクリックイベントを保持するための属性
         self.click_attr = None
 
@@ -888,6 +882,12 @@ class DisplayBoard(Board):
 
 
     def play(self):
+        # ウインドウ
+        self.main_window = MainWindow(self)
+
+        # プレイヤーの種類
+        self.player_kinds = PlayerKinds(self.main_window, ip)
+
         while True:
             self.main_window.change_page(0)
             self.main_window.mainloop()
@@ -918,6 +918,6 @@ class DisplayBoard(Board):
 
 
 if __name__ == "__main__":
-    IPADDR = input("サーバーのIPを入力してください-ない場合は0に\n")
+    ip = input("サーバーのIPを入力してください-ない場合は0に\n")
     displayboard = DisplayBoard()
-    displayboard.play()
+    displayboard.play(ip)
