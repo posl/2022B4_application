@@ -937,5 +937,6 @@ class DisplayBoard(Board):
 if __name__ == "__main__":
     ip = input("サーバーのIPを入力してください-ない場合は0に\n")
     IPADDR = ip
+    NetrorkPlayer.ip = ip
     displayboard = DisplayBoard()
     displayboard.play()
