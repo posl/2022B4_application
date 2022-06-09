@@ -149,7 +149,7 @@ class Reinforce(SelfMatch):
 def fit_reinforce_agent(episodes = 10000, restart = False):
     # ハイパーパラメータ設定
     gamma = 0.90
-    lr = 0.000025
+    lr = 0.00001
     to_gpu = False
 
     # 環境
