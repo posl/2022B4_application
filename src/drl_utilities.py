@@ -185,7 +185,7 @@ class SelfMatch:
 
     @staticmethod
     def get_path(file_name):
-        return join(dirname(__file__), "data", "{}", file_name)
+        return join(dirname(__file__), "..", "data", "{}", file_name)
 
 
     # 前回の状態を引き継いで、学習を途中再開することができる

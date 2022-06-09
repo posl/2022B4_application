@@ -574,33 +574,19 @@ class ResultPage(Page):
 
 class Sounds:
     def __init__(self):
-        self.sounds = []
+        sound_folder_path = os.path.join(os.path.dirname(__file__), "..", "sound", "{}")
+        self.sounds = [None]
+
+        for index in (47, 41, 48, 19):
+            se = pygame.mixer.Sound(sound_folder_path.format(f"maou{index}.wav"))
+            se.set_volume(0.3)
+            self.sounds.append(se)
+
         self.musics = []
-        sound_folder_path = os.path.normpath(os.path.join(os.path.abspath(__file__),  "../sound"))
-        se0 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou09.mp3"))
-        se1 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou47.wav"))
-        se2 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou41.wav"))
-        se3 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou48.wav"))
-        se4 = pygame.mixer.Sound(os.path.join(sound_folder_path, "maou19.wav"))
-        se0.set_volume(0.3)
-        se1.set_volume(0.3)
-        se2.set_volume(0.3)
-        se3.set_volume(0.3)
-        se4.set_volume(0.3)
+        self.musics.append(sound_folder_path.format("maou09.mp3"))
+        self.musics.append(sound_folder_path.format("temsu08.mp3"))
 
-        self.sounds.append(se0)
-        self.sounds.append(se1)
-        self.sounds.append(se2)
-        self.sounds.append(se3)
-        self.sounds.append(se4)
-
-        bgm1 = os.path.join(sound_folder_path, "maou09.mp3")
-        bgm2 = os.path.join(sound_folder_path, "tamsu08.mp3")
-
-        self.musics.append(bgm1)
-        self.musics.append(bgm2)
-
-        self.bgm_play(0)
+        self.bgm_play()
 
     def bgm_play(self, id, loop=-1):
         if id<0 or id>=len(self.musics):
@@ -642,8 +628,6 @@ class Human:
 
     def cheat_player(self, board):
         t = board.turn
-        bplace = board.black_positions
-        wplace = board.white_positions
         n = 0
         while True:
             self.par.mainloop()

@@ -9,6 +9,7 @@
 <br>
 
 
+
 # B4 アプリ開発
 
 ## 実行環境
@@ -22,42 +23,47 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
 <br>
 
 - brew が入っていない場合
-brew のインストールを行う。
-```
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-```
-問題がなさそうか確認する。
-```
-brew doctor
-```
-問題がなさそうなら、アップデート。
-```
-brew update
-```
+  brew のインストールを行う。
+  ```
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  ```
+  問題がなさそうか確認する。
+  ```
+  brew doctor
+  ```
+  問題がなさそうなら、アップデート。
+  ```
+  brew update
+  ```
 <br>
 <br>
 
 - tcl-tk 関連
-tcl-tk のバージョンを確認する。
-```
-brew info tcl-tk
-```
-バージョンが 8.6 以前の場合、アップグレード。
-```
-brew upgrade tcl-tk
-```
+  tcl-tk のバージョンを確認する。
+  ```
+  brew info tcl-tk
+  ```
+  バージョンが 8.6 以前の場合、アップグレード。
+  ```
+  brew upgrade tcl-tk
+  ```
 <br>
 <br>
+
 
 
 ## 実行方法
 - pipenv を使う場合
-  - 環境の再現
-    - pipenv update
+  環境の再現
+  ```
+  pipenv update
+  ```
+  
 - 自前の python 環境を使う場合
 - docker を使う場合
 <br>
 <br>
+
 
 
 ## 担当

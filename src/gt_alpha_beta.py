@@ -7,10 +7,10 @@ class GTValue:
 		#置けるマスの評価方法を決定する
 		if select_place_func == 0:
 			self.__eval_actions = self.__eval_current_actions
-			self.set_data_dir("./data/gt/current/")
+			self.set_data_dir("./../data/gt/current/")
 		else:
 			self.__eval_actions = self.__eval_valid_actions
-			self.set_data_dir("./data/gt/valid/")
+			self.set_data_dir("./../data/gt/valid/")
 
 		self.reset()
 
