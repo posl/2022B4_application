@@ -305,48 +305,9 @@ class Board:
 
 
     # ゲーム本体
-    def game(self, render_flag = False):
+    def game(self):
         flag = 1
         while flag:
             n = self.get_action()
             mask = self.put_stone(n)
-            flag = self.can_continue()
-
-            if render_flag:
-                self.render(mask, flag, n)
-
-    # 画面表示用関数 (このクラスを継承した子クラスが具体的に実装する)
-    def render(self, mask, flag, n):
-        raise NotImplementedError()
-
-
-
-
-# 以下、最終的には消す
-
-    # 一時的な盤面表示
-    def print_board(self, x):
-        for i in range(8):
-            print(format(x & 0b1111_1111, "08b")[::-1])
-            x >>= 8
-
-    def print_state(self):
-        self.print_board(self.stone_black)
-        print("-" * 20)
-        self.print_board(self.stone_white)
-        print("black:", self.black_num, "   white:", self.white_num)
-        print(self.list_placable())
-        print()
-
-    def debug_game(self, player1, player2):
-        self.reset()
-        self.set_plan(player1, player2)
-
-        flag = 1
-        while flag:
-            self.print_state()
-
-            n = self.get_action()
-            self.put_log.append(n)
-            self.put_stone(n)
             flag = self.can_continue()

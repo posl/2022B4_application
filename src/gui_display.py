@@ -7,6 +7,7 @@ from random import choice, randrange
 # pygame のウェルカムメッセージを表示させないための設定
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
+import ray
 
 from mc_tree_search import MonteCarloTreeSearch, RootPalallelMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
@@ -834,6 +835,25 @@ class MainWindow(tk.Tk):
 
 
 
+@ray.remote()
+def parallelized_play_game(board):
+    flag = 1
+    while flag:
+        n = board.get_action()
+        mask = board.put_stone(n)
+        flag = board.can_continue()
+        board.render(mask, flag, n)
+
+    return False
+
+
+@ray.remote()
+def parallelized_main_loop(board):
+    board.main_window.mainloop()
+    return True
+
+
+
 
 class DisplayBoard(Board):
     def __init__(self):
@@ -892,27 +912,39 @@ class DisplayBoard(Board):
             self.main_window.change_page(0)
             self.main_window.mainloop()
             if self.click_attr:
-                self.__play()
+                is_interrupted = self.__play()
+                if is_interrupted:
+                    continue
             else:
                 break
             self.main_window.game_page.result_view()
             self.main_window.mainloop()
 
     def __play(self):
-        # 最初の盤面表示
         self.reset()
-        self.print_state()
+        self.clear_playlog()
+
+        # 最初の盤面表示
         self.render(None, None)
         self.main_window.after(100, self.main_window.quit)
         self.main_window.mainloop()
 
-        self.clear_playlog()
-        self.add_playlog()
-        self.game(self.print_state)
+        # 中断を可能にするためのループ処理と、ゲームのプレイを同時に実行する
+        ray.init()
+        remains = [parallelized_main_loop.remote(self), parallelized_play_game.remote(self)]
+        finished, remains = ray.wait(remains, num_returns = 1)
+        is_interrupted = ray.get(finished[0])
+        ray.shutdown()
+
+        # 例外終了の場合は、それを示す真偽値を返す
+        if is_interrupted:
+            return True
 
         # 最後の１石だけ表示されない問題を解消する (１秒待機)
         self.main_window.after(1000, self.main_window.quit)
         self.main_window.mainloop()
+
+        return False
 
 
 
