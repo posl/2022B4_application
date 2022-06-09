@@ -28,12 +28,13 @@
 - tcl-tk 8.6.12
   - Mac ユーザーの場合
     - brew をインストール
-    - tcl-tk のバージョン確認
-        ```
-        brew info tcl-tk
-        ```
+    - ```tcl-tk のバージョン確認
+      brew info tcl-tk
+      ```
     - バージョンが 8.6 以前の場合
-      - ```brew upgrade tcl-tk```
+        ```
+        brew upgrade tcl-tk
+        ```
 <br>
 <br>
 
