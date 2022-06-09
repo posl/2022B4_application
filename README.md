@@ -26,15 +26,30 @@
 ## 実行環境
 - python 3.9.12
 - tcl-tk 8.6.12
-  - Mac ユーザーの場合
-    - brew をインストール
-    - ```tcl-tk のバージョン確認
-      brew info tcl-tk
-      ```
-    - バージョンが 8.6 以前の場合
-        ```
-        brew upgrade tcl-tk
-        ```
+<br>
+<br>
+
+Mac ユーザーの場合
+brew が入っていない場合
+brew をインストール
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+```
+問題がなさそうか確認して、
+```
+brew doctor
+```
+```
+brew update
+```
+tcl-tk のバージョン確認
+```
+brew info tcl-tk
+```
+バージョンが 8.6 以前の場合
+```
+brew upgrade tcl-tk
+```
 <br>
 <br>
 
