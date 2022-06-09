@@ -1,6 +1,5 @@
 import socket
 import threading
-import tkinter as tk
 import datetime
 import time
 
@@ -68,7 +67,7 @@ class Client:
 
 
 
-class NetrorkPlayer():    
+class NetrorkPlayer():
     ip = None
     client = None
     reset_fin = False
@@ -97,7 +96,6 @@ class NetrorkPlayer():
 
             #self.NoNetwork = True
             NetrorkPlayer.put_place = -1
-    
 
     def __call__(self, board):
         return self.next_action(board)
