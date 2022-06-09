@@ -30,8 +30,8 @@
     - brew をインストール
     - tcl-tk のバージョン確認
       - ```
-      - brew info tcl-tk
-      - ```
+        brew info tcl-tk
+        ```
     - バージョンが 8.6 以前の場合
       - ```brew upgrade tcl-tk```
 <br>
