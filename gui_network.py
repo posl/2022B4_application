@@ -257,58 +257,6 @@ class Server:
 
 
 
-class MainWindow(tk.Tk):
-    def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
-        self.title("Server")
-        self.geometry("400x300")
-
-        self.frame = tk.Frame(self)
-        self.frame.pack()
-
-        self.listbox = tk.Listbox(self.frame, width=40, height=15)
-        self.listbox.pack(side=tk.LEFT)
-
-        self.scroll_bar = tk.Scrollbar(self.frame, command=self.listbox.yview)
-        self.scroll_bar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.listbox.config(yscrollcommand=self.scroll_bar.set)
-
-        self.input_frame = tk.Frame(self)
-        self.input_frame.pack()
-
-        self.textbox = tk.Entry(self.input_frame)
-        self.textbox.pack(side=tk.LEFT)
-
-        self.button = tk.Button(self.input_frame, text="send")
-        self.button.pack(side=tk.RIGHT)
-
-        self.server = Server()
-        self.server.connect()
-        self.server.recv_func = self.recv_func
-        thread = threading.Thread(target=self.server.recv_loop, args=())
-        thread.daemon = True
-        thread.start()
-        #self.server.recv_loop()
-
-    def recv_func(self, id, x):
-        self.listbox.insert(tk.END, x)
-        return
-
-def func(x, y):
-    return
-
-def get_self_ip_addr():
-    for ifaceName in interfaces():
-        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
-        for addr in addresses:
-            if addr != 'No IP addr' and addr != "127.0.0.1":
-                print(ifaceName, addr)
-                return addr
-        #print(' '.join(addresses))
-        #print("---", str(addresses), "---")
-
-
 
 
 class OthelloServer:
@@ -350,15 +298,6 @@ class OthelloServer:
 
 
 if __name__=="__main__":
-    if False:
-        host = socket.gethostname()
-        print(host)
-
-        ip = socket.gethostbyname(host)
-        ip = get_self_ip_addr()
-        print(ip)
-        IPADDR = str(ip)
-
     server = OthelloServer()
     server.mainloop()
     #window = MainWindow()
