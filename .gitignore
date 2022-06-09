@@ -1,7 +1,12 @@
-.DS_Store
 .venv/
-.vscode/
 __pycache__
-gt_test.py
 Pipfile.lock
+
+.DS_Store
+.vscode/
+
+gt_test.py
 profiling.*
+
+!speedup.pyx
+speedup.*
