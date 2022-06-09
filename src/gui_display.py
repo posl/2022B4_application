@@ -213,7 +213,7 @@ class GamePage(Page):
         self.button2.place(x=3000, y=340*2)
 
         self.button3 = tk.Button(self, text="X", font = (self.font_name, 50), command=lambda:self.goto_start_page())
-        self.button3.place(x=3000, y=160)
+        self.button3.place(x=1000, y=600)
 
     def canvas_update(self, flag=None, n=999):
         print("canvas_update:",self.game_canvas_state)
