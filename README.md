@@ -18,8 +18,7 @@
 Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動作しない可能性があるため、以下の手順を踏む。
 <br>
 
-- brew が入っていない場合
-<br>
+- brew が入っていない場合<br>
   brew のインストールを行う。
   ```
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
@@ -34,8 +33,7 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
 <br>
 
-- tcl-tk 関連
-<br>
+- tcl-tk 関連<br>
   tcl-tk のバージョンを確認する。
   ```
   brew info tcl-tk
