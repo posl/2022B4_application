@@ -29,20 +29,27 @@
 <br>
 <br>
 
-Mac ユーザーの場合
-brew が入っていない場合
+Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動作しない可能性がある
+<br>
+<br>
+
+brew が入っていない場合、
 brew をインストール
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
-問題がなさそうか確認して、
+問題がなさそうか確認
 ```
 brew doctor
 ```
+問題がなさそうなら、アップデート
 ```
 brew update
 ```
-tcl-tk のバージョン確認
+<br>
+<br>
+
+tcl-tk のバージョンを確認
 ```
 brew info tcl-tk
 ```
