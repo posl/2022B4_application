@@ -583,7 +583,7 @@ class Sounds:
 
         self.musics = []
         self.musics.append(sound_folder_path.format("maou09.mp3"))
-        self.musics.append(sound_folder_path.format("temsu08.mp3"))
+        self.musics.append(sound_folder_path.format("tamsu08.mp3"))
 
         self.bgm_play(0)
 
