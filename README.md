@@ -43,7 +43,7 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
 
 
 ## 実行方法
-- pipenv を使う場合
+- pipenv を使う場合<br><br>
   環境を再現する。
   ```
   pipenv update
@@ -56,7 +56,7 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
   cd ./src  &&  pipenv run python play.py
   ```
-- 自前の python 環境を使う場合
+- 自前の python 環境を使う場合<br><br>
   パッケージをインストールする。
   ```
   pip install -U setuptools pip  &&  pip install -r requirements.txt
@@ -69,10 +69,8 @@ Mac ユーザーの場合、tcl-tk のバージョンによって、正常に動
   ```
   cd ./src  &&  python play.py
   ```
-- docker を使う場合
-  ```
+- docker を使う場合<br><br>
   鋭意、作成中。
-  ```
 <br>
 
 
