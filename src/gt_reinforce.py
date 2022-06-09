@@ -1,8 +1,8 @@
-from gt_alpha_beta import AlphaBeta
-from gt_alpha_beta import GTValue
-from board import Board
 import numpy as np
-from random import random
+
+from gt_alpha_beta import GTValue
+from gt_alpha_beta import AlphaBeta
+from board import Board
 
 
 
@@ -89,9 +89,10 @@ class GTReinforce:
 
 
 
-
         print(sum_reward)
         return self.agent.get_data()
+
+
 
 
 if __name__ == "__main__":
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     #     if num == len(place_list):
     #         num = 0
     #     return place_list[num]
-        
+
 
     # gtr = GTReinforce()
     # gtr.reset()
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     gtr2.agent.update(0)
     gtr2_file_path = "self_match2"
 
-    
+
     while 1:
         tmp_gtr2_ab = AlphaBeta(place_func, gtr2.agent.data)
         tmp_gtr2_ab.set_depth(6)
@@ -133,4 +134,3 @@ if __name__ == "__main__":
         gtr1.agent.data.write_value_list(gtr1_file_path)
         gtr1, gtr2 = gtr2, gtr1
         gtr1_file_path, gtr2_file_path = gtr2_file_path, gtr1_file_path
-

@@ -1,14 +1,11 @@
 import socket
 import threading
-import datetime
 import time
 
 from netifaces import interfaces, ifaddresses, AF_INET
 
-#from board import board
-
-IPADDR = "127.0.0.1"
 PORT = 10100
+
 
 
 class Client:
@@ -17,14 +14,12 @@ class Client:
         self.sock = None
         self.recv_func = None
         self.recv_thread = None
-        pass
 
     # 通信を開始する
     def connect(self, ip="127.0.0.1", port=8080):
         self.client_id = 0
         self.sock = socket.socket(socket.AF_INET)
         self.sock.connect((ip, port))
-        pass
 
     # サーバーからデータを受信する
     def recv_loop(self):
@@ -37,8 +32,6 @@ class Client:
                 self.__recv_func(  data.decode("utf-8")  )
                 self.recv_func(  data.decode("utf-8") )
             except ConnectionResetError:
-                break
-            #except:
                 break
         print("通信を終了します")
         self.sock.shutdown(socket.SHUT_RDWR)
@@ -54,7 +47,6 @@ class Client:
                 if len(y)<3:
                     return
                 self.client_id = int(y[2])
-        pass
 
     def send(self, message):
         if self.sock is None:
@@ -63,7 +55,6 @@ class Client:
             self.sock.send(message.encode("utf-8"))
         except:
             print("送信エラーが発生しました：クライアント")
-        pass
 
 
 
@@ -129,49 +120,6 @@ class NetrorkPlayer():
             return
         if y[0]=="PUT":
             NetrorkPlayer.put_place =  int(y[1])
-        pass
-
-
-
-
-# -- 通信まわりの初期化
-IPADDR = "127.0.0.1"
-IPADDR = "192.168.35.85"
-PORT = 10100
-
-class Log:
-    def __init__(self):
-        now = datetime.datetime.now()
-        filename = "server_log_"
-        filename += str(now.year)
-        filename += "-"
-        filename += str(now.month)
-        filename += "-"
-        filename += str(now.day)
-        filename += "-"
-        filename += str(now.hour)
-        filename += "-"
-        filename += str(now.minute)
-        filename += "-"
-        filename += str(now.microsecond//1000)
-        filename += ".txt"
-        self.filename = filename
-        self.f = open(self.filename, 'a')
-        self.f.close()
-
-    def write(self, data):
-        self.f = open(self.filename, 'a')
-        self.f.write(data)
-        self.f.close()
-
-    def writeline(self, data):
-        self.f = open(self.filename, 'a')
-        self.f.write(data)
-        self.f.write("\n")
-        self.f.close()
-
-    def close(self):
-        self.f.close()
 
 
 
@@ -183,9 +131,7 @@ class Server:
         self.sock = None
         self.client_id_curr = 0
         self.recv_func = None
-        self.log = Log()
         self.max_connection = 2
-        pass
 
     # 通信を開始
     def connect(self, port="8080"):
@@ -193,7 +139,6 @@ class Server:
         self.sock = socket.socket(socket.AF_INET)
         self.sock.bind((ip, port))
         self.sock.listen()
-        pass
 
     # 特定のクライアントから受信 スレッドにより実行される
     def recv_client(self, id, sock, addr):
@@ -203,14 +148,12 @@ class Server:
                 if data==b"":
                     break
                 print( str(self.client_map[id]) ,"から受信された：", data.decode("utf-8")  )
-                self.log.writeline( str(self.client_map[id]) +  "から受信された：" + data.decode("utf-8")  )
                 self.recv_func( id, data.decode("utf-8") )
             except ConnectionResetError:
                 break
             except:
                 break
         print("クライアントが退出:", self.client_map[id][0], self.client_map[id][2] )
-        self.log.writeline( "クライアントが退出:" + str(self.client_map[id])  )
         del self.client_map[id]
 
         try:
@@ -229,7 +172,6 @@ class Server:
             id = self.client_id_curr
             self.client_id_curr += 1
             print("新しい人が参加した：", str( self.client_map[id][0] ), str( self.client_map[id][2] ) )
-            self.log.writeline(  "新しい人が参加した：" + str( self.client_map[id] )  )
 
             thread = threading.Thread(target=self.recv_client, args=(id, sock_cl, addr))
             thread.daemon = True
@@ -237,7 +179,6 @@ class Server:
 
             self.send(id, "SET ID "+str(id) )
 
-    # 
     def send(self, id, message):
         try:
             self.client_map[id][1].send( message.encode("utf-8") )
@@ -251,8 +192,6 @@ class Server:
                 if addr != 'No IP addr' and addr != "127.0.0.1":
                     print(ifaceName, addr)
                     return addr
-
-
 
 
 
@@ -290,7 +229,6 @@ class OthelloServer:
                 s = "PUT " + str(place)
                 self.server.send(i, s )
                 break
-        pass
 
 
 

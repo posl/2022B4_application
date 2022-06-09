@@ -1,6 +1,6 @@
-from matplotlib.pyplot import get
 from board import Board
-import numpy as np
+
+
 
 class GTValue:
 	def __init__(self, select_place_func = 0):
@@ -20,7 +20,7 @@ class GTValue:
 	#評価に必要とする変数をリストとして返す
 	def get_raw_value_list(self):
 		return [self.corner, self.around_corner, self.edge, self.around_edge, self.others, self.place]
-	
+
 	#評価に必要とする変数を受け取る
 	def set_raw_value_list(self, value_list):
 		try:
@@ -52,7 +52,7 @@ class GTValue:
 		with open(file_name, mode = "r") as f:
 			tmp_value_list = list(map(float, f.read().split()))
 		self.set_raw_value_list(tmp_value_list)
-	
+
 	#マス毎の評価値を設定する
 	def __set_block_points(self):
 		block_points = {}
@@ -85,7 +85,7 @@ class GTValue:
 				value_black += self.block_points[i]
 			elif (board.stone_white >> i) & 1:
 				value_black -= self.block_points[i]
-	
+
 		#置ける場所の数の評価
 		if flag:
 			value_black += (board.turn - (not board.turn)) * self.place * self.__eval_actions(board)
@@ -130,6 +130,7 @@ class GTValue:
 
 
 
+
 class AlphaBeta:
 	def __init__(self, select_place_func = 0, value = None):
 		#評価関数を決定する.指定がない場合はdefault_dataを使用する
@@ -137,7 +138,7 @@ class AlphaBeta:
 			self.value = GTValue(select_place_func)
 		else:
 			self.value = value
-		
+
 		self.__min_value = -999
 		self.__max_value = 999
 		self.set_depth(6)
@@ -223,6 +224,9 @@ class AlphaBeta:
 						beta = value
 
 		return value
+
+
+
 
 if __name__ == "__main__":
 	#確認用プログラム
