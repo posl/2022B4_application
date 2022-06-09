@@ -72,59 +72,65 @@ class NetrorkPlayer():
     ip = None
     client = None
     reset_fin = False
-    NoNetwork = True
+    NoNetwork = False
     thread = None
+    put_place = 0
+
+    def __init__(self):
+        print(self.reset_fin)
+        print("NETWORK PLAYER INIT")
 
     def reset(self):
-        if self.reset_fin==False:
-            reset_fin = True
-            ip = self.ip
-            self.NoNetwork = (ip=="0")
-            if self.NoNetwork :
+        if NetrorkPlayer.reset_fin==False:
+            NetrorkPlayer.reset_fin = True
+            ip = NetrorkPlayer.ip
+            NetrorkPlayer.NoNetwork = (ip=="0")
+            if NetrorkPlayer.NoNetwork :
                 return
 
-            self.client = Client()
-            self.client.connect(str(ip), PORT)
-            self.client.recv_func = self.recv_func
-            self.thread = threading.Thread(target=self.client.recv_loop, args=())
-            self.thread.daemon = True
-            self.thread.start()
+            NetrorkPlayer.client = Client()
+            NetrorkPlayer.client.connect(str(ip), PORT)
+            NetrorkPlayer.client.recv_func = NetrorkPlayer.recv_func
+            NetrorkPlayer.thread = threading.Thread(target=NetrorkPlayer.client.recv_loop, args=())
+            NetrorkPlayer.thread.daemon = True
+            NetrorkPlayer.thread.start()
 
             #self.NoNetwork = True
-            self.put_place = -1
+            NetrorkPlayer.put_place = -1
     
 
     def __call__(self, board):
         return self.next_action(board)
 
-    def reset(self):
+    def reset_kesu(self):
         pass
 
     def next_action(self, board):
-        if self.NoNetwork:
+        if NetrorkPlayer.NoNetwork:
             return 0
         placable = set(board.list_placable())
         print(placable)
-        while self.put_place<0 or (not (self.put_place in placable)):
+        while NetrorkPlayer.put_place<0 or (not (NetrorkPlayer.put_place in placable)):
             time.sleep(0.1)
-        ret = self.put_place
-        self.put_place  = -1
+        ret = NetrorkPlayer.put_place
+        NetrorkPlayer.put_place  = -1
         return ret
 
     def notice(self, p):
-        if self.NoNetwork:
+        if NetrorkPlayer.NoNetwork:
             return
         s = "PUT " + str(p)
+        print(NetrorkPlayer.client)
         self.client.send(s)
 
-    def recv_func(self, data):
-        if self.NoNetwork:
+    def recv_func(data):
+        if NetrorkPlayer.NoNetwork:
             return
         y = data.split()
         if len(y)<2:
             return
         if y[0]=="PUT":
-            self.put_place =  int(y[1])
+            NetrorkPlayer.put_place =  int(y[1])
         pass
 
 

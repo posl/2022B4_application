@@ -705,6 +705,7 @@ class PlayerKinds:
         NetrorkPlayer.ip = IPADDR
         Human.par = par
         Human.network_player = NetrorkPlayer()
+        Human.network_player.reset()
 
         self.kinds_name.append("人間")
         self.kinds_difficulty.append(1)
