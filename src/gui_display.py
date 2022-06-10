@@ -409,7 +409,6 @@ class GamePage(Page):
         self.button3.place(x=3000, y=600)
 
     def canvas_update(self, flag=None, n=999):
-        print("canvas_update:",self.game_canvas_state)
         self.stone_counter_update()
         if self.game_canvas_state==0:
             self.render_current_board()
@@ -578,16 +577,13 @@ class GamePage(Page):
     def cell_click(self, event):
         if self.game_canvas_lock == True:
             return
-        print("cell_click:",self.game_canvas_state)
         x = event.x
         y = event.y
         x = (x-10) // self.cell_width
         y = (y-10) // self.cell_height
         t = (y, x)
         self.board.click_attr = self.board.t2n(t)
-        print("セルが押された：", x+1, ",", y+1)
         self.par.after(100, self.quit)
-        #self.board.player_action = n
 
     def result_view(self):
         self.win_check()
@@ -608,7 +604,6 @@ class GamePage(Page):
         self.button2.place(x=3000)
         self.label1.place(x=3000)
         self.label1.configure(text="")
-        print(self.board.log_list)
 
     def win_check(self):
         bnum = self.board.black_num
