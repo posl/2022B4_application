@@ -168,8 +168,8 @@ class PlayerKinds:
         self.kinds_difficulty.append(1)
         self.kinds_class.append( RainbowComputer )
         self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ ()  ] )
+        self.kinds_reset.append(False)
+        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
