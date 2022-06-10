@@ -780,11 +780,18 @@ def eval_alphazero_computer(index = None):
         bar_ax.bar(bar_center, bar_record[1], width = bar_width, align = "edge", label = "second")
         bar_ax.legend()
 
+        # 一目で判断できるようにするために、棒の中に勝率を表示する
+        for i in range(2):
+            for j, x in enumerate(bar_left + (bar_width / 2)):
+                win_rate = bar_record[i][j]
+                text = f"{win_rate} %"
+                bar_ax.text(x + i * bar_width, -5, text, ha = "center")
+
         bar_ax.set_xticks(ticks = bar_center, labels = sims_array)
-        bar_ax.set_ylim(-5, 105)
+        bar_ax.set_ylim(-10, 105)
         bar_ax.set_xlabel("The Number of Simulations")
         bar_ax.set_ylabel("Winning Percentage")
-        bar_ax.set_title(f"AlphaZero vs. {name}", fontsize = 14)
+        bar_ax.set_title(f"AlphaZero vs. {name}", fontsize = 14, color = "red")
 
         bar_fig.savefig(f"{graphs_path}_{alias}")
         bar_ax.cla()
@@ -920,11 +927,11 @@ def comp_alphazero_computer():
             black_wins, white_wins = results[i, j]
             result = f"{black_wins} - {white_wins}"
 
-            x_offset = 0.05 + 0.075 * (7 - len(result))
-            ax.text(x + x_offset, y + 0.4, result, size = "small")
+            ax.text(x + 0.5, y + 0.4, result, ha = "center", size = "small")
 
             diff = black_wins - white_wins
             if diff:
+                x_offset = 0.05 + 0.075 * (7 - len(result))
                 lines_dict[diff].append([(x + x_offset, y + 0.3), (x + (1. - x_offset), y + 0.3)])
 
     # 結果を分かりやすくするための下線を描画
