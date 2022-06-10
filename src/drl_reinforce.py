@@ -224,7 +224,7 @@ class ReinforceComputer:
 
 if __name__ == "__main__":
     # 学習用コード
-    fit_reinforce_agent(restart = True)
+    # fit_reinforce_agent(restart = True)
 
     # 評価用コード
     eval_computer(ReinforceComputer, "REINFORCE")
