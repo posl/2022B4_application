@@ -98,92 +98,65 @@ class PlayerKinds:
         self.kinds_class = [] # クラスを入れる
         self.kinds_args = [] # クラスのinitの引数
 
-        self.kinds_reset = []  # reset関数を呼ぶ必要があるか
-        self.kinds_resetargs = [] # reset関数に渡す引数(ID, 難易度)ごとに設定
-
         self.kinds_name.append("人間")
         self.kinds_difficulty.append(1)
         self.kinds_class.append(Human)
         self.kinds_args.append([ () ])
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append(None)
 
         self.kinds_name.append("通信")
         self.kinds_difficulty.append(1)
         self.kinds_class.append(NetrorkPlayer)
         self.kinds_args.append([ () ])
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append([ () ])
 
         self.kinds_name.append("ランダム")
         self.kinds_difficulty.append(1)
         self.kinds_class.append( ComRand )
         self.kinds_args.append( [ () ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append(None)
 
         self.kinds_name.append("MC木探索")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( MonteCarloTreeSearch )
         self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (), (), (), ()  ] )
 
         self.kinds_name.append("MC木探索 + ルート並列化")
         self.kinds_difficulty.append(2)
         self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
         self.kinds_args.append( [ (30000, ), (50000, ) ] )
-        self.kinds_reset.append( False )
-        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("原始MC法")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( PrimitiveMonteCarlo )
         self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("原始MC法 + NegaAlpha")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( NAPrimitiveMonteCarlo )
         self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("AlphaBeta")
         self.kinds_difficulty.append(2)
         self.kinds_class.append( AlphaBeta )
         self.kinds_args.append( [ (0, ), (1, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (), ()  ] )
 
         self.kinds_name.append("Reinforce")
         self.kinds_difficulty.append(1)
         self.kinds_class.append( ReinforceComputer )
         self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ ()  ] )
 
         self.kinds_name.append("RainBow")
         self.kinds_difficulty.append(1)
         self.kinds_class.append( RainbowComputer )
         self.kinds_args.append( [ (64, ) ] )
-        self.kinds_reset.append(False)
-        self.kinds_resetargs.append( None )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (64, ), (64, ), (64, ) ] )
-        self.kinds_reset.append(True)
-        self.kinds_resetargs.append( [ (randrange(10), 50), (randrange(5, 10), 200), (None, 800)  ] )
+        self.kinds_args.append( [ (64, randrange(10), 50), (64, randrange(5, 10), 200), (64, ) ] )
 
 
     def get_agent(self, id, diff):
-        if id>=0:
+        if id >= 0:
             agent = self.kinds_class[id]( * self.kinds_args[id][diff] )
-            if self.kinds_reset[id]:
-                agent.reset( * self.kinds_resetargs[id][diff] )
             return agent
         else:
             print("Index Error")

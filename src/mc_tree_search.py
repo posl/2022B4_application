@@ -14,6 +14,7 @@ class MonteCarloTreeSearch:
 
     def __init__(self, max_tries = 65536):
         self.max_tries = max_tries
+        self.reset()
 
     # ゲーム毎に呼ぶ必要がある
     def reset(self):

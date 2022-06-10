@@ -692,7 +692,7 @@ def fit_rainbow_agent(episodes = 150000, restart = False):
 # 実際に使われることを想定したコンピュータ
 # =============================================================================
 
-class RainbowComputer(RainbowAgent):
+class RainbowComputer:
     def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow", to_gpu = False):
         use_gpu = to_gpu and gpu_enable
         qnet = RainbowNet(action_size, quantiles_num, use_gpu)
@@ -705,6 +705,17 @@ class RainbowComputer(RainbowAgent):
 
     def reset(self):
         pass
+
+    def __call__(self, board):
+        placable = board.list_placable()
+        if len(placable) == 1:
+            return placable[0]
+
+        with no_train():
+            state = board.get_img()
+            placable = board.list_placable()
+            action = self.qnet.get_actions(state[None, :], placable)
+            return action
 
 
 

@@ -120,26 +120,27 @@ class AlphaZeroLoss(Function):
 # =============================================================================
 
 class AlphaZeroAgent:
-    def __init__(self, action_size, seed = None, sampling_limits = 15, c_base = 19652, c_init = 1.25):
+    def __init__(self, action_size, arg = None, simulations = 800, seed = None):
         self.network = PolicyValueNet(action_size)
+        self.reset(arg)
+
+        # ハイパーパラメータ
+        self.simulations = simulations
+        self.sampling_limits = 15
+        self.c_puct = lambda T: (log(1 + (1 + T) / 19652) + 1.25) * sqrt(T)
 
         # 並列実行によって、同じ乱数の種を使わないようにするために、明示的にインスタンスを生成する
-        rand = Random(seed)
-        self.__choices = rand.choices
-        self.__choice = rand.choice
+        random = Random(seed)
+        self.__choices = random.choices
+        self.__choice = random.choice
 
         rng = np.random.default_rng(seed)
         self.__dirichlet = rng.dirichlet
 
-        # ハイパーパラメータ
-        self.sampling_limits = sampling_limits
-        self.c_puct = lambda T: (log(1 + (1 + T) / c_base) + c_init) * sqrt(T)
 
-
-    # 第１引数はパラメータが保存されたファイルの名前か、同じモデルのインスタンス
-    def reset(self, arg = None, simulations = 800):
+    # arg は、パラメータが保存されたファイルのインデックスか、同じモデルのインスタンス
+    def reset(self, arg):
         self.load(arg)
-        self.simulations = simulations
 
         # それぞれ、過去の探索割合を近似したある種の方策、過去の勝率も参考にした累計行動価値、各状態・行動の探索回数
         self.P = {}
@@ -395,14 +396,13 @@ class ReplayBuffer:
 # =============================================================================
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def play(seed, weights, simulations):
+def play(weights, simulations, seed):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size, seed)
-    agent.reset(weights, simulations)
+    agent = AlphaZeroAgent(board.action_size, weights, simulations, seed)
 
     # 実際に１ゲームプレイして、対局データを収集する
     memory = []
@@ -426,14 +426,13 @@ def play(seed, weights, simulations):
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def test(seed, weights, simulations, turn, enemy):
+def test(weights, simulations, seed, turn, enemy):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント (先攻・後攻で分けない)
-    agent = AlphaZeroAgent(board.action_size, seed)
-    agent.reset(weights, simulations)
+    agent = AlphaZeroAgent(board.action_size, weights, simulations, seed)
 
     # 方策の設定・１ゲーム勝負
     plans = (agent, enemy) if turn else (enemy, agent)
@@ -446,16 +445,14 @@ def test(seed, weights, simulations, turn, enemy):
 
 
 @ray.remote(num_cpus = 1, num_gpus = 0)
-def verify(seed1, seed0, weights1, weights0, couple):
+def verify(weights1, weights0, seed1, seed0, couple):
     # 環境
     board = Board()
     board.reset()
 
     # エージェント
-    agent1 = AlphaZeroAgent(board.action_size, seed1)
-    agent1.reset(weights1)
-    agent0 = AlphaZeroAgent(board.action_size, seed0)
-    agent0.reset(weights0)
+    agent1 = AlphaZeroAgent(board.action_size, arg = weights1, seed = seed1)
+    agent0 = AlphaZeroAgent(board.action_size, arg = weights0, seed = seed0)
 
     # 方策の設定・１ゲーム勝負
     board.set_plan(agent1, agent0)
@@ -564,7 +561,7 @@ class AlphaZero:
                     with no_train():
                         # まだ完遂していないタスクがリストの中に残るようになる
                         seeds = sample(population, episodes)
-                        remains = [play.remote(seed, weights, simulations) for seed in seeds]
+                        remains = [play.remote(weights, simulations, seed) for seed in seeds]
 
                         # タスクが１つ終了するたびに、経験データをバッファに格納するような同期処理
                         while remains:
@@ -673,7 +670,7 @@ class AlphaZero:
 
             for turn in (1, 0):
                 seeds = sample(population, N)
-                remains = [test.remote(seed, weights, simulations, turn, enemy) for seed in seeds]
+                remains = [test.remote(weights, simulations, seed, turn, enemy) for seed in seeds]
 
                 # タスクが１つ終了するたびに、勝利数を加算していくような同期処理
                 win_count = 0
@@ -711,24 +708,11 @@ def eval_alphazero_computer(index = None):
 
     # 対戦する相手の設定  (name, alias, instance)
     enemys = []
-
-    enemy = RainbowComputer(Board.action_size)
-    enemy.reset()
-    enemys.append(("Rainbow", "rain", enemy))
-
-    enemy = ReinforceComputer(Board.action_size)
-    enemy.reset()
-    enemys.append(("REINFORCE", "rein", enemy))
-
-    enemy = AlphaBeta()
-    enemys.append(("Alpha Beta", "ab", enemy))
-
-    enemy = MonteCarloTreeSearch()
-    enemy.reset()
-    enemys.append(("MCTS", "mcts", enemy))
-
-    enemy = PrimitiveMonteCarlo()
-    enemys.append(("MC Primitive", "mcp", enemy))
+    enemys.append(("Rainbow",  "rain",  RainbowComputer(Board.action_size)))
+    enemys.append(("REINFORCE",  "rein",  ReinforceComputer(Board.action_size)))
+    enemys.append(("Alpha Beta",  "ab",  AlphaBeta()))
+    enemys.append(("MCTS",  "mcts",  MonteCarloTreeSearch()))
+    enemys.append(("MC Primitive",  "mcp",  PrimitiveMonteCarlo()))
 
 
     # 棒グラフの設定
@@ -859,7 +843,7 @@ def comp_alphazero_computer():
                 WL, WM = weights_list[l], weights_list[m]
 
                 seeds = [choices(range(i, i + 1024), k = 2) for i in n_gen]
-                remains.extend([verify.remote(SL, SM, WL, WM, (l, m)) for SL, SM in seeds])
+                remains.extend([verify.remote(WL, WM, SL, SM, (l, m)) for SL, SM in seeds])
 
     # 並列実行を行う
     with tqdm(desc = "now evaluating", total = N * (N - 1) * M, leave = False) as pbar:

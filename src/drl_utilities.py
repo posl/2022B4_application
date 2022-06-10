@@ -382,8 +382,6 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
         for __ in range(len(enemys)):
             name, enemy = enemys.pop()
             print(f"vs. {name}")
-            if hasattr(enemy, "reset"):
-                enemy.reset()
 
             win_rates = arena.eval(enemy, valid_flag = True)
             print("| {} | ~ | {} % | {} % |".format(name, *win_rates), file = f)

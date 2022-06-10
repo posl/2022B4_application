@@ -174,6 +174,7 @@ class ReinforceComputer:
         self.action_size = action_size
         self.file_path = Reinforce.get_path(file_name).format("parameters")
         self.use_gpu = to_gpu and cuda.gpu_enable
+        self.reset()
 
     def reset(self):
         file_path = self.file_path
@@ -216,6 +217,7 @@ class ReinforceComputer:
                 policy = pi(state)[:, mask]
                 probs += softmax(policy).data[0]
 
+        # 複数人のエージェントが意見を出し合って、確率的サンプリングで行動を決める
         action = choices(placable, probs)[0]
         return action
 
