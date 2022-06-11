@@ -126,7 +126,7 @@ class GTValue:
 
 
 class AlphaBeta:
-	def __init__(self, select_place_func = 0, value = None):
+	def __init__(self, select_place_func = 0, depth = 6, value = None):
 		#評価関数を決定する.指定がない場合はdefault_dataを使用する
 		if value is None:
 			self.value = GTValue(select_place_func)
@@ -135,7 +135,7 @@ class AlphaBeta:
 
 		self.__min_value = -999
 		self.__max_value = 999
-		self.set_depth(6)
+		self.set_depth(depth)
 
 	def __call__(self, board : Board):
 		return self.get_next_move(board)

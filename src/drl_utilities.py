@@ -366,9 +366,9 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     arena = SelfMatch(board, computer)
 
     # 対戦相手
-    enemys.append(("Alpha Beta", AlphaBeta()))
-    enemys.append(("MCTS", MonteCarloTreeSearch()))
-    enemys.append(("Primitive MC", PrimitiveMonteCarlo()))
+    enemys.append(("Alpha Beta Lv.1", AlphaBeta(0, 5)))
+    enemys.append(("MCTS Lv.1", MonteCarloTreeSearch(1024)))
+    enemys.append(("MC Primitive Lv.1", PrimitiveMonteCarlo(256)))
     enemys.append(("Corners Plan", corners_plan))
     enemys.append(("Simple Plan", simple_plan))
 

@@ -54,7 +54,7 @@ class GTReinforce:
         sum_reward = 0
         for i in range(repeat_num):
             board.reset()
-            agent_alphabeta = AlphaBeta(self.place_func, self.agent.new_data)
+            agent_alphabeta = AlphaBeta(self.place_func, value = self.agent.new_data)
             agent_alphabeta.set_depth(self.depth)
             board.set_plan(self.player1, agent_alphabeta.get_next_move)
             board.game()
@@ -71,7 +71,7 @@ class GTReinforce:
             sum_reward += -reward
 
             board.reset()
-            agent_alphabeta = AlphaBeta(self.agent.new_data)
+            agent_alphabeta = AlphaBeta(value = self.agent.new_data)
             agent_alphabeta.set_depth(self.depth)
             board.set_plan(agent_alphabeta.get_next_move, self.player1)
             board.game()
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
 
     while 1:
-        tmp_gtr2_ab = AlphaBeta(place_func, gtr2.agent.data)
+        tmp_gtr2_ab = AlphaBeta(place_func, value = gtr2.agent.data)
         tmp_gtr2_ab.set_depth(6)
         gtr1.set_player1(tmp_gtr2_ab)
         print(gtr1.start(1))

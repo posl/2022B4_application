@@ -131,12 +131,12 @@ class PlayerKinds:
         self.kinds_name.append("原始MC法 + NegaAlpha")
         self.kinds_difficulty.append(4)
         self.kinds_class.append( NAPrimitiveMonteCarlo )
-        self.kinds_args.append( [ (1*256, 2), (4*256, 4), (16*256, 8), (32*256, 16) ] )
+        self.kinds_args.append( [ (1*256, 2), (4*256, 3), (16*256, 5), (32*256, 8) ] )
 
         self.kinds_name.append("AlphaBeta")
-        self.kinds_difficulty.append(2)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaBeta )
-        self.kinds_args.append( [ (0, ), (1, ) ] )
+        self.kinds_args.append( [ (0, 5), (0, 6), (1, 6) ] )
 
         self.kinds_name.append("Reinforce")
         self.kinds_difficulty.append(1)
