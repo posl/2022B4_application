@@ -39,49 +39,6 @@ class Human:
     def __call__(self, board):
         return self.player(board)
 
-    def cheat_player(self, board):
-        t = board.turn
-        n = 0
-        while True:
-            self.par.mainloop()
-            n = board.click_attr
-            board.click_attr = None
-            break
-        if t==1:
-            if ((board.stone_white>>n) & 1):
-                board.stone_white = board.stone_white ^ (1<<n)
-            board.stone_black = board.stone_black ^ (1<<n)
-        else:
-            if ((board.stone_black>>n) & 1):
-                board.stone_black = board.stone_black ^ (1<<n)
-            board.stone_white = board.stone_white ^ (1<<n)
-        if ((board.stone_black>>n) & 1) & ((board.stone_white>>n) & 1):
-            board.stone_black = board.stone_black ^ (1<<n)
-            board.stone_white = board.stone_white ^ (1<<n)
-        return self.player(board)
-
-    #本来はここに書くべきではなかろうが暫定的に
-    def com_random(self, board):
-        return choice(board.list_placable())
-
-    def com_cheater1(self, board):
-        t = board.turn
-        bplace = board.black_positions
-        wplace = board.white_positions
-        ret = choice(board.list_placable())
-        if len(bplace)+len(wplace)>4:
-            if t==1:
-                p = choice(wplace)
-                if p!=ret:
-                    board.stone_white = board.stone_white ^ (1<<p)
-                    board.stone_black = board.stone_black ^ (1<<p)
-            else:
-                p = choice(bplace)
-                if p!=ret:
-                    board.stone_black = board.stone_black ^ (1<<p)
-                    board.stone_white = board.stone_white ^ (1<<p)
-        return ret
-
 
 class ComRand:
     def __call__(self, board):
