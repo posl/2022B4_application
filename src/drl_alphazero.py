@@ -890,12 +890,9 @@ def comp_alphazero_computer():
 
     # コンピュータそれぞれの学習の進捗率を示す列を追加
     for i in range(1, HW):
-        progress = 10 * i
-        x = 0.1 if progress == 100 else 0.2
-        progress = f"{progress} %"
-
-        ax.text(x, (N - i) + 0.4, progress, size = "small")
-        ax.text(x + i, N + 0.4, progress, size = "small")
+        progress = "{} %".format(10 * i)
+        ax.text(0.5, (N - i) + 0.35, progress, ha = "center", size = "small")
+        ax.text(i + 0.5, N + 0.35, progress, ha = "center", size = "small")
 
 
     # 自己対戦の結果を表に反映させる
@@ -921,7 +918,7 @@ def comp_alphazero_computer():
     # 結果を分かりやすくするための下線を描画
     for diff, lines in lines_dict.items():
         if lines:
-            S = max(0.8 - abs(diff) / M, 0)
+            S = max(0.9 - abs(diff) / M, 0)
             RGBA = (1., S, S, 0.8) if diff > 0 else (S, S, 1., 0.8)
             ax.add_collection(collections.LineCollection(lines, color = RGBA))
 

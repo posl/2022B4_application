@@ -108,7 +108,7 @@ class PlayerKinds:
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (64, randrange(10), 50), (64, randrange(5, 10), 200), (64, ) ] )
+        self.kinds_args.append( [ (64, randrange(5), 50), (64, randrange(5, 10), 200), (64, ) ] )
 
 
     def get_agent(self, id, diff):
