@@ -319,7 +319,9 @@ class SelfMatch:
             win_count = 0
             for __ in n_gen:
                 if valid_flag:
-                    agent.reset()
+                    for player in plans:
+                        if hasattr(player, "reset"):
+                            player.reset()
 
                 board.reset()
                 board.game()
@@ -366,7 +368,7 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     arena = SelfMatch(board, computer)
 
     # 対戦相手
-    enemys.append(("Alpha Beta Lv.1", AlphaBeta(0, 5)))
+    enemys.append(("Alpha Beta Lv.1", AlphaBeta(depth = 5)))
     enemys.append(("MCTS Lv.1", MonteCarloTreeSearch(1024)))
     enemys.append(("MC Primitive Lv.1", PrimitiveMonteCarlo(256)))
     enemys.append(("Corners Plan", corners_plan))

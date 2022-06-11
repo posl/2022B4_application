@@ -703,9 +703,6 @@ class RainbowComputer:
         if use_gpu:
             qnet.to_gpu()
 
-    def reset(self):
-        pass
-
     def __call__(self, board):
         placable = board.list_placable()
         if len(placable) == 1:

@@ -142,7 +142,6 @@ class AlphaBeta:
 
 	def reset(self, select_value = 0):
 		self.value = GTValue(select_value)
-		self.set_depth(6)
 
 	def set_depth(self, depth):
 		self.__max_depth = depth
