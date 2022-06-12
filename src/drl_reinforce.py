@@ -224,9 +224,15 @@ class ReinforceComputer:
 
 
 
-if __name__ == "__main__":
+def main():
     # 学習用コード
     # fit_reinforce_agent(restart = True)
 
     # 評価用コード
-    eval_computer(ReinforceComputer, "REINFORCE")
+    from drl_rainbow import RainbowComputer
+    enemys = [("Rainbow Lv.1", RainbowComputer(Board.action_size))]
+    eval_computer(ReinforceComputer, "REINFORCE", enemys)
+
+
+if __name__ == "__main__":
+    main()

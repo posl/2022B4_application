@@ -1,6 +1,7 @@
 from random import random, choice
 from os.path import join, dirname
 from time import time
+import os
 from datetime import timedelta, timezone, datetime
 
 import numpy as np
@@ -358,6 +359,11 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     file_path = SelfMatch.get_path(f"{name}.md").format("graphs")
     make_dir_exist(file_path)
 
+    # ファイルの作成時刻で改竄していないことを証明できるように、元々あったファイルは削除する
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+
     # 環境
     board = Board()
 
@@ -374,9 +380,14 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     enemys.append(("Corners Plan", corners_plan))
     enemys.append(("Simple Plan", simple_plan))
 
+
+    # タイムスタンプ用
+    JST = timezone(timedelta(hours = 9))
+    now = datetime.now(tz = JST)
+
     # 評価結果はマークダウンの表形式でファイルに出力する
-    with open(file_path, "a+") as f:
-        print(f"# {com_name}", file = f)
+    with open(file_path, "w+") as f:
+        print(f"# {com_name} Lv.1", file = f)
         print("| Opponent | ~ | Black | White |", file = f)
         print("| :-: | -: | :-: | :-: |", file = f)
 
@@ -393,8 +404,5 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
             print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
             start = finish
 
-        # タイムスタンプの追加
-        JST = timezone(timedelta(hours = 9))
-        now = datetime.now(tz = JST)
+        # ファイル作成時刻をタイムスタンプとして書き込む (改竄防止の為)
         print("- " + now.strftime("%Y / %m / %d / %H: %M: %S"), file = f)
-        print("<br>\n<br>\n", file = f)

@@ -708,11 +708,11 @@ def eval_alphazero_computer(index = None):
 
     # 対戦する相手の設定  (name, alias, instance)
     enemys = []
-    enemys.append(("Rainbow",  "rain",  RainbowComputer(Board.action_size)))
     enemys.append(("REINFORCE",  "rein",  ReinforceComputer(Board.action_size)))
-    enemys.append(("Alpha Beta",  "ab",  AlphaBeta()))
+    enemys.append(("Rainbow",  "rain",  RainbowComputer(Board.action_size)))
     enemys.append(("MCTS",  "mcts",  MonteCarloTreeSearch()))
     enemys.append(("MC Primitive",  "mcp",  PrimitiveMonteCarlo()))
+    enemys.append(("Alpha Beta",  "ab",  AlphaBeta()))
 
 
     # 棒グラフの設定
@@ -827,7 +827,7 @@ def comp_alphazero_computer():
 
 
     # 先攻・後攻入れ替えて M 回ずつ、自己対戦を行う
-    print("\n\033[92m>>Evaluatation by self match\033[0m")
+    print("\n\033[92m>> Evaluatation by self match\033[0m")
     start = time()
 
     M = 25
