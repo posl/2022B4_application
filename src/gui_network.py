@@ -230,3 +230,14 @@ class OthelloServer:
                 s = "PUT " + str(place)
                 self.server.send(i, s )
                 break
+
+
+
+
+def main():
+    server = OthelloServer()
+    server.mainloop()
+
+
+if __name__ == "__main__":
+    main()

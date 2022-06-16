@@ -887,7 +887,10 @@ class DisplayBoard:
 
 
 
-if __name__ == "__main__":
-    ip = input("サーバーのIPを入力してください-ない場合は0に\n")
+def main(ip = "0"):
     displayboard = DisplayBoard(ip)
     displayboard.play()
+
+
+if __name__ == "__main__":
+    main()

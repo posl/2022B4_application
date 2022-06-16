@@ -9,18 +9,15 @@ parser.add_argument("--ip", default = "0", help = "通信用にサーバを立�
 args = parser.parse_args()
 
 
-
 if args.console:
-    from board import Board
-    board = Board()
-    board.main()
-
+    from board import main
 elif args.host:
-    from gui_network import OthelloServer
-    server = OthelloServer()
-    server.mainloop()
-
+    from gui_network import main
 else:
-    from gui_display import DisplayBoard
-    displayboard = DisplayBoard(args.ip)
-    displayboard.play()
+    from gui_display import main
+
+
+try:
+    main(args.ip)
+except TypeError:
+    main()
