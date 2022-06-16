@@ -192,6 +192,7 @@ def get_absolute_action(board, limit_time = 1):
     # 必勝が見えたら、そこに手を打つ
     if (count_stand_bits(board.stone_black | board.stone_white)) >= 40:
         action = nega_alpha(*board.players_board, limit_time)
+        print(f"checkmate: {action}, turn: {board.turn}")
         if action in placable:
             return action
 

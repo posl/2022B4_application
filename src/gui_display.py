@@ -10,8 +10,8 @@ import pygame
 from mc_tree_search import MonteCarloTreeSearch, RootPalallelMonteCarloTreeSearch
 from mc_primitive import PrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
-from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
+from drl_rainbow import RainbowComputer
 from drl_alphazero import AlphaZeroComputer, PolicyValueNet
 
 from gui_network import NetrorkPlayer
@@ -854,7 +854,10 @@ class DisplayBoard:
         while True:
             main_window.change_page(0)
             main_window.mainloop()
+
+            print("\n*********************\n")
             self.__play()
+
             main_window.game_page.result_view()
             main_window.mainloop()
 
