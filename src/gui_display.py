@@ -1,7 +1,6 @@
 import os
 import tkinter as tk
 import tkinter.ttk as ttk
-import math
 from random import choice, randrange
 
 # pygame のウェルカムメッセージを表示させないための設定
@@ -345,13 +344,16 @@ class GamePage(Page):
         self.alphazero_model.load_weights(AlphaZeroComputer.get_trained_path(8))
 
 
-    def canvas_update(self, flag=None, n=999):
-        self.stone_counter_update()
+    def canvas_update(self, flag, n):
+        self.__canvas_update(n)
+        return self.stone_counter_update()
+
+    def __canvas_update(self, n=999):
         if self.game_canvas_state==0:
             self.render_current_board()
             self.game_canvas_state = 1
             self.game_canvas_lock = True
-            self.par.after(50//self.time_len_coef, self.canvas_update)
+            self.par.after(50//self.time_len_coef, self.__canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==1:
             self.render_placeable()
@@ -361,20 +363,21 @@ class GamePage(Page):
             self.render_reverse(n, 0)
             self.game_canvas_state = 3
             self.game_canvas_lock = True
-            self.par.after(400//self.time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.__canvas_update)
             self.par.mainloop()
         elif self.game_canvas_state==3:
             self.render_reverse(n, 1)
             self.game_canvas_state = 4
-            self.par.after(400//self.time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.__canvas_update)
         elif self.game_canvas_state==4:
             self.render_reverse(n, 2)
             self.game_canvas_state = 5
-            self.par.after(400//self.time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.__canvas_update)
         elif self.game_canvas_state==5:
             self.render_current_board()
             self.game_canvas_state = 1
-            self.par.after(400//self.time_len_coef, self.canvas_update)
+            self.par.after(400//self.time_len_coef, self.__canvas_update)
+
 
     def canvas_quit(self):
         self.game_canvas_lock = False
@@ -424,7 +427,6 @@ class GamePage(Page):
             for i in r_list:
                 i_y, i_x = self.board.n2t(i)
                 self.stone_gray_draw(i_x, i_y)
-            #self.par.after(500, self.render_reverse, False)
         elif flg==2:
             self.par.sounds.play(3)
             for i in r_list:
@@ -433,8 +435,6 @@ class GamePage(Page):
                     self.stone_black_draw(i_x, i_y)
                 if i in wplace:
                     self.stone_white_draw(i_x, i_y)
-                #self.stone_gray_draw(i_x, i_y)
-                #self.par.after(500, self.canvas_update, False)
         return
 
 
@@ -489,14 +489,17 @@ class GamePage(Page):
 
 
     def stone_counter_update(self):
-        bnum, wnum = self.get_stone_nums()
-        brate = self.get_rate
+        board = self.board
+        bnum, wnum = board.black_num, board.white_num
 
         self.black_conter_label.configure(text=format(bnum, "02d") )
         self.white_conter_label.configure(text=format(wnum, "02d") )
 
+        alphazero_brate = self.get_alphazero_rate()
+        brate = alphazero_brate if self.use_alphazero else bnum / (bnum + wnum)
+
         self.counter_bar.delete("all")
-        bw_bounder_x = int((self.canvas_width+10) * (math.tanh( (bnum/(bnum+wnum+0.1)-0.5)*3 )+1) / 2  )
+        bw_bounder_x = int((self.canvas_width + 10) * brate)
         self.counter_bar.create_rectangle(0, 0, self.canvas_width+10, 100, fill = "#22FF77")
         self.counter_bar.create_rectangle(0, 0, bw_bounder_x, 100, fill = "#000000", outline="#000000")
         for i in range(60):
@@ -508,13 +511,10 @@ class GamePage(Page):
             s = format((0xEE-60*1)+i*1, "02X" )
             s = "#" + s + s + s
             self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
-        return
 
-    def get_stone_nums(self):
-        board = self.board
-        return board.black_num, self.white_num
+        return alphazero_brate
 
-    def get_alphazero_rates(self):
+    def get_alphazero_rate(self):
         board = self.board
         turn = board.turn
 
@@ -522,8 +522,7 @@ class GamePage(Page):
         value = self.alphazero_model(board_img[None, :])
         rate = (value + 1.) / 2.
 
-        rates = rate, (1. - rate)
-        return rates if turn else rates[::-1]
+        return rate if turn else (1. - rate)
 
 
     def cell_click(self, event):
@@ -819,9 +818,9 @@ class DisplayBoard:
 
     # 画面描画用メソッド
     def render(self, mask = 0, flag = None, n = 999):
-        self.board.add_playlog()
         self.board.reversed = mask
-        self.main_window.game_page.canvas_update(flag, n)
+        brate = self.main_window.game_page.canvas_update(flag, n)
+        self.board.add_playlog(brate)
 
 
 

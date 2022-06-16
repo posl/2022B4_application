@@ -112,6 +112,7 @@ class Board:
         self.click_attr = None
         self.reversed = 0
         self.log_list = []
+        self.brate_list = []
 
 
     @property
@@ -136,11 +137,13 @@ class Board:
         self.set_state(self.log_stack.pop())
 
 
-    def add_playlog(self):
+    def add_playlog(self, brate):
         self.log_list.append(self.state)
+        self.brate_list.append(brate)
 
     def clear_playlog(self):
         self.log_list.clear()
+        self.brate_list.clear()
 
 
     # オセロ盤の状態を画像データとして取得する (形状は (2, height, width))
