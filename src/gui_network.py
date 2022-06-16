@@ -67,8 +67,6 @@ class NetrorkPlayer():
     put_place = 0
 
     def __init__(self):
-        print(self.reset_fin)
-        print("NETWORK PLAYER INIT")
         self.reset()
 
     def reset(self):

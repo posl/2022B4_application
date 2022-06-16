@@ -854,10 +854,7 @@ class DisplayBoard:
         while True:
             main_window.change_page(0)
             main_window.mainloop()
-
-            print("\n*********************\n")
             self.__play()
-
             main_window.game_page.result_view()
             main_window.mainloop()
 
