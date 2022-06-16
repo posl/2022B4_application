@@ -188,6 +188,7 @@ class OptionPage(Page):
 
         self.combo_menus = ["---"]
         self.combo_menus2 = ("x1", "x2", "x3", "x4")
+        self.combo_menus3 = ("石の数", "α０の評価値")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999", font = (self.font_name, 30))
         self.label1.place(x=10, y=30)
@@ -219,6 +220,10 @@ class OptionPage(Page):
         self.combobox5 = ttk.Combobox(self, height=4, font = (self.font_name, 30), values = self.combo_menus2, state="readonly")
         self.combobox5.place(x=200, y=370 )
         self.combobox5.current(0)
+
+        self.combobox6 = ttk.Combobox(self, height=2, font = (self.font_name, 30), values = self.combo_menus3, state="readonly")
+        self.combobox6.place(x=200, y=540 )
+        self.combobox6.current(0)
 
         self.button1 = tk.Button(self, text="Next", font = (self.font_name, 100), command=lambda:self.start_game())
         self.button1.place(x=900, y=2*350)
@@ -284,6 +289,9 @@ class OptionPage(Page):
         name1 = self.player_kinds.get_name(player1_id)
         name2 = self.player_kinds.get_name(player2_id)
         self.par.title(name1 + "Lv." + str(player1_diff+1) + "(黒) vs " + name2  + "Lv." + str(player2_diff+1) + "(白)")
+
+        value_kind = self.combobox6.current()
+        self.par.game_page.value_kind = value_kind
         return
 
     def start_game(self):
@@ -316,6 +324,7 @@ class GamePage(Page):
         self.game_canvas_state = 0
         self.game_canvas_lock = False
         self.time_len_coef = 1
+        self.value_kind = 0 # 評価値の種類 0:石の数 1:AlphaZero
 
         self.counter_bar = tk.Canvas(self, width=self.canvas_width, height=60)
         self.counter_bar.place(x=200, y=5)
