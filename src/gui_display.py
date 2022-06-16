@@ -110,6 +110,9 @@ class PlayerKinds:
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
         self.kinds_args.append( [ (A, randrange(5), 50), (A, randrange(5, 10), 200), (A, 8) ] )
+    
+    def get_lvnum(self, id):
+        return len(self.kinds_args[id])
 
 
     def get_agent(self, id, diff):
@@ -198,6 +201,9 @@ class OptionPage(Page):
 
         self.label3 = tk.Label(self, text="表示速度", fg="#999999", font = (self.font_name, 30))
         self.label3.place(x=10, y=370)
+
+        self.label4 = tk.Label(self, text="評価方法", fg="#999999", font = (self.font_name, 30))
+        self.label4.place(x=10, y=540)
 
         self.combobox3 = ttk.Combobox(self, height=4, font = (self.font_name, 30), values = self.combo_menus, state="readonly")
         self.combobox3.place(x=630, y=30 )
@@ -288,7 +294,14 @@ class OptionPage(Page):
 
         name1 = self.player_kinds.get_name(player1_id)
         name2 = self.player_kinds.get_name(player2_id)
-        self.par.title(name1 + "Lv." + str(player1_diff+1) + "(黒) vs " + name2  + "Lv." + str(player2_diff+1) + "(白)")
+        s = name1
+        if self.player_kinds.get_lvnum(player1_id)>1:
+            s += str("Lv." + str(player1_diff+1))
+        s += "(黒)    vs    " + name2
+        if self.player_kinds.get_lvnum(player2_id)>1:
+            s += str("Lv." + str(player2_diff+1))
+        s += "(白)"
+        self.par.title(s)
 
         value_kind = self.combobox6.current()
         self.par.game_page.value_kind = value_kind
