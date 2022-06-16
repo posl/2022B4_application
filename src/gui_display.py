@@ -13,7 +13,7 @@ from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
-from drl_alphazero import AlphaZeroComputer
+from drl_alphazero import AlphaZeroComputer, PolicyValueNet
 
 from gui_network import NetrorkPlayer
 from board import Board
@@ -95,20 +95,22 @@ class PlayerKinds:
         self.kinds_class.append( AlphaBeta )
         self.kinds_args.append( [ (0, 5), (0, 6), (1, 6) ] )
 
+        A = Board.action_size
+
         self.kinds_name.append("Reinforce")
         self.kinds_difficulty.append(1)
         self.kinds_class.append( ReinforceComputer )
-        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_args.append( [ (A, ) ] )
 
         self.kinds_name.append("RainBow")
         self.kinds_difficulty.append(1)
         self.kinds_class.append( RainbowComputer )
-        self.kinds_args.append( [ (64, ) ] )
+        self.kinds_args.append( [ (A, ) ] )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (64, randrange(5), 50), (64, randrange(5, 10), 200), (64, ) ] )
+        self.kinds_args.append( [ (A, randrange(5), 50), (A, randrange(5, 10), 200), (A, 8) ] )
 
 
     def get_agent(self, id, diff):
@@ -347,6 +349,11 @@ class GamePage(Page):
         self.button3 = tk.Button(self, text="X", font = (self.font_name, 50), command=lambda:self.goto_start_page())
         self.button3.place(x=3000, y=600)
 
+        # アルファゼロのモデルで近似した勝率を使うための属性
+        self.alphazero_model = PolicyValueNet(Board.action_size)
+        self.alphazero_model.load_weights(AlphaZeroComputer.get_trained_path(8))
+
+
     def canvas_update(self, flag=None, n=999):
         self.stone_counter_update()
         if self.game_canvas_state==0:
@@ -491,8 +498,8 @@ class GamePage(Page):
 
 
     def stone_counter_update(self):
-        bnum = self.board.black_num
-        wnum = self.board.white_num
+        bnum, wnum = self.get_stone_nums()
+        brate = self.get_rate
 
         self.black_conter_label.configure(text=format(bnum, "02d") )
         self.white_conter_label.configure(text=format(wnum, "02d") )
@@ -511,6 +518,21 @@ class GamePage(Page):
             s = "#" + s + s + s
             self.counter_bar.create_rectangle(bw_bounder_x, i, self.canvas_width+10, 1+i, fill = s, outline=s)
         return
+
+    def get_stone_nums(self):
+        board = self.board
+        return board.black_num, self.white_num
+
+    def get_alphazero_rates(self):
+        board = self.board
+        turn = board.turn
+
+        board_img = board.get_img()
+        value = self.alphazero_model(board_img[None, :])
+        rate = (value + 1.) / 2.
+
+        rates = rate, (1. - rate)
+        return rates if turn else rates[::-1]
 
 
     def cell_click(self, event):
@@ -610,7 +632,7 @@ class ResultPage(Page):
 
     def graph_draw(self):
         self.cur = 0
-        states = self.board.log_list
+        states, brates = self.board.log_list, self.board.brate_list
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
