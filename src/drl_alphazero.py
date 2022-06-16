@@ -15,11 +15,11 @@ try:
 except ImportError:
     pass
 
-from inada_framework import Model, Function, no_train
+from inada_framework import Model, no_train, Function
 from drl_utilities import ResNet50, SelfMatch, preprocess_to_gpu
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, tanh
-from inada_framework.cuda import get_array_module, gpu_enable, as_cupy
+from inada_framework.cuda import as_numpy, get_array_module, gpu_enable, as_cupy
 from board import Board
 from inada_framework.optimizers import Adam, WeightDecay
 from inada_framework.utilities import make_dir_exist
@@ -58,6 +58,14 @@ class PolicyValueNet(Model):
         score = self.fc_p(flatten(relu(self.bn_p(self.conv_p(x)))))
         value = self.fc_v(flatten(relu(self.bn_v(self.conv_v(x)))))
         return score, tanh(value)
+
+    def get_rate(self, x):
+        with no_train():
+            x = self.cnn(x)
+            value = self.fc_v(flatten(relu(self.bn_v(self.conv_v(x)))))
+
+        value = as_numpy(value)
+        return float(np.tanh(value[0, 0]))
 
 
 def softmax(score, xp = np):
