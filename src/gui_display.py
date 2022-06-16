@@ -188,7 +188,7 @@ class OptionPage(Page):
 
         self.combo_menus = ["---"]
         self.combo_menus2 = ("x1", "x2", "x3", "x4")
-        self.combo_menus3 = ("石の数", "α０の評価値")
+        self.combo_menus3 = ("石の数", "AlphaZero の勝率")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999", font = (self.font_name, 30))
         self.label1.place(x=10, y=30)
