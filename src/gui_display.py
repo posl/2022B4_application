@@ -1,4 +1,5 @@
 import os
+from time import sleep
 import tkinter as tk
 import tkinter.ttk as ttk
 from random import choice, randrange
@@ -367,8 +368,24 @@ class GamePage(Page):
 
 
     def canvas_update(self, flag, n):
-        if flag == 2:
-            pass
+        pass_objects = []
+        if flag == 2: # PASSが発生した場合
+            pass_objects.append(self.game_canvas.create_rectangle(
+                0, 0, self.canvas_width+10, self.canvas_height+10, 
+                fill = "#FF0000"
+                ))
+            pass_objects.append(self.game_canvas.create_text(
+                (self.canvas_width//2-50), (self.canvas_height//2-50), 
+                justify="center", 
+                font=(self.font_name, 100), 
+                fill="#0000FF", 
+                text="PASS",
+                
+                ))
+            self.par.after(2000//self.time_len_coef, self.canvas_quit)
+            self.par.mainloop()
+        for x in pass_objects:
+            self.game_canvas.delete(x)
         self.__canvas_update(n)
         return self.stone_counter_update()
 
