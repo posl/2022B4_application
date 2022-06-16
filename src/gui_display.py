@@ -365,8 +365,8 @@ class GamePage(Page):
 
 
     def canvas_update(self, flag, n):
-        self.__canvas_update(n)
         brate = self.stone_counter_update()
+        self.__canvas_update(n)
         self.render_pass(flag)
         return brate
 
@@ -562,7 +562,7 @@ class GamePage(Page):
                 fill="#0000FF",
                 text="PASS",
                 ))
-            self.par.after(2000//self.time_len_coef, self.canvas_quit)
+            self.par.after(700, self.canvas_quit)
             self.par.mainloop()
         for x in pass_objects:
             self.game_canvas.delete(x)

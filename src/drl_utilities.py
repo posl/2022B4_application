@@ -190,8 +190,9 @@ def get_absolute_action(board, limit_time = 1):
         return placable[0]
 
     # 必勝が見えたら、そこに手を打つ
-    if (count_stand_bits(board.stone_black | board.stone_white)) >= 40:
-        action = nega_alpha(*board.players_board, limit_time)
+    move_player, opposition_player = board.players_board
+    if (count_stand_bits(move_player | opposition_player)) >= 40:
+        action = nega_alpha(move_player, opposition_player, limit_time)
         if action in placable:
             return action
 
