@@ -188,7 +188,7 @@ class OptionPage(Page):
 
         self.combo_menus = ["---"]
         self.combo_menus2 = ("x1", "x2", "x3", "x4")
-        self.combo_menus3 = ("石の数", "AlphaZero の勝率")
+        self.combo_menus3 = ("石の数", "α０の評価値")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999", font = (self.font_name, 30))
         self.label1.place(x=10, y=30)
@@ -645,11 +645,11 @@ class ResultPage(Page):
         for i in range(num):
             n_ = 0
             m_ = 0.0
-            for j in range(4):
-                if (i-j)<0:
+            for j in range(12):
+                if (i+j)>=num:
                     break
                 n_ += 1
-                m_ += brates_[i-j]
+                m_ += brates_[i+j]
             brates.append(m_/n_)
         for i in range(num):
             state = states[i]
