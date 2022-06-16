@@ -12,7 +12,7 @@ import numpy as np
 from inada_framework import Layer, Parameter, Model, Function, optimizers, no_train
 from inada_framework.cuda import get_array_module, as_cupy, as_numpy, gpu_enable
 from inada_framework.functions import affine, relu, flatten, broadcast_to, sum_to
-from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, eval_computer
+from drl_utilities import ResNet50, preprocess_to_gpu, SelfMatch, get_absolute_action, eval_computer
 from inada_framework.utilities import make_dir_exist, reshape_for_broadcast
 from board import Board
 
@@ -693,26 +693,22 @@ def fit_rainbow_agent(episodes = 150000, restart = False):
 # =============================================================================
 
 class RainbowComputer:
-    def __init__(self, action_size, quantiles_num = 50, file_name = "rainbow", to_gpu = False):
-        use_gpu = to_gpu and gpu_enable
-        qnet = RainbowNet(action_size, quantiles_num, use_gpu)
-        self.qnet = qnet
-
+    def __init__(self, action_size, limit_time = 5, quantiles_num = 50, file_name = "rainbow"):
+        self.limit_time = limit_time
         file_path = Rainbow.get_path(f"{file_name}.npz").format("parameters")
-        qnet.load_weights(file_path)
-        if use_gpu:
-            qnet.to_gpu()
+
+        self.qnet = RainbowNet(action_size, quantiles_num)
+        self.qnet.load_weights(file_path)
 
     def __call__(self, board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
+        action = get_absolute_action(board, self.limit_time)
+        if isinstance(action, list):
+            placable = action
 
-        with no_train():
-            state = board.get_img()
-            placable = board.list_placable()
-            action = self.qnet.get_actions(state[None, :], placable)
-            return action
+            with no_train():
+                state = board.get_img()
+                action = self.qnet.get_actions(state[None, :], placable)
+        return action
 
 
 

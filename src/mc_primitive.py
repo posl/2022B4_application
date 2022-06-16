@@ -1,7 +1,7 @@
 from random import choice
 
 from board import Board
-from pyx.speedup import nega_alpha, count_stand_bits
+
 
 
 class PrimitiveMonteCarlo:
@@ -71,43 +71,3 @@ class PrimitiveMonteCarlo:
         move = placable[choice(max_index)]
         # print("put : ", move)
         return move
-
-class NAPrimitiveMonteCarlo(PrimitiveMonteCarlo):
-    def __init__(self, max_try = 6400, limit_time = 10):
-        self.max_try = max_try
-        self.limit_time = limit_time
-
-    def __call__(self, board : Board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
-
-        if count_stand_bits(board.stone_black | board.stone_white) > 44:
-            move = nega_alpha(*board.players_board, self.limit_time)
-            if move in placable:
-                print(move, "checkmate")
-                return move
-
-        return self.primitive_monte_carlo(board)
-
-
-if __name__ == "__main__":
-    def player(board : Board):
-        while 1:
-            try:
-                n = int(input("enter n : "))
-                if n in board.list_placable():
-                    return n
-            except:
-                print("error")
-                continue
-
-
-    pMC = PrimitiveMonteCarlo()
-    abpmc = NAPrimitiveMonteCarlo()
-    board = Board()
-    board.debug_game(abpmc, pMC)
-
-    print("game set")
-    print("black:", board.black_num)
-    print("white:", board.white_num)

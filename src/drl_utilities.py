@@ -21,6 +21,8 @@ from mc_primitive import PrimitiveMonteCarlo
 from mc_tree_search import MonteCarloTreeSearch
 from gt_alpha_beta import AlphaBeta
 
+from pyx.speedup import nega_alpha
+
 
 
 # =============================================================================
@@ -174,6 +176,26 @@ def corners_plan(board):
 
     # そうでなければ、30 % の確率でランダムな合法手を打ち、70 % の確率で取れる石の数が最大の合法手を打つ
     return simple_plan(board, placable)
+
+
+
+
+# =============================================================================
+# nega alpha 対応の行動選択に使う
+# =============================================================================
+
+def get_absolute_action(board, limit_time = 5):
+    placable = board.list_placable()
+    if len(placable) == 1:
+        return placable[0]
+
+    # 必勝が見えたら、そこに手を打つ
+    action = nega_alpha(*board.players_board, limit_time)
+    if action in placable:
+        return action
+
+    # 手が求まらなかった場合は、合法手のリストを返す
+    return placable
 
 
 

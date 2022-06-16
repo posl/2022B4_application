@@ -1,5 +1,4 @@
 import os
-from time import sleep
 import tkinter as tk
 import tkinter.ttk as ttk
 from random import choice, randrange
@@ -9,7 +8,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
 from mc_tree_search import MonteCarloTreeSearch, RootPalallelMonteCarloTreeSearch
-from mc_primitive import PrimitiveMonteCarlo, NAPrimitiveMonteCarlo
+from mc_primitive import PrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
@@ -71,24 +70,19 @@ class PlayerKinds:
         self.kinds_args.append( [ () ] )
 
         self.kinds_name.append("MC木探索")
-        self.kinds_difficulty.append(4)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( MonteCarloTreeSearch )
-        self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, ), (64*1024, ) ] )
+        self.kinds_args.append( [ (1*1024, ), (4*1024, ), (16*1024, )] )
 
         self.kinds_name.append("MC木探索 + ルート並列化")
-        self.kinds_difficulty.append(2)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( RootPalallelMonteCarloTreeSearch )
-        self.kinds_args.append( [ (30000, ), (50000, ) ] )
+        self.kinds_args.append( [ (5000, ), (10000, ), [20000, ] ] )
 
         self.kinds_name.append("原始MC法")
-        self.kinds_difficulty.append(4)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( PrimitiveMonteCarlo )
-        self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, ), (64*256, ) ] )
-
-        self.kinds_name.append("原始MC法 + NegaAlpha")
-        self.kinds_difficulty.append(4)
-        self.kinds_class.append( NAPrimitiveMonteCarlo )
-        self.kinds_args.append( [ (1*256, 2), (4*256, 3), (16*256, 5), (32*256, 8) ] )
+        self.kinds_args.append( [ (1*256, ), (4*256, ), (16*256, )] )
 
         self.kinds_name.append("AlphaBeta")
         self.kinds_difficulty.append(3)
@@ -98,20 +92,20 @@ class PlayerKinds:
         A = Board.action_size
 
         self.kinds_name.append("Reinforce")
-        self.kinds_difficulty.append(1)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( ReinforceComputer )
-        self.kinds_args.append( [ (A, ) ] )
+        self.kinds_args.append( [ (A, 0.5), (A, 2), (A, 5) ] )
 
         self.kinds_name.append("RainBow")
-        self.kinds_difficulty.append(1)
+        self.kinds_difficulty.append(3)
         self.kinds_class.append( RainbowComputer )
-        self.kinds_args.append( [ (A, ) ] )
+        self.kinds_args.append( [ (A, 0.5), (A, 2), (A, 5) ] )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
         self.kinds_args.append( [ (A, randrange(5), 50), (A, randrange(5, 10), 200), (A, 8) ] )
-    
+
     def get_lvnum(self, id):
         return len(self.kinds_args[id])
 
@@ -297,10 +291,10 @@ class OptionPage(Page):
         name2 = self.player_kinds.get_name(player2_id)
         s = name1
         if self.player_kinds.get_lvnum(player1_id)>1:
-            s += str("Lv." + str(player1_diff+1))
+            s += str(" Lv." + str(player1_diff+1))
         s += "(黒)    vs    " + name2
         if self.player_kinds.get_lvnum(player2_id)>1:
-            s += str("Lv." + str(player2_diff+1))
+            s += str(" Lv." + str(player2_diff+1))
         s += "(白)"
         self.par.title(s)
 
@@ -368,25 +362,10 @@ class GamePage(Page):
 
 
     def canvas_update(self, flag, n):
-        pass_objects = []
-        if flag == 2: # PASSが発生した場合
-            pass_objects.append(self.game_canvas.create_rectangle(
-                0, 0, self.canvas_width+10, self.canvas_height+10, 
-                fill = "#FFFFFF"
-                ))
-            pass_objects.append(self.game_canvas.create_text(
-                (self.canvas_width//2), (self.canvas_height//2), 
-                anchor="center", 
-                font=(self.font_name, 100), 
-                fill="#0000FF", 
-                text="PASS",
-                ))
-            self.par.after(2000//self.time_len_coef, self.canvas_quit)
-            self.par.mainloop()
-        for x in pass_objects:
-            self.game_canvas.delete(x)
         self.__canvas_update(n)
-        return self.stone_counter_update()
+        brate = self.stone_counter_update()
+        self.render_pass(flag)
+        return brate
 
     def __canvas_update(self, n=999):
         if self.game_canvas_state==0:
@@ -563,6 +542,27 @@ class GamePage(Page):
         rate = (value + 1.) / 2.
 
         return rate if turn else (1. - rate)
+
+
+    def render_pass(self, flag):
+        pass_objects = []
+        if flag == 2: # PASSが発生した場合
+            pass_objects.append(self.game_canvas.create_rectangle(
+                self.canvas_width // 2 - 147, self.canvas_height // 2 - 72,
+                self.canvas_width // 2 + 153, self.canvas_height // 2 + 78,
+                fill = "#FFFFFF"
+                ))
+            pass_objects.append(self.game_canvas.create_text(
+                self.canvas_width // 2 + 3, self.canvas_height // 2 - 13,
+                anchor="center",
+                font=(self.font_name, 100),
+                fill="#0000FF",
+                text="PASS",
+                ))
+            self.par.after(2000//self.time_len_coef, self.canvas_quit)
+            self.par.mainloop()
+        for x in pass_objects:
+            self.game_canvas.delete(x)
 
 
     def cell_click(self, event):

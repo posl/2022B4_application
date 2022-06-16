@@ -3,9 +3,9 @@ from random import choices, sample
 import numpy as np
 
 from inada_framework import Model, cuda, optimizers, no_train
-from drl_utilities import SelfMatch, eval_computer
 import inada_framework.layers as dzl
 from inada_framework.functions import relu, flatten, softmax, log
+from drl_utilities import SelfMatch, eval_computer, get_absolute_action
 from board import Board
 
 
@@ -170,55 +170,37 @@ def fit_reinforce_agent(episodes = 10000, restart = False):
 # =============================================================================
 
 class ReinforceComputer:
-    def __init__(self, action_size, file_name = "reinforce", to_gpu = False):
+    def __init__(self, action_size, limit_time = 5, file_name = "reinforce"):
         self.action_size = action_size
+        self.limit_time = limit_time
         self.file_path = Reinforce.get_path(file_name).format("parameters")
-        self.use_gpu = to_gpu and cuda.gpu_enable
         self.reset()
 
     def reset(self):
         file_path = self.file_path
-
         each_pi = []
+        self.each_pi = each_pi
+
         for i in sample(range(5), 3):
             pi = PolicyNet(self.action_size)
             pi.load_weights(f"{file_path}-{i}.npz")
-            if self.use_gpu:
-                pi.to_gpu()
-
             each_pi.append(pi)
-        self.each_pi = each_pi
 
     def __call__(self, board):
-        placable = board.list_placable()
-        if len(placable) == 1:
-            return placable[0]
+        action = get_absolute_action(board, self.limit_time)
+        if isinstance(action, list):
+            placable = action
+            mask = np.array(placable)
+            state = board.get_img()[None, :]
 
-        for action in placable:
-            with board.log_runtime():
-                board.put_stone(action)
-                flag = board.can_continue()
+            with no_train():
+                probs = 0
+                for pi in self.each_pi:
+                    policy = pi(state)[:, mask]
+                    probs += softmax(policy).data[0]
 
-                if not flag:
-                    result = board.black_num - board.white_num
-                    is_win = (result > 0) if board.turn else (result < 0)
-
-                    # 必ず勝つ手が存在するならば、そこに置く
-                    if is_win:
-                        return action
-
-        xp = cuda.cp if self.use_gpu else np
-        state = board.get_img(xp)[None, :]
-        mask = np.array(placable)
-
-        with no_train():
-            probs = 0
-            for pi in self.each_pi:
-                policy = pi(state)[:, mask]
-                probs += softmax(policy).data[0]
-
-        # 複数人のエージェントが意見を出し合って、確率的サンプリングで行動を決める
-        action = choices(placable, probs)[0]
+            # 複数人のエージェントが意見を出し合って、確率的サンプリングで行動を決める
+            action = choices(placable, probs)[0]
         return action
 
 
