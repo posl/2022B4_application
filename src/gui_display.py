@@ -354,6 +354,8 @@ class GamePage(Page):
 
 
     def canvas_update(self, flag, n):
+        if flag == 2:
+            pass
         self.__canvas_update(n)
         return self.stone_counter_update()
 
@@ -505,7 +507,7 @@ class GamePage(Page):
         self.white_conter_label.configure(text=format(wnum, "02d") )
 
         alphazero_brate = self.get_alphazero_rate()
-        brate = alphazero_brate if self.use_alphazero else bnum / (bnum + wnum)
+        brate = alphazero_brate if self.value_kind else bnum / (bnum + wnum)
 
         self.counter_bar.delete("all")
         bw_bounder_x = int((self.canvas_width + 10) * brate)
@@ -528,7 +530,7 @@ class GamePage(Page):
         turn = board.turn
 
         board_img = board.get_img()
-        value = self.alphazero_model(board_img[None, :])
+        value = self.alphazero_model.get_rate(board_img[None, :])
         rate = (value + 1.) / 2.
 
         return rate if turn else (1. - rate)
