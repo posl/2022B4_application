@@ -91,15 +91,15 @@ class PlayerKinds:
 
         A = Board.action_size
 
-        self.kinds_name.append("Reinforce")
+        self.kinds_name.append("Reinforce + NegaAlpha")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( ReinforceComputer )
-        self.kinds_args.append( [ (A, 0.5), (A, 2), (A, 5) ] )
+        self.kinds_args.append( [ (A, 1), (A, 3), (A, 6) ] )
 
-        self.kinds_name.append("RainBow")
+        self.kinds_name.append("RainBow + NegaAlpha")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( RainbowComputer )
-        self.kinds_args.append( [ (A, 0.5), (A, 2), (A, 5) ] )
+        self.kinds_args.append( [ (A, 1), (A, 3), (A, 6) ] )
 
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
@@ -169,9 +169,6 @@ class StartPage(Page):
         #self.button2.place(x=200, y=270)
 
     def goto_option_page(self):
-        self.par.option_page.set_player_kinds()
-        self.par.option_page.combobox1_changed()
-        self.par.option_page.combobox2_changed()
         self.par.change_page(1)
 
 
@@ -186,7 +183,7 @@ class OptionPage(Page):
 
         self.combo_menus = ["---"]
         self.combo_menus2 = ("x1", "x2", "x3", "x4")
-        self.combo_menus3 = ("石の数", "α０の評価値")
+        self.combo_menus3 = ("石の数", "アルファゼロの勝率")
 
         self.label1 = tk.Label(self, text="Player1", fg="#999999", font = (self.font_name, 30))
         self.label1.place(x=10, y=30)
@@ -232,6 +229,21 @@ class OptionPage(Page):
         # 設定情報
         self.player_kinds = PlayerKinds()
 
+        # 初期設定
+        self.set_player_kinds()
+        self.combobox1_changed()
+        self.combobox2_changed()
+
+
+    def set_player_kinds(self):
+        n = self.player_kinds.get_num()
+        self.combo_menus.clear()
+        for i in range(n):
+            self.combo_menus.append(self.player_kinds.get_name(i))
+        self.combobox1["values"] = self.combo_menus
+        self.combobox2["values"] = self.combo_menus
+        self.combobox1.current(0)
+        self.combobox2.current(0)
 
     def combobox1_changed(self):
         n = self.combobox1.current()
@@ -241,7 +253,7 @@ class OptionPage(Page):
             self.combobox3["values"] = ["1"]
             self.combobox3.current(0)
         else:
-            self.combobox3.place(x=630)
+            self.combobox3.place(x = 630)
             self.combo_menus.clear()
             for i in range(n):
                 self.combo_menus.append("難易度"+str(i+1))
@@ -263,15 +275,6 @@ class OptionPage(Page):
             self.combobox4["values"] = self.combo_menus
             self.combobox4.current(0)
 
-    def set_player_kinds(self):
-        n = self.player_kinds.get_num()
-        self.combo_menus.clear()
-        for i in range(n):
-            self.combo_menus.append(self.player_kinds.get_name(i))
-        self.combobox1["values"] = self.combo_menus
-        self.combobox2["values"] = self.combo_menus
-        self.combobox1.current(0)
-        self.combobox2.current(0)
 
     # ゲームの設定を有効化
     def game_config_validate(self):
@@ -292,10 +295,10 @@ class OptionPage(Page):
         s = name1
         if self.player_kinds.get_lvnum(player1_id)>1:
             s += str(" Lv." + str(player1_diff+1))
-        s += "(黒)    vs    " + name2
+        s += " (黒)    vs    " + name2
         if self.player_kinds.get_lvnum(player2_id)>1:
             s += str(" Lv." + str(player2_diff+1))
-        s += "(白)"
+        s += " (白)"
         self.par.title(s)
 
         value_kind = self.combobox6.current()

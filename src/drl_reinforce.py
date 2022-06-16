@@ -170,7 +170,7 @@ def fit_reinforce_agent(episodes = 10000, restart = False):
 # =============================================================================
 
 class ReinforceComputer:
-    def __init__(self, action_size, limit_time = 5, file_name = "reinforce"):
+    def __init__(self, action_size, limit_time = 1, file_name = "reinforce"):
         self.action_size = action_size
         self.limit_time = limit_time
         self.file_path = Reinforce.get_path(file_name).format("parameters")

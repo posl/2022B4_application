@@ -204,6 +204,9 @@ cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag,
         uint mask, legal_board, put
         int value, n = 0
 
+    if time(NULL) > limit_time:
+        return -100
+
     legal_board = __get_legal_board(move_player, opposition_player)
 
     if legal_board == 0:
@@ -214,16 +217,13 @@ cdef inline int __nega_alpha(uint move_player, uint opposition_player, int flag,
             return - __nega_alpha(opposition_player, move_player, 1, limit_time)
 
     while legal_board:
-        if time(NULL) > limit_time:
-            return -100
-
         if legal_board & 1:
             put =  <uint>1 << n
             mask = __get_reverse_board(put, move_player, opposition_player)
 
-            value = - __nega_alpha(opposition_player ^ mask, move_player ^ mask ^ put, 0, limit_time)
+            value = - __nega_alpha(opposition_player ^ mask, move_player ^ (mask | put), 0, limit_time)
 
-            if value == 100:
+            if (value == 100) or (value == -100):
                 return -100
 
             if value > 0:

@@ -693,7 +693,7 @@ def fit_rainbow_agent(episodes = 150000, restart = False):
 # =============================================================================
 
 class RainbowComputer:
-    def __init__(self, action_size, limit_time = 5, quantiles_num = 50, file_name = "rainbow"):
+    def __init__(self, action_size, limit_time = 1, quantiles_num = 50, file_name = "rainbow"):
         self.limit_time = limit_time
         file_path = Rainbow.get_path(f"{file_name}.npz").format("parameters")
 
