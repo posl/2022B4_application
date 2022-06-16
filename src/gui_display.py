@@ -633,12 +633,24 @@ class ResultPage(Page):
 
     def graph_draw(self):
         self.cur = 0
-        states, brates = self.board.log_list, self.board.brate_list
+        states, brates_ = self.board.log_list, self.board.brate_list
+        brates = []
         num = len(states)
         turn_width = 1.0 * self.stonenum_canvas_width / num
         turn_height = 1.0 * self.stonenum_canvas_height / 64
         self.stonenum_canvas.delete("all")
         self.stonenum_canvas.create_rectangle(0, 0, self.stonenum_canvas_width, self.stonenum_canvas_height, fill="#55FF88")
+        bvx = 0
+        bvy = 0
+        for i in range(num):
+            n_ = 0
+            m_ = 0.0
+            for j in range(4):
+                if (i-j)<0:
+                    break
+                n_ += 1
+                m_ += brates_[i-j]
+            brates.append(m_/n_)
         for i in range(num):
             state = states[i]
             state_b = state[0]
@@ -651,6 +663,13 @@ class ResultPage(Page):
             bound_wg_y = float(turn_height*(64-wnum))
             self.stonenum_canvas.create_rectangle(left_x, 0, right_x, bound_bg_y, fill="#111111")
             self.stonenum_canvas.create_rectangle(left_x, bound_wg_y, right_x, self.stonenum_canvas_height, fill="#EEEEEE")
+        for i in range(num):
+            avx = float(turn_width*(i+0.5)+1)
+            avy = int(5+(self.stonenum_canvas_height-5) * (1.0-brates[i]))
+            if i>0:
+                self.stonenum_canvas.create_line(bvx, bvy, avx, avy, fill="#FF1010", width=4)
+            bvx = avx
+            bvy = avy
         self.stonenum_canvas.create_line(0, self.stonenum_canvas_height//2, self.stonenum_canvas_width, self.stonenum_canvas_height//2, fill="#FF0000")
         self.curline1 = self.stonenum_canvas.create_line(-10, 0, -10, self.stonenum_canvas_height, fill="#0000FF")
         self.curline2 = self.stonenum_canvas.create_line(0, -10, turn_width-2, -10, fill="#0000FF")
