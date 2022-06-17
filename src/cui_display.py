@@ -7,7 +7,7 @@ from mc_primitive import PrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
-from drl_alphazero import AlphaZeroComputer, PolicyValueNet, play
+from drl_alphazero import AlphaZeroComputer
 
 
 
@@ -50,7 +50,6 @@ class CuiBoard(Board):
         player_kind = [ "人間", 
                         "ランダム", 
                         "MC木探索", 
-                        "MC木探索 + ルート並列化", 
                         "原始MC法", 
                         "AlphaBeta", 
                         "Reinforce + NegaAlpha", 
@@ -59,7 +58,6 @@ class CuiBoard(Board):
         player_class = [ Human, 
                          Random, 
                          MonteCarloTreeSearch, 
-                         RootPalallelMonteCarloTreeSearch, 
                          PrimitiveMonteCarlo, 
                          AlphaBeta, 
                          ReinforceComputer, 
@@ -68,7 +66,6 @@ class CuiBoard(Board):
         player_diff = [ [ () ], 
                         [ () ], 
                         [ (1024, ), (4096, ), (16384, ) ], 
-                        [ (5000, ), (10000, ), (20000, ) ], 
                         [ (256, ), (1024, ), (4096, ) ], 
                         [ (0, 5), (0, 6), (1, 6) ], 
                         [ (A, 1), (A, 3), (A, 6) ], 
@@ -84,18 +81,20 @@ class CuiBoard(Board):
             try:
                 player_id = int(input())
                 if 0 <= player_id < len(player_kind):
+                    name = player_kind[player_id]
                     break
                 else:
                     print("\nOut-of-Range ERROR! you should input 0 - {}".format(len(player_kind) - 1))
             except:
                 print("\nERROR! You should input number.")
         
-        print("\nSelect CPU's difficualty. Plz input 1 - 3.")
+        print("\nSelect CPU's level. Plz input 1 - 3.")
         if player_id >= 2:
             while 1:
                 try:
                     diff = int(input())
                     if 1 <= diff <= 3:
+                        name += "Lv" + str(diff)
                         break
                     else:
                         print("Out-of-range ERROR! you should input 1 - 3")
@@ -104,9 +103,9 @@ class CuiBoard(Board):
         else:
             diff = 1
 
-        print("\nOk. player{} is selected of {}, difficulty {}.".format(one_or_two, player_kind[player_id], diff))
+        print("\nOk. player{} is {}, level {}.".format(one_or_two, player_kind[player_id], diff))
 
-        return player_class[player_id](*player_diff[player_id][diff - 1])
+        return player_class[player_id](*player_diff[player_id][diff - 1]), name
 
 
     def print_board(self):
@@ -117,12 +116,13 @@ class CuiBoard(Board):
         placable = self.list_placable()
         
         print("\x1b[2J")
-
-        print("BLACK : {}  WHITE : {}".format(self.black_num, self.white_num))
+        
+        print("(⚫️){}  {}  -  {}  {}(⚪️)".format(self.player1_name, self.black_num, self.white_num, self.player2_name))
+        #print("⚫️  {} - {}  ⚪️".format(self.black_num, self.white_num))
         if self.turn:
-            print("turn : player1(⚫️)\n")
+            print("turn : ⚫️\n")
         else:
-            print("turn : player2(⚪️)\n")
+            print("turn : ⚪️\n")
 
 
         print(STR_ABC)
@@ -137,8 +137,8 @@ class CuiBoard(Board):
                 else:
                     if 8 * i + j in placable:
                         #s += "❌"
-                        s += "＋"
-                        #s += "＊" 
+                        #s += "＋"
+                        s += "＊"
                     else:
                         s += "・"
                 black >>= 1
@@ -171,8 +171,8 @@ class CuiBoard(Board):
         print("OTHELLO GAME!\n")
 
 
-        player1 = self.select_players(1)
-        player2 = self.select_players(2)
+        player1, self.player1_name = self.select_players(1)
+        player2, self.player2_name = self.select_players(2)
         
         self.set_plan(player1, player2)
 
@@ -181,11 +181,11 @@ class CuiBoard(Board):
         self.game()
         
         if self.black_num > self.white_num:
-            print("BLACK WIN!!!")
+            print("player1(⚫️) WIN!!!")
         elif self.black_num < self.white_num:
-            print("WHITE WIN!!!")
+            print("player2(⚪️) WIN!!!")
         else:
-             print("DRAW!")       
+            print("DRAW!")
 
 
 def main():
@@ -194,13 +194,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
