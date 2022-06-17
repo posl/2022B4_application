@@ -943,5 +943,5 @@ if __name__ == "__main__":
     # arena.fit(restart = False)
 
     # 評価用コード
-    eval_alphazero_computer(index = None)
+    eval_alphazero_computer(index = 8)
     comp_alphazero_computer()
