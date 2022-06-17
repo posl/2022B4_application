@@ -7,7 +7,7 @@ from mc_primitive import PrimitiveMonteCarlo
 from gt_alpha_beta import AlphaBeta
 from drl_rainbow import RainbowComputer
 from drl_reinforce import ReinforceComputer
-from drl_alphazero import AlphaZeroComputer, PolicyValueNet, play
+from drl_alphazero import AlphaZeroComputer
 
 
 
@@ -90,7 +90,7 @@ class CuiBoard(Board):
             except:
                 print("\nERROR! You should input number.")
         
-        print("\nSelect CPU's difficualty. Plz input 1 - 3.")
+        print("\nSelect CPU's level. Plz input 1 - 3.")
         if player_id >= 2:
             while 1:
                 try:
@@ -104,7 +104,7 @@ class CuiBoard(Board):
         else:
             diff = 1
 
-        print("\nOk. player{} is selected of {}, difficulty {}.".format(one_or_two, player_kind[player_id], diff))
+        print("\nOk. player{} is {}, level {}.".format(one_or_two, player_kind[player_id], diff))
 
         return player_class[player_id](*player_diff[player_id][diff - 1])
 
@@ -118,11 +118,11 @@ class CuiBoard(Board):
         
         print("\x1b[2J")
 
-        print("BLACK : {}  WHITE : {}".format(self.black_num, self.white_num))
+        print("player1(⚫️) : {}  player2(⚪️) : {}".format(self.black_num, self.white_num))
         if self.turn:
-            print("turn : player1(⚫️)\n")
+            print("turn : ⚫️\n")
         else:
-            print("turn : player2(⚪️)\n")
+            print("turn : ⚪️\n")
 
 
         print(STR_ABC)
@@ -136,9 +136,9 @@ class CuiBoard(Board):
                     s += "⚪️"
                 else:
                     if 8 * i + j in placable:
-                        #s += "❌"
-                        s += "＋"
-                        #s += "＊" 
+                        s += "❌"
+                        #s += "＋"
+                        #s += "＊"
                     else:
                         s += "・"
                 black >>= 1
@@ -181,11 +181,11 @@ class CuiBoard(Board):
         self.game()
         
         if self.black_num > self.white_num:
-            print("BLACK WIN!!!")
+            print("player1(⚫️) WIN!!!")
         elif self.black_num < self.white_num:
-            print("WHITE WIN!!!")
+            print("player2(⚪️) WIN!!!")
         else:
-             print("DRAW!")       
+            print("DRAW!")
 
 
 def main():
