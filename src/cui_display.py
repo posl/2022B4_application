@@ -50,7 +50,6 @@ class CuiBoard(Board):
         player_kind = [ "人間", 
                         "ランダム", 
                         "MC木探索", 
-                        "MC木探索 + ルート並列化", 
                         "原始MC法", 
                         "AlphaBeta", 
                         "Reinforce + NegaAlpha", 
@@ -59,7 +58,6 @@ class CuiBoard(Board):
         player_class = [ Human, 
                          Random, 
                          MonteCarloTreeSearch, 
-                         RootPalallelMonteCarloTreeSearch, 
                          PrimitiveMonteCarlo, 
                          AlphaBeta, 
                          ReinforceComputer, 
@@ -68,7 +66,6 @@ class CuiBoard(Board):
         player_diff = [ [ () ], 
                         [ () ], 
                         [ (1024, ), (4096, ), (16384, ) ], 
-                        [ (5000, ), (10000, ), (20000, ) ], 
                         [ (256, ), (1024, ), (4096, ) ], 
                         [ (0, 5), (0, 6), (1, 6) ], 
                         [ (A, 1), (A, 3), (A, 6) ], 
@@ -197,13 +194,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
