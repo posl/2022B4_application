@@ -183,12 +183,12 @@ GUI の環境構築をしていない場合でも、コンソール入出力の�
 
 <br>
 
-　ただ、linux 系 OS 上で実行する場合、GPU に対応させつつ、１コマンドで実行する方法はある。
+　ただ、linux 系 OS 上で実行する場合、GPU に対応させつつ、１コマンドで実行する方法はあるにはある。
 
-(参考: https://towardsdatascience.com/empowering-docker-using-tkinter-gui-bf076d9e4974)
+　(参考: https://towardsdatascience.com/empowering-docker-using-tkinter-gui-bf076d9e4974)
 
 <br>
 
 　また、linux 系 OS 以外の上で実行する場合でも、XQuartz (X11) をデスクトップの環境にインストールし、適切な設定を施せば、実行できないことはない。
 
-(参考: http://blog.eszett-design.com/2020/10/dockerpythontkinter.html)
+　(参考: http://blog.eszett-design.com/2020/10/dockerpythontkinter.html)
