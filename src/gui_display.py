@@ -1,7 +1,7 @@
 import os
 import tkinter as tk
 import tkinter.ttk as ttk
-from random import choice, randrange
+from random import choice
 
 # pygame のウェルカムメッセージを表示させないための設定
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
@@ -39,7 +39,7 @@ class Human:
         return self.player(board)
 
 
-class ComRand:
+class Random:
     def __call__(self, board):
         return choice(board.list_placable())
 
@@ -66,7 +66,7 @@ class PlayerKinds:
 
         self.kinds_name.append("ランダム")
         self.kinds_difficulty.append(1)
-        self.kinds_class.append( ComRand )
+        self.kinds_class.append( Random )
         self.kinds_args.append( [ () ] )
 
         self.kinds_name.append("MC木探索")
@@ -87,7 +87,7 @@ class PlayerKinds:
         self.kinds_name.append("AlphaBeta")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaBeta )
-        self.kinds_args.append( [ (0, 5), (0, 6), (1, 6) ] )
+        self.kinds_args.append( [ (0, 4), (1, 4), (0, 6) ] )
 
         A = Board.action_size
 
@@ -104,7 +104,7 @@ class PlayerKinds:
         self.kinds_name.append("AlphaZero")
         self.kinds_difficulty.append(3)
         self.kinds_class.append( AlphaZeroComputer )
-        self.kinds_args.append( [ (A, randrange(5), 50), (A, randrange(5, 10), 200), (A, 8) ] )
+        self.kinds_args.append( [ (A, 8, 50), (A, 8, 200), (A, 8) ] )
 
     def get_lvnum(self, id):
         return len(self.kinds_args[id])
