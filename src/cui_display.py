@@ -84,6 +84,7 @@ class CuiBoard(Board):
             try:
                 player_id = int(input())
                 if 0 <= player_id < len(player_kind):
+                    name = player_kind[player_id]
                     break
                 else:
                     print("\nOut-of-Range ERROR! you should input 0 - {}".format(len(player_kind) - 1))
@@ -96,6 +97,7 @@ class CuiBoard(Board):
                 try:
                     diff = int(input())
                     if 1 <= diff <= 3:
+                        name += "Lv" + str(diff)
                         break
                     else:
                         print("Out-of-range ERROR! you should input 1 - 3")
@@ -106,7 +108,7 @@ class CuiBoard(Board):
 
         print("\nOk. player{} is {}, level {}.".format(one_or_two, player_kind[player_id], diff))
 
-        return player_class[player_id](*player_diff[player_id][diff - 1])
+        return player_class[player_id](*player_diff[player_id][diff - 1]), name
 
 
     def print_board(self):
@@ -117,8 +119,9 @@ class CuiBoard(Board):
         placable = self.list_placable()
         
         print("\x1b[2J")
-
-        print("player1(⚫️) : {}  player2(⚪️) : {}".format(self.black_num, self.white_num))
+        
+        print("(⚫️){}  {}  -  {}  {}(⚪️)".format(self.player1_name, self.black_num, self.white_num, self.player2_name))
+        #print("⚫️  {} - {}  ⚪️".format(self.black_num, self.white_num))
         if self.turn:
             print("turn : ⚫️\n")
         else:
@@ -136,9 +139,9 @@ class CuiBoard(Board):
                     s += "⚪️"
                 else:
                     if 8 * i + j in placable:
-                        s += "❌"
+                        #s += "❌"
                         #s += "＋"
-                        #s += "＊"
+                        s += "＊"
                     else:
                         s += "・"
                 black >>= 1
@@ -171,8 +174,8 @@ class CuiBoard(Board):
         print("OTHELLO GAME!\n")
 
 
-        player1 = self.select_players(1)
-        player2 = self.select_players(2)
+        player1, self.player1_name = self.select_players(1)
+        player2, self.player2_name = self.select_players(2)
         
         self.set_plan(player1, player2)
 
