@@ -410,23 +410,29 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     now = datetime.now(tz = JST)
 
     # 評価結果はマークダウンの表形式でファイルに出力する
-    with open(file_path, "w+") as f:
-        print(f"# {com_name} Lv.1", file = f)
-        print("| Opponent | ~ | Black | White |", file = f)
-        print("| :-: | -: | :-: | :-: |", file = f)
+    md_str = ""
+    md_str += f"# {com_name} Lv.1\n"
+    md_str += "| Opponent | ~ | Black | White |\n"
+    md_str += "| :-: | -: | :-: | :-: |\n"
 
-        start = time()
-        for __ in range(len(enemys)):
-            name, enemy = enemys.pop()
-            print(f"vs. {name}")
+    start = time()
+    for __ in range(len(enemys)):
+        name, enemy = enemys.pop()
+        print(f"vs. {name}")
 
-            win_rates = arena.eval(enemy, valid_flag = True)
-            print("| {} | ~ | {} % | {} % |".format(name, *win_rates), file = f)
+        win_rates = arena.eval(enemy, valid_flag = True)
+        md_str += "| {} | ~ | {} % | {} % |\n".format(name, *win_rates)
 
-            # かかった時間の画面表示
-            finish = time()
-            print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
-            start = finish
+        # かかった時間の画面表示
+        finish = time()
+        print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
+        start = finish
 
-        # ファイル作成時刻をタイムスタンプとして書き込む (改竄防止の為)
-        print("- " + now.strftime("%Y / %m / %d / %H: %M: %S"), file = f)
+    # ファイル作成時刻をタイムスタンプとして書き込む (改竄防止の為)
+    md_str += "\n- "
+    md_str += now.strftime("%Y / %m / %d / %H: %M: %S")
+    md_str += "\n<br>\n<br>\n"
+
+    # 途中の結果が残らないように、ファイルへの反映はまとめて行う
+    with open(file_path, "a+") as f:
+        print(md_str, file = f)

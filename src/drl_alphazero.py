@@ -668,7 +668,7 @@ class AlphaZero:
 
 
     @staticmethod
-    def eval(weights, simulations = 100, enemy = AlphaBeta()):
+    def eval(weights, simulations = 800, enemy = AlphaBeta()):
         N = 20
         population = range(N * 1024)
 

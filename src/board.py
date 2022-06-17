@@ -345,3 +345,13 @@ class Board:
 
             if render_flag:
                 render_func(mask, flag, n)
+
+
+
+
+def main():
+    board = Board()
+
+
+if __name__ == "__main__":
+    main()

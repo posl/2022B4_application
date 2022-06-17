@@ -1,10 +1,14 @@
 # REINFORCE Lv.1
 | Opponent | ~ | Black | White |
 | :-: | -: | :-: | :-: |
-| Simple Plan | ~ | 95 % | 85 % |
-| Corners Plan | ~ | 70 % | 75 % |
-| MC Primitive Lv.1 | ~ | 10 % | 15 % |
-| MCTS Lv.1 | ~ | 5 % | 0 % |
-| Alpha Beta Lv.1 | ~ | 0 % | 5 % |
-| Rainbow Lv.1 | ~ | 20 % | 15 % |
-- 2022 / 06 / 12 / 03: 39: 17
+| Simple Plan | ~ | 100 % | 90 % |
+| Corners Plan | ~ | 100 % | 95 % |
+| MC Primitive Lv.1 | ~ | 60 % | 75 % |
+| MCTS Lv.1 | ~ | 55 % | 65 % |
+| Alpha Beta Lv.1 | ~ | 5 % | 15 % |
+| Rainbow Lv.1 | ~ | 50 % | 80 % |
+
+- 2022 / 06 / 17 / 03: 41: 10
+<br>
+<br>
+
