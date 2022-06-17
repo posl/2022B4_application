@@ -337,7 +337,7 @@ class SelfMatch:
             board.set_plan(*plans)
 
             if valid_flag:
-                n_gen = tqdm(range(20), desc = "first" if turn else "second", leave = False)
+                n_gen = tqdm(range(100), desc = "first" if turn else "second", leave = False)
             else:
                 n_gen = range(100)
 
@@ -383,11 +383,6 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
     file_path = SelfMatch.get_path(f"{name}.md").format("graphs")
     make_dir_exist(file_path)
 
-    # ファイルの作成時刻で改竄していないことを証明できるように、元々あったファイルは削除する
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
-
     # 環境
     board = Board()
 
@@ -428,7 +423,7 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
         print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
         start = finish
 
-    # ファイル作成時刻をタイムスタンプとして書き込む (改竄防止の為)
+    # 評価開始時刻をタイムスタンプとして書き込む
     md_str += "\n- "
     md_str += now.strftime("%Y / %m / %d / %H: %M: %S")
     md_str += "\n<br>\n<br>\n"
