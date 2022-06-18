@@ -80,7 +80,7 @@ class CuiBoard(Board):
         self.yn_dict = {"yes": 1, "y": 1, "no": 0, "n": 0}
 
 
-    def select_players(self, is_first):
+    def select_player(self, is_first):
         players, names = self.players, self.names
         repr = "先攻" if is_first else "後攻"
 
@@ -140,8 +140,8 @@ class CuiBoard(Board):
         play_flag = 1
         while play_flag:
             # コンソールの標準入力を用いた、プレイヤーの設定
-            player1, name1 = self.select_players(is_first = True)
-            player0, name0 = self.select_players(is_first = False)
+            player1, name1 = self.select_player(is_first = True)
+            player0, name0 = self.select_player(is_first = False)
             self.set_plan(player1, player0)
 
             # 画面表示で、先攻・後攻のプレイヤーを示す時に使う文字列を設定する
