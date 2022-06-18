@@ -12,9 +12,9 @@ args = parser.parse_args()
 if args.host:
     from dp_network import main
 elif args.console:
-    from dp_cui import main
+    from dp_console import main
 else:
-    from dp_gui import main
+    from dp_graphical import main
 
 
 try:
