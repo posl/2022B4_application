@@ -1,7 +1,6 @@
 from random import random, choice
 from os.path import join, dirname
 from time import time
-import os
 from datetime import timedelta, timezone, datetime
 
 import numpy as np
@@ -276,8 +275,8 @@ class SelfMatch:
                             pbar.set_postfix(dict(caution = "\"Don't suspend right now, please.\""))
 
                             # エージェントの評価 (合計 100 回)
-                            win_rates = self.eval()
-                            history[:, eval_q - 1] += win_rates
+                            black_wins, white_wins = self.eval()
+                            history[:, eval_q - 1] += black_wins, white_wins
 
                             # 学習再開に必要な情報の保存 (合計 100 回)
                             pbar.set_description(f"now saving")
@@ -286,13 +285,13 @@ class SelfMatch:
                             np.save(f"{is_yet_path}_history.npy", history)
 
                             pbar.set_description(f"run {run}")
-                            pbar.set_postfix(dict(rates = "({}%, {}%)".format(*win_rates)))
+                            pbar.set_postfix(dict(rates = f"({black_wins}%, {white_wins}%)"))
 
                 # パラメータの最終保存・評価結果の表示
                 if restart <= episodes:
                     self.save(params_path, index = run - 1 if runs > 1 else None)
-                    print("{:>3} || {:>3} % | {:>3} %".format(run, *win_rates), end = "   ")
-                    print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
+                    print(f"{run:>3} || {black_wins:>3} % | {white_wins:>3} %", end = "   ")
+                    print(f"({((time() - start_time) / 60.):.5g} min elapsed)")
 
                 restart = 1
 
@@ -354,8 +353,6 @@ class SelfMatch:
                 result = board.black_num - board.white_num
                 win_count += (result > 0) if turn else (result < 0)
 
-            if valid_flag:
-                win_count *= 5
             win_rates.append(win_count)
         return win_rates
 
@@ -415,12 +412,12 @@ def eval_computer(com_class, com_name: str, enemys: list = []):
         name, enemy = enemys.pop()
         print(f"vs. {name}")
 
-        win_rates = arena.eval(enemy, valid_flag = True)
-        md_str += "| {} | ~ | {} % | {} % |\n".format(name, *win_rates)
+        black_wins, white_wins = arena.eval(enemy, valid_flag = True)
+        md_str += f"| {name} | ~ | {black_wins} % | {white_wins} % |\n"
 
         # かかった時間の画面表示
         finish = time()
-        print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
+        print(f"done!  (took {((finish - start) / 60.):5g} minutes)")
         start = finish
 
     # 評価開始時刻をタイムスタンプとして書き込む

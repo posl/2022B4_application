@@ -632,15 +632,15 @@ class AlphaZero:
 
                         # パラメータの保存 (合計 10 回)
                         if not save_r:
-                            network.save_weights(params_path + "-{}.npz".format(save_q - 1))
+                            network.save_weights(f"{params_path}-{save_q - 1}.npz")
 
                         # エージェントの評価 (合計 100 回)
-                        win_rates = self.eval(weights)
-                        history[:, eval_q - 1] = win_rates
-                        print("{:>6} % || {:>3} % | {:>3} %".format(eval_q, *win_rates), end = "   ")
+                        black_wins, white_wins = self.eval(weights)
+                        history[:, eval_q - 1] = black_wins, white_wins
+                        print(f"{eval_q:>6} % || {black_wins:>3} % | {white_wins:>3} %", end = "   ")
 
                         # 累計経過時間の表示
-                        print("({:.5g} min elapsed)".format((time() - start_time) / 60.))
+                        print(f"({((time() - start_time) / 60.):.5g} min elapsed)")
 
 
                 # 途中再開に必要な暫定の情報を上書きする
@@ -760,10 +760,12 @@ def eval_alphazero_computer(index = None):
         for i, simulations in enumerate(sims_array):
             win_rates = AlphaZero.eval(weights, simulations, enemy)
             bar_record[:, i] = win_rates
-            print("{:>4} || {:>3} % | {:>3} %".format(simulations, *win_rates))
+
+            black_wins, white_wins = win_rates
+            print(f"{simulations:>4} || {black_wins:>3} % | {white_wins:>3} %")
 
         finish = time()
-        print("done!  (took {:5g} minutes)".format((finish - start) / 60.))
+        print(f"done!  (took {((finish - start) / 60.):5g} minutes)")
         start = finish
 
 
@@ -863,7 +865,7 @@ def comp_alphazero_computer():
             results[couple] += result
             pbar.update(1)
 
-    print("done!  (took {:5g} minutes)".format((time() - start) / 60.))
+    print(f"done!  (took {((time() - start) / 60.):5g} minutes)")
 
 
     # 図の生成
@@ -898,7 +900,7 @@ def comp_alphazero_computer():
 
     # コンピュータそれぞれの学習の進捗率を示す列を追加
     for i in range(1, HW):
-        progress = "{} %".format(10 * i)
+        progress = f"{10 * i} %"
         ax.text(0.5, (N - i) + 0.35, progress, ha = "center", size = "small")
         ax.text(i + 0.5, N + 0.35, progress, ha = "center", size = "small")
 
