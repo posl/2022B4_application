@@ -82,12 +82,12 @@ class CuiBoard(Board):
 
     def select_player(self, is_first):
         players, names = self.players, self.names
-        repr = "先攻" if is_first else "後攻"
+        repr = "先攻 (⚫️)" if is_first else "後攻 (⚪️)"
 
         N = len(players)
         M = N - 1
 
-        desc = f"次の形式で、{repr}のプレイヤーを指定してください。([0-{M}] e.g. {randrange(N)})"
+        desc = f"次の形式で、{repr} のプレイヤーを指定してください。([0-{M}] e.g. {randrange(N)})"
         player_id = self.input_additional(desc, names, N)
         (cls, args), name = players[player_id], names[player_id]
 
@@ -146,8 +146,8 @@ class CuiBoard(Board):
 
             # 画面表示で、先攻・後攻のプレイヤーを示す時に使う文字列を設定する
             maxlen = max(len(name1), len(name0))
-            self.str_player1 = f"先攻(⚫️):  {name1.ljust(maxlen)}"
-            self.str_player0 = f"後攻(⚪️):  {name0.ljust(maxlen)}"
+            self.str_player1 = f"先攻 (⚫️):  {name1.ljust(maxlen)}"
+            self.str_player0 = f"後攻 (⚪️):  {name0.ljust(maxlen)}"
 
             # オセロボードの初期化
             self.reset()
@@ -172,9 +172,9 @@ class CuiBoard(Board):
             diff = self.black_num - self.white_num
             if diff:
                 if diff > 0:
-                    print(f"\n先攻 \"{name1}\" の勝ち！")
+                    print(f"\n先攻 (⚫️) \"{name1}\" の勝ち！")
                 else:
-                    print(f"\n後攻 \"{name0}\" の勝ち！")
+                    print(f"\n後攻 (⚪️) \"{name0}\" の勝ち！")
             else:
                 print("\n引き分け")
 
