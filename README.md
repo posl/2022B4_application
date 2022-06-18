@@ -183,7 +183,7 @@ GUI の環境構築をしていない場合でも、コンソール入出力の�
 
 <br>
 
-　ただ、linux 系 OS 上で実行する場合、GPU に対応させつつ、１コマンドで実行する方法はあるにはある。
+　ただ、linux 系 OS 上で実行する場合、GUI に対応させつつ、１コマンドで実行する方法はあるにはある。
 
 　(参考: https://towardsdatascience.com/empowering-docker-using-tkinter-gui-bf076d9e4974)
 
