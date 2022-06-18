@@ -14,7 +14,7 @@ from drl_reinforce import ReinforceComputer
 from drl_rainbow import RainbowComputer
 from drl_alphazero import AlphaZeroComputer, PolicyValueNet
 
-from gui_network import NetrorkPlayer
+from dp_network import NetrorkPlayer
 from board import Board
 
 

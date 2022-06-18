@@ -10,11 +10,11 @@ args = parser.parse_args()
 
 
 if args.host:
-    from gui_network import main
+    from dp_network import main
 elif args.console:
-    from cui_display import main
+    from dp_cui import main
 else:
-    from gui_display import main
+    from dp_gui import main
 
 
 try:
