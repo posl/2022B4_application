@@ -143,9 +143,9 @@ GUI の環境構築をしていない場合でも、コンソール入出力の�
 
   一切の環境構築を必要とせず、以下のコマンドのみを発行して、実行する。
   ```
-  docker run -it --rm inadatsukasa/othello
+  docker run -it --rm inadatsukasa/othello.slim
   ```
-  (指定したイメージは Docker Hub にて公開されており、サイズは 550 MB 、スキャンは未実行である。)
+  (指定したイメージは Docker Hub にて公開されており、サイズは 240 MB 、スキャンは未実行である。)
 
 
 <br>
