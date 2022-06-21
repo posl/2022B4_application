@@ -67,10 +67,8 @@ python での実行環境の準備は、以下の手順で行う。
   pipenv update
   ```
   Cython を使って、実行ファイルを生成する。
-
-  (生成場所が変わるので、cd コマンドを推奨する。)
   ```
-  cd ./src/pyx  &&  pipenv run python setup.py build_ext --inplace
+  pipenv run python setup.py build_ext --inplace
   ```
 
 - 自前の python 環境を使う場合
@@ -80,10 +78,8 @@ python での実行環境の準備は、以下の手順で行う。
   pip install -U setuptools pip  &&  pip install -r requirements.txt
   ```
   Cython を使って、実行ファイルを生成する。
-
-  (生成場所が変わるので、cd コマンドを推奨する。)
   ```
-  cd ./src/pyx  &&  python setup.py build_ext --inplace
+  python setup.py build_ext --inplace
   ```
 
 
