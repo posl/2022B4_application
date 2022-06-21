@@ -799,7 +799,11 @@ class Sounds:
 class MainWindow(tk.Tk):
     def __init__(self, board, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        pygame.init()
+
+        # スタイルを ("aqua", "clam", "alt", "default", "classic") から選ぶ
+        styles = ttk.Style()
+        styles.theme_use("classic")
+
         self.board = board
         self.width = 640*2
         self.height = 480*2
@@ -813,9 +817,10 @@ class MainWindow(tk.Tk):
         self.result_page = ResultPage(self, self.board)
         self.change_page(0)
 
-        self.sounds = Sounds()
-
         self.protocol("WM_DELETE_WINDOW", self.on_exit)
+
+        pygame.init()
+        self.sounds = Sounds()
 
     def on_exit(self):
         self.destroy()
