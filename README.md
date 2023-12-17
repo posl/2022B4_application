@@ -188,3 +188,11 @@ GUI の環境構築をしていない場合でも、コンソール入出力の�
 　また、linux 系 OS 以外の上で実行する場合でも、XQuartz (X11) をデスクトップの環境にインストールし、適切な設定を施せば、実行できないことはない。
 
 　(参考: http://blog.eszett-design.com/2020/10/dockerpythontkinter.html)
+
+# 使用素材
+このゲームから素材を取り出して，２次使用することは禁止します．
+
+魔王魂さま（https://maou.audio/）
+TAM Music Factory さま(http://www.tam-music.com)
+
+
